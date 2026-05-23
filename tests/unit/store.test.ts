@@ -1,40 +1,48 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useStore } from '@/store'
 
 describe('Pinia Store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    vi.mock('@tauri-apps/api/core', () => ({
+      invoke: vi.fn(),
+    }))
   })
 
   it('initial state', () => {
     const store = useStore()
-    expect(store.isInitialized).toBe(false)
-    expect(store.name).toBe('')
-    expect(store.version).toContain('0.1.0')
+    expect(store.appName).toBe('')
+    expect(store.appVersion).toBe('')
+    expect(store.appDescription).toBe('')
+    // debug is import.meta.env.MODE === 'development', which is true in vitest
+    expect(typeof store.debug).toBe('boolean')
   })
 
-  it('initApp action', () => {
+  it('isDev getter returns debug state', () => {
     const store = useStore()
-    store.initApp()
-    expect(store.isInitialized).toBe(true)
+    expect(typeof store.isDev).toBe('boolean')
   })
 
-  it('isReady getter returns true when not initialized', () => {
+  it('loadAppMeta loads app metadata', async () => {
+    const { invoke } = await import('@tauri-apps/api/core')
+    vi.mocked(invoke).mockResolvedValue({
+      app: { name: 'TestApp', version: '2.0.0', description: 'A test app' },
+    })
     const store = useStore()
-    expect(store.isReady).toBe(true)
-    store.initApp()
-    expect(store.isReady).toBe(false)
+    await store.loadAppMeta()
+    expect(store.appName).toBe('TestApp')
+    expect(store.appVersion).toBe('2.0.0')
+    expect(store.appDescription).toBe('A test app')
   })
 
-  it('storeGreet getter returns empty when no name', () => {
+  it('loadAppMeta uses defaults on error', async () => {
+    const { invoke } = await import('@tauri-apps/api/core')
+    vi.mocked(invoke).mockRejectedValue(new Error('failed'))
     const store = useStore()
-    expect(store.storeGreet).toBe('')
-  })
-
-  it('storeGreet getter returns greeting when name is set', () => {
-    const store = useStore()
-    store.name = 'Rust'
-    expect(store.storeGreet).toBe('Greetings from Pinia store, Rust!')
+    await store.loadAppMeta()
+    expect(store.appName).toBe('RustVerse')
+    expect(store.appVersion).toBe('0.0.0')
+    expect(store.appDescription).toBe('')
   })
 })

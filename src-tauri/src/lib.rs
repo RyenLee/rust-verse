@@ -35,6 +35,7 @@ use utils::exec::run_command_with_streaming;
 /// Refresh the current process PATH from the Windows Registry.
 #[tauri::command]
 fn refresh_process_path() -> crate::error::AppResult<String> {
+    #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
     let mut added: Vec<String> = Vec::new();
 
     #[cfg(target_os = "windows")]

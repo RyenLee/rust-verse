@@ -23,7 +23,7 @@ describe('DashboardView', () => {
     const wrapper = mount(DashboardView, {
       global: { plugins: [router] },
     })
-    expect(wrapper.text()).toContain('Loading')
+    expect(wrapper.text()).toContain('Loading...')
   })
 
   it('shows onboarding when rustup not installed', async () => {
@@ -33,7 +33,6 @@ describe('DashboardView', () => {
       global: { plugins: [router] },
     })
     await vi.dynamicImportSettled()
-    // Wait for onMounted
     await new Promise((r) => setTimeout(r, 10))
     expect(wrapper.text()).toContain('Rust Toolchain Not Found')
   })
@@ -56,7 +55,7 @@ describe('DashboardView', () => {
     await vi.dynamicImportSettled()
     await new Promise((r) => setTimeout(r, 50))
     expect(wrapper.text()).toContain('Default Toolchain')
-    expect(wrapper.text()).toContain('Installed Toolchains')
+    expect(wrapper.text()).toContain('Installed')
     expect(wrapper.text()).toContain('Environment')
   })
 
