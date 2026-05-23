@@ -4,7 +4,8 @@ version = "1.2.4"
 description = "Rust Toolchain Visual Version Manager"
 authors = ["ryenlii"]
 edition = "2024"
-repository = "https://github.com/RyenLee/rustverse"
+repository = "https://github.com/RyenLee/rust-verse"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

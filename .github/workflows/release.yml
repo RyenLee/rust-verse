@@ -62,7 +62,7 @@ jobs:
         with:
           tagName: v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
           releaseName: "v__VERSION__"
-          releaseBody: "See [CHANGES.md](https://github.com/RyenLee/rustverse/blob/main/CHANGES.md) for a complete list of changes."
+          releaseBody: "See [CHANGES.md](https://github.com/RyenLee/rust-verse/blob/main/CHANGES.md) for a complete list of changes."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
