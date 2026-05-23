@@ -10,6 +10,35 @@ function readVersion() {
   return pkg.version
 }
 
+function readChangesForVersion(version) {
+  const changesPath = path.join(process.cwd(), 'CHANGES.md')
+  try {
+    const content = fs.readFileSync(changesPath, 'utf8')
+    const lines = content.split('\n')
+    const result = []
+    let inVersion = false
+    let bracketCount = 0
+
+    for (const line of lines) {
+      if (line.match(/^## \[.*\]/)) {
+        if (inVersion) break
+        if (line.includes(`[${version}]`)) {
+          inVersion = true
+          continue
+        }
+      }
+      if (inVersion) {
+        result.push(line)
+      }
+    }
+
+    const changes = result.join('\n').trim()
+    return changes || `Release v${version}`
+  } catch {
+    return `Release v${version}`
+  }
+}
+
 function run(cmd, dryRun) {
   if (dryRun) {
     console.log(`[dry-run] ${cmd}`)
@@ -62,10 +91,8 @@ function main() {
   const skipBump = args.includes('--skip-bump')
   const all = !pushTag && !pushMain
 
-  // Extract version argument (first non-flag arg)
   const newVersion = args.find(a => !a.startsWith('-'))
 
-  // Step 1: Stash unstaged changes, then pull latest code
   const beforeStash = getStashCount()
   const hadUnstaged = hasUnstagedChanges()
   if (hadUnstaged) {
@@ -80,7 +107,6 @@ function main() {
   }
   console.log()
 
-  // Step 2: Run bump-version.cjs
   if (!skipBump) {
     console.log('=== Running bump-version ===')
     runBumpVersion(newVersion, dryRun)
@@ -89,20 +115,20 @@ function main() {
 
   const version = readVersion()
   const tag = `v${version}`
+  const changes = readChangesForVersion(version)
 
   console.log(`Version: ${version}`)
   console.log(`Tag: ${tag}`)
+  console.log(`Changes:\n${changes.split('\n').slice(0, 5).join('\n')}${changes.split('\n').length > 5 ? '\n...' : ''}`)
   console.log()
 
-  // Step 3: Commit version bump changes
   if (!skipBump) {
     console.log('=== Committing version bump ===')
     run(`git add -A`, dryRun)
-    run(`git commit -m "chore: bump version to v${version}"`, dryRun)
+    run(`git commit -m "chore: release v${version}"`, dryRun)
     console.log()
   }
 
-  // Step 4: Push to GitHub
   if (all || pushMain) {
     run('git push origin main', dryRun)
   }
@@ -122,7 +148,15 @@ function main() {
       run(`git push origin ${tag}`, dryRun)
     } else {
       console.log(`Creating tag ${tag}...`)
-      run(`git tag ${tag} -m "v${version}"`, dryRun)
+      const tagMessage = `v${version}\n\n${changes}`
+      const tempFile = path.join(process.cwd(), '.tag-msg.tmp')
+      if (!dryRun) {
+        fs.writeFileSync(tempFile, tagMessage)
+      }
+      run(`git tag ${tag} -F ${tempFile}`, dryRun)
+      if (!dryRun) {
+        fs.unlinkSync(tempFile)
+      }
       run(`git push origin ${tag}`, dryRun)
     }
   }
