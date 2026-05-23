@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2025-05-23
+
+### Added
+
+- **Crates镜像源管理** - 集成crm工具管理crates.io镜像源，支持自动最优切换、镜像列表展示、手动切换、延迟测试等功能
+  - 新增crm安装引导功能，初次使用时自动提示安装
+  - 支持自动最优（best）功能，评估网络延迟并自动切换
+  - 支持镜像列表展示、切换、测试
+  - 固定表头布局，提升大数据量时的体验
+- 环境变量列表组件支持动态宽度调整
+
+### Fixed
+
+- Fixed input box icon and text overlapping issue by adjusting padding (pl-9 → pl-10)
+- Fixed mirror list parsing for * marker, current mirror highlighting, and index address prefix removal
+- Fixed mirror type detection: sparse+ prefix → sparse, .git suffix → git, others → other
+- Fixed "测试全部" button position, moved to "自动最优" button after
+- Fixed left sidebar width and language switch Chinese text wrapping issue
+- Fixed local installed plugins display issue
+- Fixed crm version number display in status bar
+- Fixed page refresh status not updating when switching to mirror management
+
 ## [1.2.3] - 2025-05-23
 
 ### Added

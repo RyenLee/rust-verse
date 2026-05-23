@@ -3,7 +3,19 @@ import { invoke } from '@tauri-apps/api/core'
 export interface MirrorInfo {
   name: string
   index: string
-  is_sparse: boolean
+  mirror_type: string
+  is_current: boolean
+}
+
+export interface MirrorLatency {
+  name: string
+  is_current: boolean
+  network_ms: number | null
+  download_ms: number | null
+}
+
+export interface CrmTestResult {
+  latencies: MirrorLatency[]
 }
 
 const CARGO = 'cargo'
@@ -41,8 +53,8 @@ export function useMirror() {
     return invoke('crm_default')
   }
 
-  async function test(name?: string): Promise<string> {
-    return invoke<string>('crm_test', { name: name ?? null })
+  async function test(name?: string): Promise<CrmTestResult> {
+    return invoke<CrmTestResult>('crm_test', { name: name ?? null })
   }
 
   return {

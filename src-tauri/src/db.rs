@@ -219,20 +219,101 @@ pub fn delete_env_var_entry(
 
 /// Read all app metadata values.
 pub fn get_app_metadata(db: &Database) -> (String, String, String) {
+    // If config.toml exists, always prefer its values over database
+    if has_config_file() {
+        return get_app_metadata_from_config();
+    }
+
+    // Otherwise fall back to database values
     let batch = get_simple_batch(db, &["app.name", "app.version", "app.description"]);
-    let name = batch
-        .get("app.name")
-        .cloned()
-        .unwrap_or_else(default_app_name);
-    let version = batch
-        .get("app.version")
-        .cloned()
-        .unwrap_or_else(default_app_version);
-    let description = batch
-        .get("app.description")
-        .cloned()
-        .unwrap_or_else(default_app_description);
-    (name, version, description)
+    (
+        batch
+            .get("app.name")
+            .cloned()
+            .unwrap_or_else(default_app_name),
+        batch
+            .get("app.version")
+            .cloned()
+            .unwrap_or_else(default_app_version),
+        batch
+            .get("app.description")
+            .cloned()
+            .unwrap_or_else(default_app_description),
+    )
+}
+
+/// Check if config.toml or config.toml.migrated exists and is readable.
+fn has_config_file() -> bool {
+    let exe_path = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+    let exe_dir = match exe_path.parent() {
+        Some(d) => d,
+        None => return false,
+    };
+
+    let toml_paths = [
+        exe_dir.join("config.toml"),
+        exe_dir.join("config.toml.migrated"),
+    ];
+
+    for toml_path in &toml_paths {
+        if toml_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(toml_path) {
+                if toml::from_str::<crate::config::AppConfig>(&content).is_ok() {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Try to read app metadata from config.toml or config.toml.migrated.
+fn get_app_metadata_from_config() -> (String, String, String) {
+    let exe_path = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(_) => {
+            return (
+                default_app_name(),
+                default_app_version(),
+                default_app_description(),
+            );
+        }
+    };
+    let exe_dir = match exe_path.parent() {
+        Some(d) => d,
+        None => {
+            return (
+                default_app_name(),
+                default_app_version(),
+                default_app_description(),
+            );
+        }
+    };
+
+    // Try config.toml first, then config.toml.migrated
+    let toml_paths = [
+        exe_dir.join("config.toml"),
+        exe_dir.join("config.toml.migrated"),
+    ];
+
+    for toml_path in &toml_paths {
+        if toml_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(toml_path) {
+                if let Ok(config) = toml::from_str::<crate::config::AppConfig>(&content) {
+                    return (config.app.name, config.app.version, config.app.description);
+                }
+            }
+        }
+    }
+
+    (
+        default_app_name(),
+        default_app_version(),
+        default_app_description(),
+    )
 }
 
 /// Read all binaries config values.
@@ -411,21 +492,16 @@ pub fn migrate_from_toml(db: &Database, toml_path: &Path) -> Result<bool, String
             };
         }
 
-        maybe_write!(
-            "app.name",
-            app_config.app.name,
-            defaults.app.name
-        );
-        maybe_write!(
-            "app.version",
-            app_config.app.version,
-            defaults.app.version
-        );
-        maybe_write!(
-            "app.description",
-            app_config.app.description,
-            defaults.app.description
-        );
+        // Always write app metadata from config.toml to ensure database stays in sync
+        table
+            .insert("app.name", app_config.app.name.as_str())
+            .map_err(|e| format!("insert app.name: {e}"))?;
+        table
+            .insert("app.version", app_config.app.version.as_str())
+            .map_err(|e| format!("insert app.version: {e}"))?;
+        table
+            .insert("app.description", app_config.app.description.as_str())
+            .map_err(|e| format!("insert app.description: {e}"))?;
         maybe_write!(
             "binaries.rustup",
             app_config.binaries.rustup,
@@ -620,7 +696,7 @@ pub fn default_app_name() -> String {
     "RustVerse".to_string()
 }
 pub fn default_app_version() -> String {
-    "1.2.0".to_string()
+    "1.2.5".to_string()
 }
 pub fn default_app_description() -> String {
     "Rust Toolchain Visual Version Manager".to_string()
@@ -900,15 +976,15 @@ pub fn default_env_vars() -> HashMap<String, HashMap<String, EnvVarEntryConfig>>
 
     // ── 其他实用变量 ──
     let mut misc = HashMap::new();
-    misc.insert(
-        "CARGO_REGISTRIES_CRATES_IO_PROTOCOL".to_string(),
-        env_var_entry!(
-            None,
-            Some("git (新版本 Cargo 已默认启用 sparse)"),
-            "指定 crates.io 索引协议",
-            "启用更快的稀疏索引，如遇 git 协议被墙尤其有用。可显式指定以防回退。"
-        ),
-    );
+    // misc.insert(
+    //     "CARGO_REGISTRIES_CRATES_IO_PROTOCOL".to_string(),
+    //     env_var_entry!(
+    //         None,
+    //         Some("git (新版本 Cargo 已默认启用 sparse)"),
+    //         "指定 crates.io 索引协议",
+    //         "启用更快的稀疏索引，如遇 git 协议被墙尤其有用。可显式指定以防回退。"
+    //     ),
+    // );
     misc.insert(
         "CARGO_BUILD_TARGET".to_string(),
         env_var_entry!(

@@ -12,6 +12,7 @@ A cross-platform desktop application for visually managing Rust toolchains, comp
 - **Cargo Plugins** — Install and uninstall cargo subcommands
 - **Environment Variables** — View, set, and persist environment variables
 - **Auto Update** — Built-in application auto-update via tauri-plugin-updater
+- **Crates Mirror** — Integrated crm tool for managing crates.io mirror sources with auto-optimal switching
 
 ## Prerequisites
 

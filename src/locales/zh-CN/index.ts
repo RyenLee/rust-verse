@@ -2,6 +2,7 @@ import app from './app'
 import nav from './nav'
 import common from './common'
 import dashboard from './dashboard'
+import mirror from './mirror'
 import toolchains from './toolchains'
 import components from './components'
 import targets from './targets'
@@ -20,6 +21,7 @@ export default {
   nav,
   common,
   dashboard,
+  mirror,
   toolchains,
   components,
   targets,

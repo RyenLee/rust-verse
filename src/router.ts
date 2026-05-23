@@ -44,6 +44,11 @@ const router = createRouter({
       component: () => import('@/views/EnvVarsView.vue'),
     },
     {
+      path: '/mirrors',
+      name: 'mirrors',
+      component: () => import('@/views/MirrorView.vue'),
+    },
+    {
       path: '/help',
       name: 'help',
       component: () => import('@/views/HelpView.vue'),

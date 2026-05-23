@@ -1,6 +1,7 @@
 export default {
   dashboard: '仪表盘',
   envVars: '环境变量',
+  mirrors: 'crates镜像源',
   toolchains: '工具链',
   components: '组件',
   targets: '编译目标',

@@ -141,6 +141,18 @@ pub fn parse_search_results(output: &str) -> Vec<SearchResult> {
 }
 
 /// Parse `cargo install --list` output.
+///
+/// Output format:
+/// ```text
+/// cargo-audit v0.18.3:
+///     cargo-audit
+/// crm v0.2.3:
+///     crm.exe
+/// ```
+///
+/// Each plugin line ends with `:` and contains a crate name and version.
+/// The `cargo_prefix` is used to derive a short display name (e.g. "cargo-audit" → "audit").
+/// Non-cargo-prefixed crates use their full name as the display name.
 pub fn parse_cargo_plugin_list(
     output: &str,
     cargo_prefix: &str,
@@ -151,7 +163,8 @@ pub fn parse_cargo_plugin_list(
     for line in output.lines() {
         let line = line.trim();
 
-        if !line.starts_with(cargo_prefix) || !line.ends_with(':') {
+        // Plugin lines end with ':'
+        if !line.ends_with(':') {
             continue;
         }
 
@@ -164,6 +177,8 @@ pub fn parse_cargo_plugin_list(
 
         let crate_name = parts[0].to_string();
         let version = parts[1].trim_start_matches('v').to_string();
+
+        // Derive display name: strip "cargo-" prefix if present, otherwise use full name
         let name = crate_name
             .strip_prefix(cargo_prefix)
             .unwrap_or(&crate_name)
@@ -205,12 +220,25 @@ mod tests {
         let (prefix, official) = default_config_values();
         let output = "cargo-audit v0.18.3:\n    cargo-audit\ncargo-expand v1.0.0:\n    cargo-expand\nrust-script v0.3.0:\n    rust-script";
         let result = parse_cargo_plugin_list(output, &prefix, &official);
-        assert_eq!(result.len(), 2);
+        assert_eq!(result.len(), 3);
         assert_eq!(result[0].name, "audit");
         assert_eq!(result[0].crate_name, "cargo-audit");
         assert_eq!(result[0].version, "0.18.3");
         assert!(!result[0].is_official);
         assert_eq!(result[1].name, "expand");
+        assert_eq!(result[2].name, "rust-script");
+        assert_eq!(result[2].crate_name, "rust-script");
+    }
+
+    #[test]
+    fn test_parse_cargo_plugin_list_non_cargo_prefix() {
+        let (prefix, official) = default_config_values();
+        let output = "crm v0.2.3:\n    crm.exe";
+        let result = parse_cargo_plugin_list(output, &prefix, &official);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "crm");
+        assert_eq!(result[0].crate_name, "crm");
+        assert_eq!(result[0].version, "0.2.3");
     }
 
     #[test]
@@ -225,7 +253,9 @@ mod tests {
         let (prefix, official) = default_config_values();
         let output = "some-tool v1.0.0:\n    some-tool";
         let result = parse_cargo_plugin_list(output, &prefix, &official);
-        assert!(result.is_empty());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "some-tool");
+        assert_eq!(result[0].crate_name, "some-tool");
     }
 
     #[test]

@@ -16,6 +16,7 @@ use commands::env_var::{
     update_env_var_meta,
 };
 use commands::locale::{LocaleScanState, get_locale, list_available_locales, set_locale};
+use commands::mirror::{check_crm_installed, crm_best, crm_current, crm_default, crm_list, crm_test, crm_use, crm_version, install_crm};
 use commands::override_cmd::{get_override, list_overrides, remove_override, set_override};
 use commands::persist::{
     is_env_var_persisted, list_persisted_env_vars, persist_env_var, remove_persisted_env_var,

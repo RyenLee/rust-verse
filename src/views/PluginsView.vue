@@ -152,7 +152,7 @@ onMounted(async () => {
             <input
               v-model="searchQuery"
               :placeholder="t('plugins.placeholder.search')"
-              class="w-full h-9 box-border pl-9 pr-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+              class="w-full h-9 box-border pl-10 pr-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
               @keyup.enter="handleSearch"
             />
           </div>
@@ -196,7 +196,7 @@ onMounted(async () => {
           <input
             v-model="installCrateName"
             :placeholder="t('plugins.placeholder.installByName')"
-            class="w-full h-9 box-border pl-9 pr-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+            class="w-full h-9 box-border pl-10 pr-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
             @keyup.enter="installPlugin"
           />
         </div>
@@ -219,7 +219,7 @@ onMounted(async () => {
           <input
             v-model="pluginFilter"
             :placeholder="t('plugins.placeholder.filter')"
-            class="w-full h-9 box-border pl-9 pr-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+            class="w-full h-9 box-border pl-10 pr-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
           />
         </div>
       </div>

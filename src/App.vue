@@ -108,6 +108,7 @@ function handleClickOutside(e: MouseEvent) {
 const navItems = computed(() => [
   { path: '/', label: t('nav.dashboard'), icon: 'mdi:view-dashboard-outline' },
   { path: '/env-vars', label: t('nav.envVars'), icon: 'mdi:variable' },
+  { path: '/mirrors', label: t('nav.mirrors'), icon: 'mdi:mirror' },
   { path: '/toolchains', label: t('nav.toolchains'), icon: 'mdi:cog-outline' },
   { path: '/components', label: t('nav.components'), icon: 'mdi:puzzle-outline' },
   { path: '/targets', label: t('nav.targets'), icon: 'mdi:target' },
@@ -402,7 +403,7 @@ onBeforeUnmount(() => {
     <div v-if="phase === 'main'" class="flex h-screen overflow-hidden">
       <!-- Sidebar -->
       <nav
-        class="sidebar w-60 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col shrink-0"
+        class="sidebar w-64 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col shrink-0"
       >
         <!-- Brand -->
         <div class="sidebar-brand px-5 py-5 flex items-center gap-3">
@@ -446,7 +447,7 @@ onBeforeUnmount(() => {
               @click="localeDropdownOpen = !localeDropdownOpen"
             >
               <iconify-icon icon="mdi:translate" width="18" class="text-gray-400 dark:text-gray-500"></iconify-icon>
-              <span class="flex-1 text-left truncate">{{ currentLocaleInfo?.name || currentLocale }}</span>
+              <span class="flex-1 text-left truncate whitespace-nowrap">{{ currentLocaleInfo?.name || currentLocale }}</span>
               <iconify-icon
                 icon="mdi:chevron-down"
                 width="16"

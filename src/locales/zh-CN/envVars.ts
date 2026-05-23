@@ -10,7 +10,7 @@ export default {
     delete: '删除',
   },
   placeholder: {
-    search: '搜索变量名或说明...',
+    search: '  搜索变量名或说明...',
     nameInput: '选择或输入变量名...',
     valueInput: '输入值...',
     editValue: '输入 {name} 的值...',

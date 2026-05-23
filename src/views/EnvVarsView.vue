@@ -313,7 +313,7 @@ onMounted(async () => {
         <input
           v-model="searchQuery"
           :placeholder="t('envVars.placeholder.search')"
-          class="w-full h-9 box-border pl-9 pr-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+          class="w-full h-9 box-border pl-10 pr-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
         />
       </div>
 
@@ -392,11 +392,12 @@ onMounted(async () => {
             </p>
           </div>
 
-          <div v-else class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
-            <table class="w-full text-sm">
-              <thead>
+          <div v-else class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="overflow-y-auto max-h-full">
+            <table class="w-full text-sm table-fixed">
+              <thead class="sticky top-0 z-10">
                 <tr class="bg-gray-50 dark:bg-gray-800/80">
-                  <th class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  <th class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap max-w-0">
                     {{ t('envVars.field.variable') }}
                   </th>
                   <th class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
@@ -412,7 +413,7 @@ onMounted(async () => {
                     {{ t('envVars.field.notes') }}
                   </th>
                   <th
-                    class="text-center px-3 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap"
+                    class="text-center px-3 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap w-[160px]"
                   >
                     {{ t('envVars.field.actions') }}
                   </th>
@@ -425,14 +426,14 @@ onMounted(async () => {
                   class="border-t border-gray-100 dark:border-gray-700/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors"
                 >
                   <!-- Variable name -->
-                  <td class="px-4 py-3">
-                    <div class="flex items-center gap-2">
+                  <td class="px-4 py-3 max-w-0">
+                    <div class="flex items-center gap-2 min-w-0">
                       <span
                         class="shrink-0 w-2 h-2 rounded-full"
                         :class="v.is_set ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'"
                         :title="v.is_set ? t('envVars.status.set') : t('envVars.status.notSet')"
                       />
-                      <span class="font-mono text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      <span class="font-mono text-sm font-semibold text-gray-900 dark:text-gray-100 truncate" :title="v.name">
                         {{ v.name }}
                       </span>
                       <span
@@ -447,7 +448,7 @@ onMounted(async () => {
                   </td>
 
                   <!-- Description -->
-                  <td class="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-[240px]">
+                  <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
                     <span class="line-clamp-2">{{ v.description }}</span>
                   </td>
 
@@ -455,7 +456,7 @@ onMounted(async () => {
                   <td class="px-4 py-3">
                     <code
                       v-if="v.rec"
-                      class="font-mono text-xs bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 px-2 py-1 rounded max-w-[200px] truncate block"
+                      class="font-mono text-xs bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 px-2 py-1 rounded truncate block"
                     >
                       {{ v.rec }}
                     </code>
@@ -464,14 +465,14 @@ onMounted(async () => {
 
                   <!-- Default value -->
                   <td class="px-4 py-3">
-                    <span v-if="v.def" class="font-mono text-xs text-gray-500 dark:text-gray-400 max-w-[200px] truncate block">
+                    <span v-if="v.def" class="font-mono text-xs text-gray-500 dark:text-gray-400 truncate block">
                       {{ v.def }}
                     </span>
                     <span v-else class="text-gray-300 dark:text-gray-600">—</span>
                   </td>
 
                   <!-- Notes -->
-                  <td class="px-4 py-3 max-w-[200px]">
+                  <td class="px-4 py-3">
                     <span
                       v-if="v.notes"
                       class="text-xs text-amber-600 dark:text-amber-400 line-clamp-2"
@@ -527,6 +528,7 @@ onMounted(async () => {
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       </div>

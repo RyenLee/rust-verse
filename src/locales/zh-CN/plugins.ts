@@ -6,9 +6,9 @@ export default {
     installByName: '按 crate 名称安装',
   },
   placeholder: {
-    search: '搜索插件（如 cargo-audit）...',
-    installByName: '按 crate 名称安装（如 cargo-audit）...',
-    filter: '筛选已安装...',
+    search: '  搜索插件（如 cargo-audit）...',
+    installByName: '  按 crate 名称安装（如 cargo-audit）...',
+    filter: '  筛选已安装...',
   },
   status: {
     serverError: 'crates.io 服务器错误，请稍后重试。',
