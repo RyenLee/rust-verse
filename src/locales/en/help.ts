@@ -1,0 +1,28 @@
+export default {
+  title: 'Help',
+  section: {
+    gettingStarted: 'Getting Started',
+    toolchains: 'Toolchains',
+    components: 'Components',
+    targets: 'Targets',
+    directoryOverrides: 'Directory Overrides',
+    updates: 'Updates',
+    cargoPlugins: 'Cargo Plugins',
+    keyboardShortcuts: 'Keyboard Shortcuts',
+    about: 'About',
+  },
+  desc: {
+    gettingStarted: 'RustVerse requires {rustup} to be installed on your system. If rustup is not detected, the dashboard will show an onboarding guide with installation instructions.',
+    toolchainsInstall: 'Install — Click "Install New" and select a channel (stable, beta, nightly) to install a new toolchain.',
+    toolchainsDefault: 'Set Default — Click "Set Default" on any installed toolchain to make it the system default.',
+    toolchainsUninstall: 'Uninstall — Click "Uninstall" to remove a non-default toolchain.',
+    components: 'Components are optional additions to a toolchain such as {rustfmt}, {clippy}, and {miri}. Select a toolchain from the dropdown, then install or remove components as needed.',
+    targets: 'Targets define the platform you want to compile for. Use the search box to filter available targets, then install or remove them for the selected toolchain.',
+    directoryOverrides: 'Overrides let you use a specific toolchain for a particular directory. Add a path and select the desired toolchain. This is equivalent to {command}.',
+    updates: 'The Updates page checks all installed toolchains for available updates. Click "Update All" to apply all pending updates, or update individual toolchains. Progress is streamed in real time.',
+    cargoPlugins: 'Install cargo subcommands (e.g., {audit} and {expand}) by entering the crate name and clicking Install. Uninstall plugins with the Remove button.',
+    reloadApp: 'Reload the application',
+    toggleDevTools: 'Toggle developer tools (debug builds only)',
+    about: '{name} v{version} — Built with Tauri 2 + Vue 3 + Rust.',
+  },
+}

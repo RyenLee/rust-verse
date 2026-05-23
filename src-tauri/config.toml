@@ -1,0 +1,88 @@
+[app]
+name = "RustVerse"
+version = "1.2.1"
+description = "Rust Toolchain Visual Version Manager"
+
+[binaries]
+rustup = "rustup"
+cargo = "cargo"
+
+[paths]
+cargo_bin_relative = ".cargo/bin"
+
+[locale]
+codes = ["en","zh-CN"]
+
+# Locale metadata (auto-generated, do not edit manually)
+[locale.meta."en"]
+  name = "English"
+  english_name = "English"
+[locale.meta."zh-CN"]
+  name = "简体中文"
+  english_name = "Chinese Simplified"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[timeouts]
+cargo_search_seconds = 30
+
+[events]
+install_log = "install-log"
+install_finished = "install-finished"
+plugin_install_log = "plugin-install-log"
+plugin_install_finished = "plugin-install-finished"
+update_log = "update-log"
+update_finished = "update-finished"
+
+[plugins.official]
+names = ["cargo-clippy", "cargo-fmt", "cargo-miri", "cargo-rustdoc", "cargo-test-fixture", "rustfmt", "clippy", "miri"]
+
+[parsing]
+default_marker = "(default)"
+active_marker = "(active)"
+installed_marker = "(installed)"
+no_overrides = "no overrides"
+up_to_date = "Up to date"
+update_available = "Update available"
+version_separator = " -> "
+status_separator = " - "
+cargo_prefix = "cargo-"

@@ -1,0 +1,42 @@
+export default {
+  action: {
+    save: 'Save',
+    cancel: 'Cancel',
+    confirm: 'Confirm',
+    delete: 'Delete',
+    edit: 'Edit',
+    install: 'Install',
+    uninstall: 'Uninstall',
+    remove: 'Remove',
+    search: 'Search',
+    close: 'Close',
+    load: 'Load',
+    set: 'Set',
+    add: 'Add',
+    browse: 'Browse',
+    refresh: 'Refresh',
+  },
+  status: {
+    loading: 'Loading...',
+    searching: 'Searching...',
+    notSet: 'Not set',
+    na: 'N/A',
+    done: 'Done.',
+    default: 'default',
+    active: 'active',
+    official: 'Official',
+  },
+  dialog: {
+    confirmUninstall: 'Confirm Uninstall',
+    deleteTitle: 'Delete Environment Variable',
+  },
+  label: {
+    example: 'Example:',
+    items: '{count} items',
+    showLess: 'Show less',
+    showAll: 'Show all ({count})',
+  },
+  empty: {
+    noItems: 'No items found.',
+  },
+}

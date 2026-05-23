@@ -1,0 +1,42 @@
+export default {
+  action: {
+    save: '保存',
+    cancel: '取消',
+    confirm: '确认',
+    delete: '删除',
+    edit: '编辑',
+    install: '安装',
+    uninstall: '卸载',
+    remove: '移除',
+    search: '搜索',
+    close: '关闭',
+    load: '加载',
+    set: '设置',
+    add: '添加',
+    browse: '浏览',
+    refresh: '刷新',
+  },
+  status: {
+    loading: '加载中...',
+    searching: '搜索中...',
+    notSet: '未设置',
+    na: '不可用',
+    done: '完成。',
+    default: '默认',
+    active: '活动',
+    official: '官方',
+  },
+  dialog: {
+    confirmUninstall: '确认卸载',
+    deleteTitle: '删除环境变量',
+  },
+  label: {
+    example: '示例：',
+    items: '{count} 项',
+    showLess: '收起',
+    showAll: '显示全部（{count}）',
+  },
+  empty: {
+    noItems: '未找到项目。',
+  },
+}

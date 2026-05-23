@@ -1,0 +1,10 @@
+allowBuilds:
+  '@swc/core': true
+  esbuild: true
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - vue-tsc
+  - unplugin-vue-components
+  - vitest
+  - '@types/node'
+  - rollup

@@ -1,0 +1,49 @@
+[package]
+name = "rustverse"
+version = "1.2.1"
+description = "Rust Toolchain Visual Version Manager"
+authors = ["ryenlii"]
+edition = "2024"
+repository = "https://github.com/RyenLee/rustverse"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "rustverse_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.2", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.2", features = [] }
+tauri-plugin-shell = "2.3.5"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+tauri-plugin-prevent-default = "5.0.0"
+thiserror = "2.0.18"
+tokio = { version = "1.52.3", features = ["full"] }
+regex = "1.12.3"
+which = "8.0.2"
+dirs = "6.0.0"
+tauri-plugin-updater = "2.10.1"
+tauri-plugin-store = "2.4.3"
+tauri-plugin-dialog = "2.7.1"
+redb = "4.1.0"
+toml = "1.1.2"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56.0"
+
+[profile.dev]
+incremental = true # Compile your binary in smaller steps.
+
+[profile.release]
+codegen-units = 1 # Allows LLVM to perform better optimization.
+lto = true        # Enables link-time-optimizations.
+opt-level = "s"   # Prioritizes small binary size. Use `3` if you prefer speed.
+panic = "abort"   # Higher performance by disabling panic handlers.
+strip = true      # Ensures debug symbols are removed.

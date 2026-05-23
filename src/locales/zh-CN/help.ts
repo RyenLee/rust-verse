@@ -1,0 +1,28 @@
+export default {
+  title: '帮助',
+  section: {
+    gettingStarted: '入门指南',
+    toolchains: '工具链',
+    components: '组件',
+    targets: '编译目标',
+    directoryOverrides: '目录覆盖',
+    updates: '更新',
+    cargoPlugins: 'Cargo 插件',
+    keyboardShortcuts: '键盘快捷键',
+    about: '关于',
+  },
+  desc: {
+    gettingStarted: 'RustVerse 需要系统安装 {rustup}。如果未检测到 rustup，仪表盘将显示安装指引。',
+    toolchainsInstall: '安装 — 点击"安装新工具链"并选择频道（stable、beta、nightly）来安装新工具链。',
+    toolchainsDefault: '设为默认 — 点击已安装工具链的"设为默认"将其设为系统默认。',
+    toolchainsUninstall: '卸载 — 点击"卸载"移除非默认工具链。',
+    components: '组件是工具链的可选附加项，如 {rustfmt}、{clippy} 和 {miri}。从下拉菜单选择工具链，然后按需安装或移除组件。',
+    targets: '编译目标定义了你要编译的目标平台。使用搜索框筛选可用目标，然后为选定的工具链安装或移除目标。',
+    directoryOverrides: '覆盖允许你为特定目录使用指定的工具链。添加路径并选择所需工具链，等效于 {command}。',
+    updates: '更新页面会检查所有已安装工具链的可用更新。点击"全部更新"应用所有待处理更新，或更新单个工具链。进度实时流式显示。',
+    cargoPlugins: '输入 crate 名称并点击"安装"来安装 cargo 子命令（如 {audit} 和 {expand}）。使用"移除"按钮来卸载插件。',
+    reloadApp: '重新加载应用',
+    toggleDevTools: '切换开发者工具（仅调试版本）',
+    about: '{name} v{version} — 基于 Tauri 2 + Vue 3 + Rust 构建。',
+  },
+}

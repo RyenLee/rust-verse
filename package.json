@@ -1,0 +1,72 @@
+{
+  "name": "rustverse",
+  "private": true,
+  "version": "1.2.1",
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "dev": "cross-env DEBUG=0 vite",
+    "test": "vitest",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --build --force",
+    "tauri": "tauri",
+    "bump": "node bump-version.cjs",
+    "check": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@iconify-json/mdi": "^1.2.3",
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-shell": "^2.3.5",
+    "@tauri-apps/plugin-store": "^2.4.3",
+    "@tauri-apps/plugin-updater": "^2.10.1",
+    "iconify-icon": "^3.0.2",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.34",
+    "vue-i18n": "^11.4.4",
+    "vue-router": "^5.0.7"
+  },
+  "devDependencies": {
+    "@pinia/testing": "^1.0.3",
+    "@playwright/test": "^1.60.0",
+    "@tailwindcss/vite": "^4.3.0",
+    "@tauri-apps/cli": "^2.11.2",
+    "@tsconfig/node22": "^22.0.5",
+    "@types/node": "^25.9.1",
+    "@typescript-eslint/eslint-plugin": "^8.59.4",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/test-utils": "^2.4.10",
+    "@vue/tsconfig": "^0.9.1",
+    "cross-env": "^10.1.0",
+    "esbuild": "^0.28.0",
+    "eslint": "^10.4.0",
+    "eslint-plugin-security": "^4.0.0",
+    "eslint-plugin-vue": "^10.9.1",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.8.3",
+    "rollup": "^4.60.4",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3",
+    "unplugin-auto-import": "^21.0.0",
+    "unplugin-vue-components": "^32.1.0",
+    "vite": "^8.0.14",
+    "vite-plugin-node-polyfills": "^0.28.0",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-vue-devtools": "^8.1.2",
+    "vitest": "^4.1.7",
+    "vue-tsc": "^3.3.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "@tailwindcss/oxide",
+      "esbuild",
+      "vue-demi"
+    ]
+  }
+}
