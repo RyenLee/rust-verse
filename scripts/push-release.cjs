@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { execSync } = require('child_process')
+const { execSync, spawnSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 
@@ -19,12 +19,40 @@ function run(cmd, dryRun) {
   execSync(cmd, { stdio: 'inherit' })
 }
 
+function runBumpVersion(newVersion, dryRun) {
+  const scriptPath = path.join(process.cwd(), 'scripts', 'bump-version.cjs')
+  const args = newVersion ? [scriptPath, newVersion] : [scriptPath]
+
+  if (dryRun) {
+    console.log(`[dry-run] node ${args.join(' ')}`)
+    return
+  }
+
+  console.log(`> node ${args.join(' ')}`)
+  const result = spawnSync('node', args, { stdio: 'inherit' })
+  if (result.status !== 0) {
+    console.error('bump-version.cjs failed')
+    process.exit(1)
+  }
+}
+
 function main() {
   const args = process.argv.slice(2)
   const dryRun = args.includes('--dry-run') || args.includes('-n')
   const pushTag = args.includes('--tag') || args.includes('-t')
   const pushMain = args.includes('--main') || args.includes('-m')
+  const skipBump = args.includes('--skip-bump')
   const all = !pushTag && !pushMain
+
+  // Extract version argument (first non-flag arg)
+  const newVersion = args.find(a => !a.startsWith('-'))
+
+  // Step 1: Run bump-version.cjs
+  if (!skipBump) {
+    console.log('=== Running bump-version ===')
+    runBumpVersion(newVersion, dryRun)
+    console.log()
+  }
 
   const version = readVersion()
   const tag = `v${version}`
@@ -33,6 +61,7 @@ function main() {
   console.log(`Tag: ${tag}`)
   console.log()
 
+  // Step 2: Push to GitHub
   if (all || pushMain) {
     run('git push origin main', dryRun)
   }
