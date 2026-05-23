@@ -19,6 +19,24 @@ function run(cmd, dryRun) {
   execSync(cmd, { stdio: 'inherit' })
 }
 
+function hasUnstagedChanges() {
+  try {
+    execSync('git diff --quiet', { stdio: 'pipe' })
+    return false
+  } catch {
+    return true
+  }
+}
+
+function getStashCount() {
+  try {
+    const out = execSync('git stash list --quiet', { stdio: 'pipe' }).toString().trim()
+    return out ? out.split('\n').length : 0
+  } catch {
+    return 0
+  }
+}
+
 function runBumpVersion(newVersion, dryRun) {
   const scriptPath = path.join(process.cwd(), 'scripts', 'bump-version.cjs')
   const args = newVersion ? [scriptPath, newVersion] : [scriptPath]
@@ -47,7 +65,22 @@ function main() {
   // Extract version argument (first non-flag arg)
   const newVersion = args.find(a => !a.startsWith('-'))
 
-  // Step 1: Run bump-version.cjs
+  // Step 1: Stash unstaged changes, then pull latest code
+  const beforeStash = getStashCount()
+  const hadUnstaged = hasUnstagedChanges()
+  if (hadUnstaged) {
+    console.log('=== Stashing unstaged changes ===')
+    run('git stash push -m "wip: pre-release stash"', dryRun)
+  }
+  console.log('=== Pulling latest code ===')
+  run('git pull --rebase origin main', dryRun)
+  if (hadUnstaged) {
+    console.log('=== Restoring stashed changes ===')
+    run('git stash pop', dryRun)
+  }
+  console.log()
+
+  // Step 2: Run bump-version.cjs
   if (!skipBump) {
     console.log('=== Running bump-version ===')
     runBumpVersion(newVersion, dryRun)
@@ -61,7 +94,15 @@ function main() {
   console.log(`Tag: ${tag}`)
   console.log()
 
-  // Step 2: Push to GitHub
+  // Step 3: Commit version bump changes
+  if (!skipBump) {
+    console.log('=== Committing version bump ===')
+    run(`git add -A`, dryRun)
+    run(`git commit -m "chore: bump version to v${version}"`, dryRun)
+    console.log()
+  }
+
+  // Step 4: Push to GitHub
   if (all || pushMain) {
     run('git push origin main', dryRun)
   }
@@ -81,7 +122,7 @@ function main() {
       run(`git push origin ${tag}`, dryRun)
     } else {
       console.log(`Creating tag ${tag}...`)
-      run(`git tag ${tag}`, dryRun)
+      run(`git tag ${tag} -m "v${version}"`, dryRun)
       run(`git push origin ${tag}`, dryRun)
     }
   }
