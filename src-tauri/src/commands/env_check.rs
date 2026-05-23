@@ -26,6 +26,17 @@ async fn check_rustup(app: &tauri::AppHandle, binary_name: &str) -> (bool, Optio
 
     let rustup_full_path = match find_binary(binary_name) {
         Ok(path) => {
+            // Validate that the found binary matches the expected name
+            // to prevent executing a hijacked binary with a different name
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                if stem != binary_name {
+                    emit_log(app, &format!(
+                        "Found binary at {} but stem '{}' does not match expected '{}', skipping",
+                        path.display(), stem, binary_name
+                    ));
+                    return (false, Some(format!("binary name mismatch: expected '{binary_name}', found '{stem}'")));
+                }
+            }
             emit_log(app, &format!("Found {} at {}", binary_name, path.display()));
             path
         }
@@ -155,11 +166,11 @@ pub struct VersionInfo {
 pub async fn get_versions(state: tauri::State<'_, AppState>) -> Result<VersionInfo, String> {
     let (rustup, cargo) = db::get_binaries_config(&state.db);
 
-    let rustup_version = run_command(&rustup, &["--version"])
+    let rustup_version = run_command(&rustup, &["--version"], 30)
         .await
         .ok()
         .map(|s| s.lines().next().unwrap_or(&s).to_string());
-    let cargo_version = run_command(&cargo, &["--version"])
+    let cargo_version = run_command(&cargo, &["--version"], 30)
         .await
         .ok()
         .map(|s| s.lines().next().unwrap_or(&s).to_string());

@@ -9,7 +9,9 @@ use crate::error::{AppError, AppResult};
 ///
 /// Sets `LC_ALL=C` to ensure consistent output format across locales,
 /// which is critical for reliable parsing of `rustup`/`cargo` output.
-pub async fn run_command(bin: &str, args: &[&str]) -> AppResult<String> {
+///
+/// If the command does not complete within `timeout_secs`, `AppError::Timeout` is returned.
+pub async fn run_command(bin: &str, args: &[&str], timeout_secs: u64) -> AppResult<String> {
     let mut cmd = Command::new(bin);
     cmd.args(args)
         .env("LC_ALL", "C")
@@ -20,37 +22,40 @@ pub async fn run_command(bin: &str, args: &[&str]) -> AppResult<String> {
     {
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
-    let output = cmd
-        .output()
-        .await
-        .map_err(|e| AppError::Command(format!("failed to execute '{bin}': {e}")))?;
 
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let code = output.status.code().unwrap_or(-1);
-        Err(AppError::Command(format!(
-            "'{bin}' exited with code {code}: {stderr}"
-        )))
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(timeout_secs),
+        cmd.output(),
+    )
+    .await;
+
+    match result {
+        Ok(Ok(output)) => {
+            if output.status.success() {
+                Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                let code = output.status.code().unwrap_or(-1);
+                Err(AppError::Command(format!(
+                    "'{bin}' exited with code {code}: {stderr}"
+                )))
+            }
+        }
+        Ok(Err(e)) => Err(AppError::Command(format!("failed to execute '{bin}': {e}"))),
+        Err(_) => Err(AppError::Timeout(timeout_secs)),
     }
 }
 
 /// Execute a command with a timeout (in seconds).
 ///
-/// Wraps `run_command` with `tokio::time::timeout`. Returns
-/// `AppError::Timeout` if the command does not complete within the limit.
+/// Delegates to `run_command` with the specified timeout.
+/// Kept for backward compatibility with callers that explicitly set timeout.
 pub async fn run_command_with_timeout(
     bin: &str,
     args: &[&str],
     timeout_secs: u64,
 ) -> AppResult<String> {
-    tokio::time::timeout(
-        std::time::Duration::from_secs(timeout_secs),
-        run_command(bin, args),
-    )
-    .await
-    .map_err(|_| AppError::Timeout(timeout_secs))?
+    run_command(bin, args, timeout_secs).await
 }
 
 /// Run a command with streaming output forwarded as Tauri events.
@@ -58,6 +63,9 @@ pub async fn run_command_with_timeout(
 /// Spawns the process, pipes stdout and stderr through `BufReader`,
 /// and emits each line as a `log_event`. When the process exits,
 /// emits `finished_event` and returns the result.
+///
+/// If the process does not complete within `timeout_secs`, it is killed
+/// and `AppError::Timeout` is returned.
 pub async fn run_command_with_streaming(
     app: AppHandle,
     command: &str,
@@ -65,6 +73,7 @@ pub async fn run_command_with_streaming(
     locale_key: &str,
     log_event: &str,
     finished_event: &str,
+    timeout_secs: u64,
 ) -> AppResult<()> {
     let mut child_cmd = Command::new(command);
     child_cmd
@@ -88,20 +97,36 @@ pub async fn run_command_with_streaming(
         spawn_line_reader(app.clone(), stdout, log_event.to_string());
     }
 
-    let status = child
-        .wait()
-        .await
-        .map_err(|e| AppError::Command(format!("failed to wait for process: {e}")))?;
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(timeout_secs),
+        child.wait(),
+    )
+    .await;
 
-    let _ = app.emit(finished_event, ());
-
-    if status.success() {
-        Ok(())
-    } else {
-        let code = status.code().unwrap_or(-1);
-        Err(AppError::Command(format!(
-            "command failed with exit code {code}"
-        )))
+    match result {
+        Ok(Ok(status)) => {
+            let _ = app.emit(finished_event, ());
+            if status.success() {
+                Ok(())
+            } else {
+                let code = status.code().unwrap_or(-1);
+                Err(AppError::Command(format!(
+                    "command failed with exit code {code}"
+                )))
+            }
+        }
+        Ok(Err(e)) => {
+            let _ = app.emit(finished_event, ());
+            Err(AppError::Command(format!(
+                "failed to wait for process: {e}"
+            )))
+        }
+        Err(_) => {
+            // Timeout elapsed — kill the child process
+            let _ = child.kill().await;
+            let _ = app.emit(finished_event, ());
+            Err(AppError::Timeout(timeout_secs))
+        }
     }
 }
 
@@ -123,7 +148,9 @@ fn spawn_line_reader(
 /// Execute a command in a specific working directory.
 ///
 /// Used by `rustup override set/unset` which need to run in the target directory.
-pub async fn run_command_with_cwd(bin: &str, args: &[&str], cwd: &str) -> AppResult<String> {
+///
+/// If the command does not complete within `timeout_secs`, `AppError::Timeout` is returned.
+pub async fn run_command_with_cwd(bin: &str, args: &[&str], cwd: &str, timeout_secs: u64) -> AppResult<String> {
     let mut cmd = Command::new(bin);
     cmd.args(args)
         .env("LC_ALL", "C")
@@ -135,19 +162,29 @@ pub async fn run_command_with_cwd(bin: &str, args: &[&str], cwd: &str) -> AppRes
     {
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
-    let output = cmd
-        .output()
-        .await
-        .map_err(|e| AppError::Command(format!("failed to execute '{bin}' in '{cwd}': {e}")))?;
 
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let code = output.status.code().unwrap_or(-1);
-        Err(AppError::Command(format!(
-            "'{bin}' exited with code {code}: {stderr}"
-        )))
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(timeout_secs),
+        cmd.output(),
+    )
+    .await;
+
+    match result {
+        Ok(Ok(output)) => {
+            if output.status.success() {
+                Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                let code = output.status.code().unwrap_or(-1);
+                Err(AppError::Command(format!(
+                    "'{bin}' exited with code {code}: {stderr}"
+                )))
+            }
+        }
+        Ok(Err(e)) => Err(AppError::Command(format!(
+            "failed to execute '{bin}' in '{cwd}': {e}"
+        ))),
+        Err(_) => Err(AppError::Timeout(timeout_secs)),
     }
 }
 
@@ -157,14 +194,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_command_success() {
-        let result = run_command("cmd", &["/C", "echo", "hello"]).await;
+        let result = run_command("cmd", &["/C", "echo", "hello"], 30).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "hello");
     }
 
     #[tokio::test]
     async fn test_run_command_not_found() {
-        let result = run_command("nonexistent_binary_xyz_12345", &[]).await;
+        let result = run_command("nonexistent_binary_xyz_12345", &[], 30).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AppError::Command(msg) => assert!(msg.contains("failed to execute")),
@@ -181,7 +218,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_command_exit_nonzero() {
-        let result = run_command("cmd", &["/C", "exit", "1"]).await;
+        let result = run_command("cmd", &["/C", "exit", "1"], 30).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AppError::Command(msg) => assert!(msg.contains("exited with code")),

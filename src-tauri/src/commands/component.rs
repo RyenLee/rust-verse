@@ -17,7 +17,8 @@ pub struct ComponentInfo {
 /// List components for a toolchain.
 #[tauri::command]
 pub async fn list_components(rustup_path: String, toolchain: String, state: State<'_, AppState>) -> AppResult<Vec<ComponentInfo>> {
-    let output = exec::run_command(&rustup_path, &["component", "list", "--toolchain", &toolchain]).await?;
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+    let output = exec::run_command(&rustup_path, &["component", "list", "--toolchain", &toolchain], 30).await?;
     let parsing = crate::db::get_parsing_config(&state.db);
     Ok(parse_component_list(&output, &parsing.installed_marker))
 }
@@ -29,7 +30,8 @@ pub async fn add_component(
     toolchain: String,
     component: String,
 ) -> AppResult<()> {
-    exec::run_command(&rustup_path, &["component", "add", &component, "--toolchain", &toolchain]).await?;
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+    exec::run_command(&rustup_path, &["component", "add", &component, "--toolchain", &toolchain], 120).await?;
     Ok(())
 }
 
@@ -40,7 +42,8 @@ pub async fn remove_component(
     toolchain: String,
     component: String,
 ) -> AppResult<()> {
-    exec::run_command(&rustup_path, &["component", "remove", &component, "--toolchain", &toolchain]).await?;
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+    exec::run_command(&rustup_path, &["component", "remove", &component, "--toolchain", &toolchain], 60).await?;
     Ok(())
 }
 

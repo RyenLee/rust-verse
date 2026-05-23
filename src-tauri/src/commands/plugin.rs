@@ -28,7 +28,8 @@ pub async fn list_cargo_plugins(
     cargo_path: String,
     state: State<'_, AppState>,
 ) -> AppResult<Vec<CargoPluginInfo>> {
-    let output = exec::run_command(&cargo_path, &["install", "--list"]).await?;
+    crate::system::env::validate_rust_binary(&cargo_path).map_err(|e| crate::error::AppError::Command(e))?;
+    let output = exec::run_command(&cargo_path, &["install", "--list"], 30).await?;
     let parsing = crate::db::get_parsing_config(&state.db);
     let official_names = crate::db::get_plugin_names(&state.db);
     Ok(parse_cargo_plugin_list(
@@ -49,6 +50,7 @@ pub async fn install_plugin(
     cargo_path: String,
     crate_name: String,
 ) -> AppResult<()> {
+    crate::system::env::validate_rust_binary(&cargo_path).map_err(|e| crate::error::AppError::Command(e))?;
     let (locale_key, log_event, finished_event) = {
         let events = crate::db::get_events_config(&state.db);
         let locale_key = crate::db::get_simple(&state.db, "locale.force_locale")
@@ -67,6 +69,7 @@ pub async fn install_plugin(
         &locale_key,
         &log_event,
         &finished_event,
+        600, // 10 minute timeout for plugin installation
     )
     .await
 }
@@ -74,7 +77,8 @@ pub async fn install_plugin(
 /// Uninstall a cargo plugin.
 #[tauri::command]
 pub async fn uninstall_plugin(cargo_path: String, crate_name: String) -> AppResult<()> {
-    exec::run_command(&cargo_path, &["uninstall", &crate_name]).await?;
+    crate::system::env::validate_rust_binary(&cargo_path).map_err(|e| crate::error::AppError::Command(e))?;
+    exec::run_command(&cargo_path, &["uninstall", &crate_name], 120).await?;
     Ok(())
 }
 
@@ -93,6 +97,7 @@ pub async fn search_plugins(
     query: String,
     state: State<'_, AppState>,
 ) -> AppResult<Vec<SearchResult>> {
+    crate::system::env::validate_rust_binary(&cargo_path).map_err(|e| crate::error::AppError::Command(e))?;
     let timeout = crate::db::get_simple(&state.db, "timeouts.cargo_search_seconds")
         .and_then(|s| s.parse().ok())
         .unwrap_or_else(crate::db::default_cargo_search_seconds);

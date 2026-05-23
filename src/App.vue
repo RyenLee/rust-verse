@@ -184,9 +184,10 @@ async function handleUninstallRustup() {
     uninstallProgressStatus.value = 'success'
     uninstallProgressStatusText.value = t('app.uninstallSuccess')
 
-    // After a brief pause, return to welcome page
-    setTimeout(() => {
+    // After a brief pause, recheck environment then return to welcome page
+    setTimeout(async () => {
       showUninstallProgress.value = false
+      await recheckEnv()
       router.push('/')
       phase.value = 'welcome'
     }, 2000)

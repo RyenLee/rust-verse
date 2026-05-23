@@ -482,46 +482,42 @@ onMounted(async () => {
                   </td>
 
                   <!-- Actions -->
-                  <td class="px-3 py-3">
-                    <div class="flex items-center justify-center gap-0.5 flex-wrap">
+                  <td class="px-2 py-3 w-[160px]">
+                    <div class="flex items-center justify-center gap-1 flex-wrap max-h-[40px] overflow-hidden">
                       <button
-                        class="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-xs font-medium text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors"
-                        :title="t('envVars.dialog.viewTitle')"
+                        class="inline-flex items-center justify-center w-7 h-7 rounded-md text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors"
+                        :title="t('envVars.action.view')"
                         @click="openView(v)"
                       >
                         <iconify-icon icon="mdi:eye-outline" width="14"></iconify-icon>
-                        {{ t('envVars.action.view') }}
                       </button>
                       <button
                         v-if="!persistedVars.has(v.name)"
-                        class="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        class="inline-flex items-center justify-center w-7 h-7 rounded-md text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         :title="t('envVars.action.apply')"
                         :disabled="!v.rec"
                         @click="applyVar(v)"
                       >
                         <iconify-icon icon="mdi:check-circle-outline" width="14"></iconify-icon>
-                        {{ t('envVars.action.apply') }}
                       </button>
                       <button
                         v-else
-                        class="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                        class="inline-flex items-center justify-center w-7 h-7 rounded-md text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
                         :title="t('envVars.action.deactivate')"
                         @click="deactivateVar(v)"
                       >
                         <iconify-icon icon="mdi:close-circle-outline" width="14"></iconify-icon>
-                        {{ t('envVars.action.deactivate') }}
                       </button>
                       <button
-                        class="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-xs font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
-                        :title="t('envVars.dialog.editTitle')"
+                        class="inline-flex items-center justify-center w-7 h-7 rounded-md text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
+                        :title="t('envVars.action.edit')"
                         @click="openEditModal(v, idx)"
                       >
                         <iconify-icon icon="mdi:pencil-outline" width="14"></iconify-icon>
-                        {{ t('envVars.action.edit') }}
                       </button>
                       <button
-                        class="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                        :title="t('envVars.dialog.deleteTitle')"
+                        class="inline-flex items-center justify-center w-7 h-7 rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                        :title="t('envVars.action.delete')"
                         @click="confirmDelete = v"
                       >
                         <iconify-icon icon="mdi:delete-outline" width="14"></iconify-icon>

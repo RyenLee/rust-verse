@@ -96,7 +96,7 @@ async fn uninstall_rustup(state: tauri::State<'_, AppState>) -> crate::error::Ap
         ));
     }
 
-    let result = run_command(&rustup, &["self", "uninstall", "-y"]).await;
+    let result = run_command(&rustup, &["self", "uninstall", "-y"], 120).await;
     match result {
         Ok(output) => {
             *state.rustup_path.lock().unwrap() = None;
@@ -132,7 +132,7 @@ async fn uninstall_rustup(state: tauri::State<'_, AppState>) -> crate::error::Ap
                     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 }
 
-                let retry = run_command(&rustup, &["self", "uninstall", "-y"]).await;
+                let retry = run_command(&rustup, &["self", "uninstall", "-y"], 120).await;
                 match retry {
                     Ok(output) => {
                         *state.rustup_path.lock().unwrap() = None;
@@ -164,22 +164,41 @@ async fn uninstall_rustup(state: tauri::State<'_, AppState>) -> crate::error::Ap
 
 #[cfg(target_os = "windows")]
 async fn try_elevated_uninstall(rustup: &str) -> Result<(), String> {
-    let escaped_path = rustup.replace('\'', "''");
-    let ps_cmd = format!(
-        "Start-Process -FilePath '{}' -ArgumentList 'self','uninstall','-y' -Verb RunAs -Wait",
-        escaped_path
+    // Write the PowerShell command to a temporary script file to avoid
+    // command injection via string interpolation. The rustup path is passed
+    // as a script variable rather than embedded in the command string.
+    let temp_dir = std::env::temp_dir().join("rustverse-elevated-uninstall");
+    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("failed to create temp dir: {e}"))?;
+
+    let script_path = temp_dir.join("uninstall.ps1");
+    let script_content = format!(
+        "$rustupPath = '{escaped}'\nStart-Process -FilePath $rustupPath -ArgumentList 'self','uninstall','-y' -Verb RunAs -Wait",
+        escaped = rustup.replace("'", "''")
     );
+    std::fs::write(&script_path, &script_content)
+        .map_err(|e| format!("failed to write script: {e}"))?;
 
     // IMPORTANT: Do NOT use -NonInteractive here. PowerShell in non-interactive
     // mode conflicts with -Verb RunAs — the UAC dialog may fail to appear,
     // causing PowerShell to hang indefinitely waiting for a prompt the user
     // never sees. -NoProfile alone is safe (skips profile load, ~fast startup).
+    // Using -ExecutionPolicy Bypass to avoid script execution policy blocking.
     let output = tokio::process::Command::new("powershell.exe")
-        .args(["-NoProfile", "-Command", &ps_cmd])
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            &script_path.to_string_lossy(),
+        ])
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
         .output()
         .await
         .map_err(|e| format!("failed to launch elevated process: {e}"))?;
+
+    // Clean up the temporary script
+    let _ = std::fs::remove_file(&script_path);
+    let _ = std::fs::remove_dir(&temp_dir);
 
     if output.status.success() {
         Ok(())
@@ -192,8 +211,14 @@ async fn try_elevated_uninstall(rustup: &str) -> Result<(), String> {
 /// Install rustup using the official installer with streaming output.
 #[tauri::command]
 async fn install_rustup(app: tauri::AppHandle) -> crate::error::AppResult<()> {
-    // Only block installation if the full toolchain (rustup + cargo) is already present
-    if binary_exists("rustup") && binary_exists("cargo") {
+    // Block installation only when both rustup and cargo are *functionally* available.
+    // Using `binary_exists` is insufficient after uninstall because residual files
+    // may remain on disk (e.g. ~/.cargo/bin/rustup.exe) while the toolchain is
+    // actually broken. We verify by running `--version` instead.
+    let rustup_ok = is_binary_functional("rustup").await;
+    let cargo_ok = is_binary_functional("cargo").await;
+
+    if rustup_ok && cargo_ok {
         return Err(crate::error::AppError::Command(
             "rustup and cargo are already installed".to_string(),
         ));
@@ -208,6 +233,21 @@ async fn install_rustup(app: tauri::AppHandle) -> crate::error::AppResult<()> {
     {
         install_rustup_unix(app).await
     }
+}
+
+/// Check whether a binary is functionally available by running `<name> --version`.
+/// Returns `true` only if the command executes successfully.
+async fn is_binary_functional(name: &str) -> bool {
+    let mut cmd = tokio::process::Command::new(name);
+    cmd.arg("--version");
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    tokio::time::timeout(std::time::Duration::from_secs(5), cmd.output())
+        .await
+        .map(|result| result.map(|o| o.status.success()).unwrap_or(false))
+        .unwrap_or(false)
 }
 
 #[cfg(target_os = "windows")]
@@ -228,11 +268,17 @@ async fn install_rustup_windows(app: tauri::AppHandle) -> crate::error::AppResul
         installer_path.to_string_lossy()
     );
 
-    let download_output = tokio::process::Command::new("powershell.exe")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &ps_script])
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
-        .output()
-        .await
+    let download_result = tokio::time::timeout(
+        std::time::Duration::from_secs(120), // 2 minute timeout for download
+        tokio::process::Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &ps_script])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output(),
+    )
+    .await;
+
+    let download_output = download_result
+        .map_err(|_| crate::error::AppError::Timeout(120))?
         .map_err(|e| crate::error::AppError::Network(format!("failed to download rustup: {e}")))?;
 
     if !download_output.status.success() {
@@ -262,6 +308,7 @@ async fn install_rustup_windows(app: tauri::AppHandle) -> crate::error::AppResul
         "C",
         "rustup-install-log",
         "rustup-install-finished",
+        600, // 10 minute timeout for rustup installation
     )
     .await?;
 
@@ -282,15 +329,21 @@ async fn install_rustup_unix(app: tauri::AppHandle) -> crate::error::AppResult<(
 
     let script_path = temp_dir.join("rustup-init.sh");
 
-    let download_output = tokio::process::Command::new("curl")
-        .args([
-            "-sSf",
-            "https://sh.rustup.rs",
-            "-o",
-            &script_path.to_string_lossy(),
-        ])
-        .output()
-        .await
+    let download_result = tokio::time::timeout(
+        std::time::Duration::from_secs(120), // 2 minute timeout for download
+        tokio::process::Command::new("curl")
+            .args([
+                "-sSf",
+                "https://sh.rustup.rs",
+                "-o",
+                &script_path.to_string_lossy(),
+            ])
+            .output(),
+    )
+    .await;
+
+    let download_output = download_result
+        .map_err(|_| crate::error::AppError::Timeout(120))?
         .map_err(|e| {
             crate::error::AppError::Network(format!("failed to download rustup installer: {e}"))
         })?;
@@ -321,6 +374,7 @@ async fn install_rustup_unix(app: tauri::AppHandle) -> crate::error::AppResult<(
         "C",
         "rustup-install-log",
         "rustup-install-finished",
+        600, // 10 minute timeout for rustup installation
     )
     .await?;
 
@@ -563,6 +617,15 @@ pub fn run() {
             get_locale,
             set_locale,
             list_available_locales,
+            check_crm_installed,
+            install_crm,
+            crm_list,
+            crm_current,
+            crm_version,
+            crm_use,
+            crm_best,
+            crm_default,
+            crm_test,
         ])
         .manage(app_state)
         .manage(locale_scan_state)

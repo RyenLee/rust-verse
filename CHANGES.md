@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added i18n plugin setup for tests
   - Fixed shared composable state leaks between tests
   - Updated test assertions to match current component behavior
+- Fixed Rust uninstall auto-redirect to welcome page issue by changing installation status detection from file existence to functional validation
+- Fixed PowerShell command injection vulnerability in `try_elevated_uninstall` by using temporary script files
+- Added timeout protection to `run_command_with_streaming`, `run_command`, and `run_command_with_cwd` functions
+- Added parameter validation for `rustup_path` and `cargo_path` to prevent arbitrary command execution
+- Added timeout protection to PowerShell download and curl download operations
+- Added path validation for `cwd` parameter in `run_command_with_cwd`
+- Added binary name validation in `check_rustup` to prevent path hijacking
 
 ## [1.2.1] - 2025-05-23
 

@@ -21,11 +21,12 @@ pub struct ToolchainInfo {
 /// List all installed toolchains via `rustup toolchain list`.
 #[tauri::command]
 pub async fn list_toolchains(rustup_path: String, state: State<'_, AppState>) -> AppResult<Vec<ToolchainInfo>> {
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
     let parsing = crate::db::get_parsing_config(&state.db);
     let default_marker = parsing.default_marker;
     let active_marker = parsing.active_marker;
 
-    let output = exec::run_command(&rustup_path, &["toolchain", "list"]).await?;
+    let output = exec::run_command(&rustup_path, &["toolchain", "list"], 30).await?;
 
     Ok(parse_toolchain_list(&output, &default_marker, &active_marker)?)
 }
@@ -42,6 +43,7 @@ pub async fn install_toolchain(
     channel: String,
     date: Option<String>,
 ) -> AppResult<()> {
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
     let (locale_key, log_event, finished_event) = {
         let events = crate::db::get_events_config(&state.db);
         let locale_key = crate::db::get_simple(&state.db, "locale.force_locale")
@@ -66,6 +68,7 @@ pub async fn install_toolchain(
         &locale_key,
         &log_event,
         &finished_event,
+        600, // 10 minute timeout for toolchain installation
     )
     .await
 }
@@ -73,14 +76,16 @@ pub async fn install_toolchain(
 /// Uninstall a toolchain.
 #[tauri::command]
 pub async fn uninstall_toolchain(rustup_path: String, name: String) -> AppResult<()> {
-    exec::run_command(&rustup_path, &["toolchain", "uninstall", &name]).await?;
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+    exec::run_command(&rustup_path, &["toolchain", "uninstall", &name], 120).await?;
     Ok(())
 }
 
 /// Set the default toolchain.
 #[tauri::command]
 pub async fn set_default_toolchain(rustup_path: String, name: String) -> AppResult<()> {
-    exec::run_command(&rustup_path, &["default", &name]).await?;
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+    exec::run_command(&rustup_path, &["default", &name], 30).await?;
     Ok(())
 }
 

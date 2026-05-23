@@ -109,6 +109,26 @@ pub fn binary_exists(name: &str) -> bool {
     find_binary(name).is_ok()
 }
 
+/// Validate that a binary name/path is a known Rust toolchain binary.
+///
+/// This prevents arbitrary command execution by rejecting unexpected
+/// binary names passed from the frontend. Only `rustup` and `cargo`
+/// (with or without `.exe` suffix and absolute path) are allowed.
+pub fn validate_rust_binary(name: &str) -> Result<(), String> {
+    // Extract the file stem (e.g. "rustup" from "C:\Users\...\.cargo\bin\rustup.exe")
+    let stem = std::path::Path::new(name)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(name);
+
+    match stem {
+        "rustup" | "cargo" => Ok(()),
+        other => Err(format!(
+            "invalid binary name '{other}': only 'rustup' and 'cargo' are allowed"
+        )),
+    }
+}
+
 /// Add `.exe` suffix on Windows.
 fn format_bin_name(name: &str) -> String {
     if cfg!(target_os = "windows") && !name.ends_with(".exe") {

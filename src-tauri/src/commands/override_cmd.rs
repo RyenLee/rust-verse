@@ -19,7 +19,8 @@ pub struct OverrideInfo {
 /// Executes `rustup override list` and filters for the given path.
 #[tauri::command]
 pub async fn get_override(rustup_path: String, dir_path: String, state: State<'_, AppState>) -> AppResult<Option<OverrideInfo>> {
-    let output = exec::run_command(&rustup_path, &["override", "list"]).await?;
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+    let output = exec::run_command(&rustup_path, &["override", "list"], 30).await?;
     let parsing = crate::db::get_parsing_config(&state.db);
     let no_overrides = parsing.no_overrides;
     let override_info = parse_override_list(&output, &no_overrides)
@@ -35,23 +36,28 @@ pub async fn set_override(
     dir_path: String,
     toolchain: String,
 ) -> AppResult<()> {
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+    validate_dir_path(&dir_path)?;
     // rustup override set requires being in the target directory
     // Use --path flag if available, otherwise cd
-    exec::run_command_with_cwd(&rustup_path, &["override", "set", &toolchain], &dir_path).await?;
+    exec::run_command_with_cwd(&rustup_path, &["override", "set", &toolchain], &dir_path, 60).await?;
     Ok(())
 }
 
 /// Remove a toolchain override for a directory.
 #[tauri::command]
 pub async fn remove_override(rustup_path: String, dir_path: String) -> AppResult<()> {
-    exec::run_command_with_cwd(&rustup_path, &["override", "unset"], &dir_path).await?;
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+    validate_dir_path(&dir_path)?;
+    exec::run_command_with_cwd(&rustup_path, &["override", "unset"], &dir_path, 60).await?;
     Ok(())
 }
 
 /// List all overrides.
 #[tauri::command]
 pub async fn list_overrides(rustup_path: String, state: State<'_, AppState>) -> AppResult<Vec<OverrideInfo>> {
-    let output = exec::run_command(&rustup_path, &["override", "list"]).await?;
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+    let output = exec::run_command(&rustup_path, &["override", "list"], 30).await?;
     let parsing = crate::db::get_parsing_config(&state.db);
     let no_overrides = parsing.no_overrides;
     Ok(parse_override_list(&output, &no_overrides))
@@ -84,6 +90,22 @@ pub fn parse_override_list(output: &str, no_overrides_marker: &str) -> Vec<Overr
     }
 
     overrides
+}
+
+/// Validate that a directory path exists and is actually a directory.
+fn validate_dir_path(dir_path: &str) -> AppResult<()> {
+    let path = std::path::Path::new(dir_path);
+    if !path.exists() {
+        return Err(crate::error::AppError::Command(
+            format!("directory does not exist: {dir_path}")
+        ));
+    }
+    if !path.is_dir() {
+        return Err(crate::error::AppError::Command(
+            format!("path is not a directory: {dir_path}")
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

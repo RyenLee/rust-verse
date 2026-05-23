@@ -7,6 +7,7 @@ export default {
     apply: '生效',
     deactivate: '失效',
     edit: '编辑',
+    delete: '删除',
   },
   placeholder: {
     search: '搜索变量名或说明...',

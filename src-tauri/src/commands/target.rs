@@ -17,7 +17,8 @@ pub struct TargetInfo {
 /// List targets for a toolchain.
 #[tauri::command]
 pub async fn list_targets(rustup_path: String, toolchain: String, state: State<'_, AppState>) -> AppResult<Vec<TargetInfo>> {
-    let output = exec::run_command(&rustup_path, &["target", "list", "--toolchain", &toolchain]).await?;
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+    let output = exec::run_command(&rustup_path, &["target", "list", "--toolchain", &toolchain], 30).await?;
     let parsing = crate::db::get_parsing_config(&state.db);
     Ok(parse_target_list(&output, &parsing.installed_marker, &parsing.default_marker))
 }
@@ -29,7 +30,8 @@ pub async fn add_target(
     toolchain: String,
     target: String,
 ) -> AppResult<()> {
-    exec::run_command(&rustup_path, &["target", "add", &target, "--toolchain", &toolchain]).await?;
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+    exec::run_command(&rustup_path, &["target", "add", &target, "--toolchain", &toolchain], 120).await?;
     Ok(())
 }
 
@@ -40,7 +42,8 @@ pub async fn remove_target(
     toolchain: String,
     target: String,
 ) -> AppResult<()> {
-    exec::run_command(&rustup_path, &["target", "remove", &target, "--toolchain", &toolchain]).await?;
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+    exec::run_command(&rustup_path, &["target", "remove", &target, "--toolchain", &toolchain], 60).await?;
     Ok(())
 }
 

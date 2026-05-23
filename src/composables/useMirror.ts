@@ -1,0 +1,59 @@
+import { invoke } from '@tauri-apps/api/core'
+
+export interface MirrorInfo {
+  name: string
+  index: string
+  is_sparse: boolean
+}
+
+const CARGO = 'cargo'
+
+export function useMirror() {
+  async function checkInstalled(): Promise<boolean> {
+    return invoke<boolean>('check_crm_installed')
+  }
+
+  async function install(): Promise<void> {
+    return invoke('install_crm', { cargoPath: CARGO })
+  }
+
+  async function list(): Promise<MirrorInfo[]> {
+    return invoke<MirrorInfo[]>('crm_list')
+  }
+
+  async function current(): Promise<string> {
+    return invoke<string>('crm_current')
+  }
+
+  async function version(): Promise<string> {
+    return invoke<string>('crm_version')
+  }
+
+  async function useMirror(name: string): Promise<void> {
+    return invoke('crm_use', { name })
+  }
+
+  async function best(mode?: string): Promise<void> {
+    return invoke('crm_best', { mode: mode ?? '' })
+  }
+
+  async function restoreDefault(): Promise<void> {
+    return invoke('crm_default')
+  }
+
+  async function test(name?: string): Promise<string> {
+    return invoke<string>('crm_test', { name: name ?? null })
+  }
+
+  return {
+    checkInstalled,
+    install,
+    list,
+    current,
+    version,
+    useMirror,
+    best,
+    restoreDefault,
+    test,
+  }
+}

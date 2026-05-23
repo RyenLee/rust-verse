@@ -154,11 +154,10 @@ function handleEnter() {
 }
 
 function handleRetry() {
-  if (envCheck.value?.rustup_installed && envCheck.value?.cargo_installed) {
-    handleDetect()
-  } else {
-    handleInstall()
-  }
+  // Always re-detect first. After an uninstall, residual files may cause
+  // install_rustup to report "already installed" even though the toolchain
+  // is broken. Re-detecting refreshes envCheck with the actual state.
+  handleDetect()
 }
 
 function resetToIdle() {

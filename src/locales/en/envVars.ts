@@ -7,6 +7,7 @@ export default {
     apply: 'Apply',
     deactivate: 'Deactivate',
     edit: 'Edit',
+    delete: 'Delete',
   },
   placeholder: {
     search: 'Search variable name or description...',

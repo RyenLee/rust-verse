@@ -21,6 +21,7 @@ pub struct UpdateInfo {
 /// Check for available updates with a configurable timeout.
 #[tauri::command]
 pub async fn check_update(rustup_path: String, state: State<'_, AppState>) -> AppResult<Vec<UpdateInfo>> {
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
     let timeout = crate::db::get_simple(&state.db, "timeouts.rustup_check_seconds")
         .and_then(|s| s.parse().ok())
         .unwrap_or(30); // default 30s timeout
@@ -44,6 +45,7 @@ pub async fn check_update(rustup_path: String, state: State<'_, AppState>) -> Ap
 /// and a finished event when done.
 #[tauri::command]
 pub async fn update_all(app: AppHandle, state: State<'_, AppState>, rustup_path: String) -> AppResult<()> {
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
     let (locale_key, log_event, finished_event) = {
         let events = crate::db::get_events_config(&state.db);
         let locale_key = crate::db::get_simple(&state.db, "locale.force_locale")
@@ -62,6 +64,7 @@ pub async fn update_all(app: AppHandle, state: State<'_, AppState>, rustup_path:
         &locale_key,
         &log_event,
         &finished_event,
+        600, // 10 minute timeout for toolchain updates
     )
     .await
 }
@@ -72,6 +75,7 @@ pub async fn update_all(app: AppHandle, state: State<'_, AppState>, rustup_path:
 /// and a finished event when done.
 #[tauri::command]
 pub async fn update_rustup(app: AppHandle, state: State<'_, AppState>, rustup_path: String) -> AppResult<()> {
+    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
     let (locale_key, log_event, finished_event) = {
         let events = crate::db::get_events_config(&state.db);
         let locale_key = crate::db::get_simple(&state.db, "locale.force_locale")
@@ -90,6 +94,7 @@ pub async fn update_rustup(app: AppHandle, state: State<'_, AppState>, rustup_pa
         &locale_key,
         &log_event,
         &finished_event,
+        300, // 5 minute timeout for rustup self-update
     )
     .await
 }
