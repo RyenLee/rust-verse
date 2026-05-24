@@ -17,8 +17,8 @@ export function useToolchainOptions() {
     loading.value = true
     try {
       toolchains.value = await listToolchains()
-    } catch (e) {
-      console.error('[useToolchainOptions] Failed to load:', e)
+    } catch {
+      // ignore
     } finally {
       loading.value = false
     }

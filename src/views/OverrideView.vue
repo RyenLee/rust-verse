@@ -28,8 +28,8 @@ async function refresh() {
   loading.value = true
   try {
     overrides.value = await listOverrides()
-  } catch (e) {
-    console.error('Failed to load overrides:', e)
+  } catch {
+    // ignore
   } finally {
     loading.value = false
   }

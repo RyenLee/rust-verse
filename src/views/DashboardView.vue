@@ -22,26 +22,19 @@ const updateError = ref(false)
 
 async function loadData() {
   const t0 = performance.now()
-  console.log('[Dashboard] loadData started')
   loading.value = true
   updateError.value = false
 
   // Step 1: Check environment (15s timeout — matches App.vue)
   try {
-    console.log('[Dashboard] step1: checkEnv (15s timeout)...')
     const r = await withTimeout(checkEnv(), 15000)
     if (!r.ok) {
-      console.error('[Dashboard] step1: checkEnv TIMEOUT')
+      // checkEnv timeout
     } else {
       envCheck.value = r.value
-      console.log(
-        `[Dashboard] step1: checkEnv done in ${Math.round(performance.now() - t0)}ms: rustup=${
-          r.value.rustup_installed
-        }`
-      )
     }
-  } catch (e) {
-    console.error('[Dashboard] step1: checkEnv error:', e)
+  } catch {
+    // checkEnv error
   }
 
   // Fallback if envCheck is still null (timeout or error)
@@ -66,10 +59,6 @@ async function loadData() {
   }
 
   // Steps 2-4: Run in parallel with individual timeouts
-  console.log('[Dashboard] step2: listToolchains (20s timeout)...')
-  console.log('[Dashboard] step3: checkUpdate (30s timeout)...')
-  console.log('[Dashboard] step4: getVersions (10s timeout)...')
-
   const [tlResult, cuResult, gvResult] = await Promise.allSettled([
     withTimeout(listToolchains(), 20000),
     withTimeout(checkUpdate(), 30000),
@@ -82,9 +71,6 @@ async function loadData() {
     toolchainCount.value = toolchains.length
     const def = toolchains.find(t => t.is_default)
     if (def) defaultToolchain.value = def.name
-    console.log(`[Dashboard] step2: listToolchains done: ${toolchains.length} toolchains`)
-  } else {
-    console.error('[Dashboard] step2: listToolchains failed/timeout')
   }
 
   // Process updates
@@ -92,27 +78,20 @@ async function loadData() {
     const updates = cuResult.value.value
     updateCount.value = updates.filter(u => !u.up_to_date).length
     updateError.value = false
-    console.log(`[Dashboard] step3: checkUpdate done: ${updates.length} entries`)
   } else {
-    console.error('[Dashboard] step3: checkUpdate failed/timeout')
     updateError.value = true
   }
 
   // Process versions
   if (gvResult.status === 'fulfilled' && gvResult.value.ok) {
     versions.value = gvResult.value.value
-    console.log('[Dashboard] step4: getVersions done')
-  } else {
-    console.error('[Dashboard] step4: getVersions failed/timeout')
   }
 
   loading.value = false
   loaded.value = true
-  console.log(`[Dashboard] loadData done in ${Math.round(performance.now() - t0)}ms`)
 }
 
 onMounted(() => {
-  console.log('[Dashboard] onMounted, loaded:', loaded.value)
   if (!loaded.value) {
     loadData()
   }

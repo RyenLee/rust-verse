@@ -37,6 +37,20 @@ const viewVar = ref<EnvVarInfo | null>(null)
 // Delete confirmation state
 const confirmDelete = ref<EnvVarInfo | null>(null)
 
+// Critical variable confirmation state (CARGO_HOME only - requires checkbox)
+const CRITICAL_VARS = new Set(['CARGO_HOME'])
+
+// Normal variable confirmation state (all vars - simple confirm)
+const normalConfirm = ref<{
+  type: 'apply' | 'deactivate'
+  variable: EnvVarInfo
+} | null>(null)
+const criticalConfirm = ref<{
+  type: 'apply' | 'deactivate'
+  variable: EnvVarInfo
+} | null>(null)
+const criticalConfirmed = ref(false)
+
 // Persisted state tracking
 const persistedVars = ref<Set<string>>(new Set())
 
@@ -108,7 +122,6 @@ async function loadData() {
   try {
     envVars.value = await listEnvVars()
   } catch (e) {
-    console.error('Failed to load env vars:', e)
     error(t('envVars.message.loadFailed'))
   } finally {
     loading.value = false
@@ -119,8 +132,8 @@ async function loadPersistedStatus() {
   try {
     const list = await listPersistedEnvVars()
     persistedVars.value = new Set(list)
-  } catch (e) {
-    console.error('Failed to load persisted status:', e)
+  } catch {
+    // Silently ignore - persisted status is optional
   }
 }
 
@@ -229,6 +242,18 @@ async function applyVar(v: EnvVarInfo) {
     error(t('envVars.message.noValueToApply'))
     return
   }
+  // Critical variable (CARGO_HOME): show full confirmation dialog with checkbox
+  if (CRITICAL_VARS.has(v.name)) {
+    criticalConfirm.value = { type: 'apply', variable: v }
+    criticalConfirmed.value = false
+    return
+  }
+  // All other variables: show simple confirmation dialog
+  normalConfirm.value = { type: 'apply', variable: v }
+  return
+}
+
+async function doApplyVar(v: EnvVarInfo) {
   try {
     // 1. Set in current process
     await setEnvVar(v.name, v.rec)
@@ -246,6 +271,18 @@ async function applyVar(v: EnvVarInfo) {
 
 // Deactivate: remove from system persistence AND unset from current process
 async function deactivateVar(v: EnvVarInfo) {
+  // Critical variable (CARGO_HOME): show full confirmation dialog with checkbox
+  if (CRITICAL_VARS.has(v.name)) {
+    criticalConfirm.value = { type: 'deactivate', variable: v }
+    criticalConfirmed.value = false
+    return
+  }
+  // All other variables: show simple confirmation dialog
+  normalConfirm.value = { type: 'deactivate', variable: v }
+  return
+}
+
+async function doDeactivateVar(v: EnvVarInfo) {
   try {
     // 1. Remove from system persistence (registry / shell config)
     await removePersistedEnvVar(v.name)
@@ -258,8 +295,31 @@ async function deactivateVar(v: EnvVarInfo) {
     notifyEnvVarChange()
     await loadData()
   } catch (e: any) {
-    console.error('Failed to deactivate env var:', v.name, e)
     error(t('envVars.message.deactivateFailed', { error: String(e) }))
+  }
+}
+
+// Handle critical variable confirmation
+function handleCriticalConfirm() {
+  if (!criticalConfirm.value) return
+  const { type, variable } = criticalConfirm.value
+  criticalConfirm.value = null
+  if (type === 'apply') {
+    doApplyVar(variable)
+  } else {
+    doDeactivateVar(variable)
+  }
+}
+
+// Handle normal variable confirmation
+function handleNormalConfirm() {
+  if (!normalConfirm.value) return
+  const { type, variable } = normalConfirm.value
+  normalConfirm.value = null
+  if (type === 'apply') {
+    doApplyVar(variable)
+  } else {
+    doDeactivateVar(variable)
   }
 }
 
@@ -392,142 +452,168 @@ onMounted(async () => {
             </p>
           </div>
 
-          <div v-else class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div
+            v-else
+            class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+          >
             <div class="overflow-y-auto max-h-full">
-            <table class="w-full text-sm table-fixed">
-              <thead class="sticky top-0 z-10">
-                <tr class="bg-gray-50 dark:bg-gray-800/80">
-                  <th class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap max-w-0">
-                    {{ t('envVars.field.variable') }}
-                  </th>
-                  <th class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                    {{ t('envVars.field.description') }}
-                  </th>
-                  <th class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                    {{ t('envVars.field.rec') }}
-                  </th>
-                  <th class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                    {{ t('envVars.field.def') }}
-                  </th>
-                  <th class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                    {{ t('envVars.field.notes') }}
-                  </th>
-                  <th
-                    class="text-center px-3 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap w-[160px]"
+              <table class="w-full text-sm table-fixed">
+                <thead class="sticky top-0 z-10">
+                  <tr class="bg-gray-50 dark:bg-gray-800/80">
+                    <th
+                      class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap max-w-0"
+                    >
+                      {{ t('envVars.field.variable') }}
+                    </th>
+                    <th class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      {{ t('envVars.field.description') }}
+                    </th>
+                    <th class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      {{ t('envVars.field.rec') }}
+                    </th>
+                    <th class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      {{ t('envVars.field.def') }}
+                    </th>
+                    <th class="text-left px-4 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      {{ t('envVars.field.notes') }}
+                    </th>
+                    <th
+                      class="text-center px-3 py-3 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap w-[160px]"
+                    >
+                      {{ t('envVars.field.actions') }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(v, idx) in filteredVars"
+                    :key="v.name"
+                    class="border-t border-gray-100 dark:border-gray-700/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors"
                   >
-                    {{ t('envVars.field.actions') }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(v, idx) in filteredVars"
-                  :key="v.name"
-                  class="border-t border-gray-100 dark:border-gray-700/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors"
-                >
-                  <!-- Variable name -->
-                  <td class="px-4 py-3 max-w-0">
-                    <div class="flex items-center gap-2 min-w-0">
-                      <span
-                        class="shrink-0 w-2 h-2 rounded-full"
-                        :class="v.is_set ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'"
-                        :title="v.is_set ? t('envVars.status.set') : t('envVars.status.notSet')"
-                      />
-                      <span class="font-mono text-sm font-semibold text-gray-900 dark:text-gray-100 truncate" :title="v.name">
-                        {{ v.name }}
+                    <!-- Variable name -->
+                    <td class="px-4 py-3 max-w-0">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span
+                          class="shrink-0 w-2 h-2 rounded-full"
+                          :class="v.is_set ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'"
+                          :title="v.is_set ? t('envVars.status.set') : t('envVars.status.notSet')"
+                        />
+                        <span
+                          class="font-mono text-sm font-semibold truncate"
+                          :class="
+                            CRITICAL_VARS.has(v.name)
+                              ? 'text-amber-700 dark:text-amber-300'
+                              : 'text-gray-900 dark:text-gray-100'
+                          "
+                          :title="v.name"
+                        >
+                          {{ v.name }}
+                        </span>
+                        <iconify-icon
+                          v-if="CRITICAL_VARS.has(v.name)"
+                          icon="mdi:alert-outline"
+                          width="14"
+                          class="text-amber-500 dark:text-amber-400 shrink-0"
+                          :title="t('envVars.criticalVar.title')"
+                        ></iconify-icon>
+                        <iconify-icon
+                          v-else
+                          icon="mdi:information-outline"
+                          width="14"
+                          class="text-sky-500 dark:text-sky-400 shrink-0"
+                          :title="t('envVars.normalVar.title')"
+                        ></iconify-icon>
+                        <span
+                          v-if="persistedVars.has(v.name)"
+                          class="text-emerald-600 dark:text-emerald-400 flex items-center shrink-0"
+                          :title="t('envVars.persist.label')"
+                        >
+                          <iconify-icon icon="mdi:pin" width="14"></iconify-icon>
+                        </span>
+                      </div>
+                    </td>
+
+                    <!-- Description -->
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      <span class="line-clamp-2">{{ v.description }}</span>
+                    </td>
+
+                    <!-- Recommended value -->
+                    <td class="px-4 py-3">
+                      <code
+                        v-if="v.rec"
+                        class="font-mono text-xs bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 px-2 py-1 rounded truncate block"
+                      >
+                        {{ v.rec }}
+                      </code>
+                      <span v-else class="text-gray-300 dark:text-gray-600">—</span>
+                    </td>
+
+                    <!-- Default value -->
+                    <td class="px-4 py-3">
+                      <span v-if="v.def" class="font-mono text-xs text-gray-500 dark:text-gray-400 truncate block">
+                        {{ v.def }}
                       </span>
+                      <span v-else class="text-gray-300 dark:text-gray-600">—</span>
+                    </td>
+
+                    <!-- Notes -->
+                    <td class="px-4 py-3">
                       <span
-                        v-if="persistedVars.has(v.name)"
-                        class="text-xs px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 flex items-center gap-0.5 shrink-0"
-                        :title="t('envVars.persist.label')"
+                        v-if="v.notes"
+                        class="text-xs text-amber-600 dark:text-amber-400 line-clamp-2"
+                        :title="v.notes"
                       >
-                        <iconify-icon icon="mdi:pin" width="11"></iconify-icon>
-                        {{ t('envVars.persist.label') }}
+                        {{ v.notes }}
                       </span>
-                    </div>
-                  </td>
+                    </td>
 
-                  <!-- Description -->
-                  <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
-                    <span class="line-clamp-2">{{ v.description }}</span>
-                  </td>
-
-                  <!-- Recommended value -->
-                  <td class="px-4 py-3">
-                    <code
-                      v-if="v.rec"
-                      class="font-mono text-xs bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 px-2 py-1 rounded truncate block"
-                    >
-                      {{ v.rec }}
-                    </code>
-                    <span v-else class="text-gray-300 dark:text-gray-600">—</span>
-                  </td>
-
-                  <!-- Default value -->
-                  <td class="px-4 py-3">
-                    <span v-if="v.def" class="font-mono text-xs text-gray-500 dark:text-gray-400 truncate block">
-                      {{ v.def }}
-                    </span>
-                    <span v-else class="text-gray-300 dark:text-gray-600">—</span>
-                  </td>
-
-                  <!-- Notes -->
-                  <td class="px-4 py-3">
-                    <span
-                      v-if="v.notes"
-                      class="text-xs text-amber-600 dark:text-amber-400 line-clamp-2"
-                      :title="v.notes"
-                    >
-                      {{ v.notes }}
-                    </span>
-                  </td>
-
-                  <!-- Actions -->
-                  <td class="px-2 py-3 w-[160px]">
-                    <div class="flex items-center justify-center gap-1 flex-wrap max-h-[40px] overflow-hidden">
-                      <button
-                        class="inline-flex items-center justify-center w-7 h-7 rounded-md text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors"
-                        :title="t('envVars.action.view')"
-                        @click="openView(v)"
-                      >
-                        <iconify-icon icon="mdi:eye-outline" width="14"></iconify-icon>
-                      </button>
-                      <button
-                        v-if="!persistedVars.has(v.name)"
-                        class="inline-flex items-center justify-center w-7 h-7 rounded-md text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        :title="t('envVars.action.apply')"
-                        :disabled="!v.rec"
-                        @click="applyVar(v)"
-                      >
-                        <iconify-icon icon="mdi:check-circle-outline" width="14"></iconify-icon>
-                      </button>
-                      <button
-                        v-else
-                        class="inline-flex items-center justify-center w-7 h-7 rounded-md text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                        :title="t('envVars.action.deactivate')"
-                        @click="deactivateVar(v)"
-                      >
-                        <iconify-icon icon="mdi:close-circle-outline" width="14"></iconify-icon>
-                      </button>
-                      <button
-                        class="inline-flex items-center justify-center w-7 h-7 rounded-md text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
-                        :title="t('envVars.action.edit')"
-                        @click="openEditModal(v, idx)"
-                      >
-                        <iconify-icon icon="mdi:pencil-outline" width="14"></iconify-icon>
-                      </button>
-                      <button
-                        class="inline-flex items-center justify-center w-7 h-7 rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                        :title="t('envVars.action.delete')"
-                        @click="confirmDelete = v"
-                      >
-                        <iconify-icon icon="mdi:delete-outline" width="14"></iconify-icon>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    <!-- Actions -->
+                    <td class="px-2 py-3 w-[160px]">
+                      <div class="flex items-center justify-center gap-1 flex-wrap max-h-[40px] overflow-hidden">
+                        <button
+                          class="inline-flex items-center justify-center w-7 h-7 rounded-md text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors"
+                          :title="t('envVars.action.view')"
+                          @click="openView(v)"
+                        >
+                          <iconify-icon icon="mdi:eye-outline" width="14"></iconify-icon>
+                        </button>
+                        <button
+                          v-if="!persistedVars.has(v.name)"
+                          class="inline-flex items-center justify-center w-7 h-7 rounded-md text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          :title="t('envVars.action.apply')"
+                          :disabled="!v.rec"
+                          @click="applyVar(v)"
+                        >
+                          <iconify-icon icon="mdi:check-circle-outline" width="14"></iconify-icon>
+                        </button>
+                        <button
+                          v-else
+                          class="inline-flex items-center justify-center w-7 h-7 rounded-md text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                          :title="t('envVars.action.deactivate')"
+                          @click="deactivateVar(v)"
+                        >
+                          <iconify-icon icon="mdi:close-circle-outline" width="14"></iconify-icon>
+                        </button>
+                        <button
+                          class="inline-flex items-center justify-center w-7 h-7 rounded-md text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
+                          :title="t('envVars.action.edit')"
+                          @click="openEditModal(v, idx)"
+                        >
+                          <iconify-icon icon="mdi:pencil-outline" width="14"></iconify-icon>
+                        </button>
+                        <button
+                          class="inline-flex items-center justify-center w-7 h-7 rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                          :title="t('envVars.action.delete')"
+                          @click="confirmDelete = v"
+                        >
+                          <iconify-icon icon="mdi:delete-outline" width="14"></iconify-icon>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -778,6 +864,212 @@ onMounted(async () => {
                   @click="saveEditModal"
                 >
                   {{ t('common.action.save') }}
+                </button>
+              </div>
+            </div>
+          </Transition>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Normal variable confirmation dialog -->
+    <Teleport to="body">
+      <Transition name="dialog-overlay">
+        <div
+          v-if="normalConfirm"
+          class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
+          @click.self="normalConfirm = null"
+        >
+          <Transition name="dialog-panel">
+            <div
+              v-if="normalConfirm"
+              class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+            >
+              <!-- Header -->
+              <div class="px-6 pt-6 pb-4">
+                <div class="flex items-center gap-3 mb-3">
+                  <div
+                    class="w-9 h-9 rounded-full bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center shrink-0"
+                  >
+                    <iconify-icon
+                      icon="mdi:information-outline"
+                      width="20"
+                      class="text-sky-600 dark:text-sky-400"
+                    ></iconify-icon>
+                  </div>
+                  <h3 class="text-base font-bold text-gray-900 dark:text-gray-100">
+                    {{ t('envVars.normalVar.title') }}
+                  </h3>
+                </div>
+
+                <div class="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg p-3">
+                  <p class="text-sm text-sky-800 dark:text-sky-200">
+                    {{
+                      t('envVars.normalVar.' + (normalConfirm.type === 'apply' ? 'applyHint' : 'deactivateHint'), {
+                        name: normalConfirm.variable.name,
+                      })
+                    }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Footer -->
+              <div
+                class="px-6 py-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-end gap-2"
+              >
+                <button
+                  class="h-9 px-4 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  @click="normalConfirm = null"
+                >
+                  {{ t('common.action.cancel') }}
+                </button>
+                <button
+                  class="h-9 px-4 rounded-lg text-sm font-medium bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors"
+                  @click="handleNormalConfirm"
+                >
+                  {{ normalConfirm.type === 'apply' ? t('envVars.action.apply') : t('envVars.action.deactivate') }}
+                </button>
+              </div>
+            </div>
+          </Transition>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Critical variable confirmation dialog -->
+    <Teleport to="body">
+      <Transition name="dialog-overlay">
+        <div
+          v-if="criticalConfirm"
+          class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
+          @click.self="criticalConfirm = null"
+        >
+          <Transition name="dialog-panel">
+            <div
+              v-if="criticalConfirm"
+              class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+            >
+              <!-- Header -->
+              <div class="px-6 pt-6 pb-4">
+                <div class="flex items-center gap-3 mb-4">
+                  <div
+                    class="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0"
+                  >
+                    <iconify-icon
+                      icon="mdi:alert-outline"
+                      width="24"
+                      class="text-amber-600 dark:text-amber-400"
+                    ></iconify-icon>
+                  </div>
+                  <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">
+                    {{ t('envVars.criticalVar.title') }}
+                  </h3>
+                </div>
+
+                <!-- Warning content -->
+                <div
+                  class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 space-y-3"
+                >
+                  <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                    {{
+                      t(
+                        'envVars.criticalVar.' +
+                          (criticalConfirm.type === 'apply' ? 'applyWarning' : 'deactivateWarning'),
+                        { name: criticalConfirm.variable.name }
+                      )
+                    }}
+                  </p>
+
+                  <ul class="space-y-1.5">
+                    <template v-if="criticalConfirm.type === 'apply'">
+                      <li class="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300">
+                        <iconify-icon icon="mdi:chevron-right" width="16" class="shrink-0 mt-0.5"></iconify-icon>
+                        <span>{{ t('envVars.criticalVar.effect1', { name: criticalConfirm.variable.name }) }}</span>
+                      </li>
+                      <li class="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300">
+                        <iconify-icon icon="mdi:chevron-right" width="16" class="shrink-0 mt-0.5"></iconify-icon>
+                        <span>{{ t('envVars.criticalVar.effect2', { name: criticalConfirm.variable.name }) }}</span>
+                      </li>
+                      <li class="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300">
+                        <iconify-icon icon="mdi:chevron-right" width="16" class="shrink-0 mt-0.5"></iconify-icon>
+                        <span>{{ t('envVars.criticalVar.effect3', { name: criticalConfirm.variable.name }) }}</span>
+                      </li>
+                      <li class="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300">
+                        <iconify-icon icon="mdi:chevron-right" width="16" class="shrink-0 mt-0.5"></iconify-icon>
+                        <span>{{ t('envVars.criticalVar.effect4', { name: criticalConfirm.variable.name }) }}</span>
+                      </li>
+                    </template>
+                    <template v-else>
+                      <li class="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300">
+                        <iconify-icon icon="mdi:chevron-right" width="16" class="shrink-0 mt-0.5"></iconify-icon>
+                        <span>{{
+                          t('envVars.criticalVar.deactivateEffect1', { name: criticalConfirm.variable.name })
+                        }}</span>
+                      </li>
+                      <li class="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300">
+                        <iconify-icon icon="mdi:chevron-right" width="16" class="shrink-0 mt-0.5"></iconify-icon>
+                        <span>{{
+                          t('envVars.criticalVar.deactivateEffect2', { name: criticalConfirm.variable.name })
+                        }}</span>
+                      </li>
+                      <li class="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300">
+                        <iconify-icon icon="mdi:chevron-right" width="16" class="shrink-0 mt-0.5"></iconify-icon>
+                        <span>{{
+                          t('envVars.criticalVar.deactivateEffect3', { name: criticalConfirm.variable.name })
+                        }}</span>
+                      </li>
+                    </template>
+                  </ul>
+
+                  <!-- PATH note -->
+                  <div
+                    class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3 flex items-start gap-2"
+                  >
+                    <iconify-icon
+                      icon="mdi:information-outline"
+                      width="16"
+                      class="text-blue-500 dark:text-blue-400 shrink-0 mt-0.5"
+                    ></iconify-icon>
+                    <p class="text-xs font-semibold text-blue-700 dark:text-blue-300">
+                      {{ t('envVars.criticalVar.pathNote', { name: criticalConfirm.variable.name }) }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Confirm checkbox -->
+              <div class="px-6 pb-4">
+                <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    v-model="criticalConfirmed"
+                    type="checkbox"
+                    class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                    {{ t('envVars.criticalVar.confirm') }}
+                  </span>
+                </label>
+              </div>
+
+              <!-- Footer -->
+              <div
+                class="px-6 py-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-end gap-2"
+              >
+                <button
+                  class="h-9 px-4 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  @click="criticalConfirm = null"
+                >
+                  {{ t('common.action.cancel') }}
+                </button>
+                <button
+                  class="h-9 px-4 rounded-lg text-sm font-medium text-white shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  :class="
+                    criticalConfirm.type === 'apply' ? 'bg-amber-600 hover:bg-amber-500' : 'bg-red-600 hover:bg-red-500'
+                  "
+                  :disabled="!criticalConfirmed"
+                  @click="handleCriticalConfirm"
+                >
+                  {{ criticalConfirm.type === 'apply' ? t('envVars.action.apply') : t('envVars.action.deactivate') }}
                 </button>
               </div>
             </div>

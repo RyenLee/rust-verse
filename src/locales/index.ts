@@ -167,7 +167,6 @@ export async function loadLocaleAsync(locale: string): Promise<void> {
   const modulePath = `./${locale}/index.ts`
   const loader = localeModules[modulePath]
   if (!loader) {
-    console.warn(`[i18n] No locale module found for: ${locale} (tried ${modulePath})`)
     return
   }
 
@@ -177,8 +176,7 @@ export async function loadLocaleAsync(locale: string): Promise<void> {
     i18n.global.setLocaleMessage(locale, messages)
     loadedLocales.add(locale)
     i18n.global.locale.value = locale
-  } catch (e) {
-    console.error(`[i18n] Failed to load locale "${locale}":`, e)
+  } catch {
     if (locale !== 'en') {
       await loadLocaleAsync('en')
     }

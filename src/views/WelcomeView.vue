@@ -7,15 +7,12 @@ import { useRustup, type EnvCheck } from '@/composables/useRustup'
 import { useAppStore } from '@/composables/useAppStore'
 import { useStore } from '@/store'
 
-console.log('[WelcomeView] script setup executing')
-
 // Safely initialize i18n
 let t: ReturnType<typeof useI18n>['t']
 try {
   const i18n = useI18n()
   t = i18n.t
-} catch (e) {
-  console.error('[WelcomeView] useI18n failed:', e)
+} catch {
   t = ((key: string) => key) as any
 }
 
@@ -30,21 +27,18 @@ try {
   checkEnv = rustup.checkEnv
   refreshProcessPath = rustup.refreshProcessPath
 } catch (e) {
-  console.error('[WelcomeView] useRustup failed:', e)
   throw e
 }
 
 try {
   initTheme = useAppStore().initTheme
-} catch (e) {
-  console.error('[WelcomeView] useAppStore failed:', e)
-  throw e
+} catch {
+  // ignore
 }
 
 try {
   store = useStore()
-} catch (e) {
-  console.error('[WelcomeView] useStore failed:', e)
+} catch {
   store = { appVersion: 'unknown', appName: 'RustVerse' } as any
 }
 
@@ -66,12 +60,17 @@ const emit = defineEmits<{
 function simulateProgress() {
   installProgress.value = 0
   const interval = setInterval(() => {
+    // Stop simulation once real progress kicks in (>= 5% from backend)
+    if (installProgress.value >= 5) {
+      clearInterval(interval)
+      return
+    }
     if (installProgress.value >= 90) {
       clearInterval(interval)
       return
     }
-    installProgress.value += Math.random() * 10
-    if (installProgress.value > 90) installProgress.value = 90
+    installProgress.value += Math.random() * 3
+    if (installProgress.value > 5) installProgress.value = 5
   }, 500)
   return interval
 }
@@ -117,6 +116,13 @@ async function handleInstall() {
   // Listen for Tauri events
   const unlistenLog = await listen<string>('rustup-install-log', event => {
     installLogs.value.push(event.payload)
+    // Parse real download progress from log messages like "Downloading... 45% (4.2 MB)"
+    const match = event.payload.match(/Downloading\.\.\.\s+(\d+)%/)
+    if (match) {
+      const pct = parseInt(match[1], 10)
+      // Map download progress to 0-80% range (installation takes the remaining 20%)
+      installProgress.value = Math.min(pct * 0.8, 80)
+    }
   })
   const unlistenDone = await listen<void>('rustup-install-finished', () => {
     installProgress.value = 100
@@ -167,10 +173,7 @@ function resetToIdle() {
 }
 
 onMounted(() => {
-  console.log('[WelcomeView] onMounted - component mounted successfully')
-  initTheme().catch(e => {
-    console.error('[WelcomeView] initTheme in onMounted failed:', e)
-  })
+  initTheme().catch(() => {})
 })
 </script>
 

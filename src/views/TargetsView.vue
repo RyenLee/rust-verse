@@ -37,8 +37,8 @@ async function loadTargets() {
   try {
     targets.value = await listTargets(selectedToolchain.value)
     loaded.value = true
-  } catch (e) {
-    console.error('Failed to load targets:', e)
+  } catch {
+    // ignore
   } finally {
     loading.value = false
   }

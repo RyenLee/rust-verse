@@ -130,7 +130,48 @@ fn persist_env_var_windows(name: &str, value: &str) -> AppResult<()> {
     env.set_value(name, &value)
         .map_err(|e| AppError::Config(format!("failed to set registry value: {e}")))?;
 
+    // If this is CARGO_HOME, automatically add %CARGO_HOME%\bin to user PATH
+    if name == "CARGO_HOME" {
+        let _ = add_cargo_home_bin_to_path_windows(&env, value);
+    }
+
     broadcast_env_change();
+
+    Ok(())
+}
+
+#[cfg(windows)]
+fn add_cargo_home_bin_to_path_windows(env: &winreg::RegKey, cargo_home_value: &str) -> AppResult<()> {
+    let bin_entry = format!(r"%{}\bin", "CARGO_HOME"); // Use %CARGO_HOME%\bin for expandability
+
+    let current_path: Result<String, _> = env.get_value("Path");
+    let new_path = match current_path {
+        Ok(path) => {
+            // Check if %CARGO_HOME%\bin is already in PATH
+            let entries: Vec<&str> = path.split(';').collect();
+            if entries.iter().any(|e| e.eq_ignore_ascii_case(&bin_entry)) {
+                return Ok(()); // Already present
+            }
+            // Also check for the resolved path
+            let resolved_bin = format!(r"{}\bin", cargo_home_value);
+            if entries.iter().any(|e| e.eq_ignore_ascii_case(&resolved_bin)) {
+                return Ok(()); // Already present (resolved form)
+            }
+            // Append to PATH
+            if path.ends_with(';') {
+                format!("{}{}", path, bin_entry)
+            } else {
+                format!("{};{}", path, bin_entry)
+            }
+        }
+        Err(_) => {
+            // No Path variable yet, create one
+            bin_entry.clone()
+        }
+    };
+
+    env.set_value("Path", &new_path)
+        .map_err(|e| AppError::Config(format!("failed to update PATH in registry: {e}")))?;
 
     Ok(())
 }
@@ -150,10 +191,38 @@ fn remove_persisted_env_var_windows(name: &str) -> AppResult<()> {
         return Ok(()); // Already not present, nothing to do
     }
 
+    // If this is CARGO_HOME, remove %CARGO_HOME%\bin from user PATH first
+    if name == "CARGO_HOME" {
+        let _ = remove_cargo_home_bin_from_path_windows(&env);
+    }
+
     env.delete_value(name)
         .map_err(|e| AppError::Config(format!("failed to delete registry value: {e}")))?;
 
     broadcast_env_change();
+
+    Ok(())
+}
+
+#[cfg(windows)]
+fn remove_cargo_home_bin_from_path_windows(env: &winreg::RegKey) -> AppResult<()> {
+    let bin_entry = r"%CARGO_HOME%\bin";
+
+    let current_path: Result<String, _> = env.get_value("Path");
+    if let Ok(path) = current_path {
+        let entries: Vec<&str> = path.split(';').collect();
+        let filtered: Vec<&str> = entries
+            .iter()
+            .filter(|e| !e.eq_ignore_ascii_case(bin_entry))
+            .copied()
+            .collect();
+
+        if filtered.len() != entries.len() {
+            let new_path = filtered.join(";");
+            env.set_value("Path", &new_path)
+                .map_err(|e| AppError::Config(format!("failed to update PATH in registry: {e}")))?;
+        }
+    }
 
     Ok(())
 }
@@ -251,13 +320,25 @@ fn persist_env_var_unix(name: &str, value: &str) -> AppResult<()> {
 
     // Append the new export line with marker
     let export_line = format!("export {name}={value}  {RUSTVERSE_MARKER}");
-    let new_content = if filtered.is_empty() {
+    let mut new_content = if filtered.is_empty() {
         export_line
     } else if filtered.ends_with('\n') {
         format!("{filtered}{export_line}\n")
     } else {
         format!("{filtered}\n{export_line}\n")
     };
+
+    // If this is CARGO_HOME, automatically add $CARGO_HOME/bin to PATH
+    if name == "CARGO_HOME" {
+        let path_line = format!(r#"export PATH="$CARGO_HOME/bin:$PATH"  {RUSTVERSE_MARKER}_PATH"#);
+        // Remove any existing managed PATH line for CARGO_HOME
+        let without_path = remove_managed_path_lines(&new_content);
+        new_content = if without_path.ends_with('\n') {
+            format!("{without_path}{path_line}\n")
+        } else {
+            format!("{without_path}\n{path_line}\n")
+        };
+    }
 
     std::fs::write(&shell_config, new_content)
         .map_err(|e| AppError::Config(format!("failed to write shell config: {e}")))?;
@@ -271,7 +352,12 @@ fn remove_persisted_env_var_unix(name: &str) -> AppResult<()> {
 
     let content = std::fs::read_to_string(&shell_config).unwrap_or_default();
 
-    let filtered = remove_managed_lines(&content, name);
+    let mut filtered = remove_managed_lines(&content, name);
+
+    // If this is CARGO_HOME, also remove the managed PATH line
+    if name == "CARGO_HOME" {
+        filtered = remove_managed_path_lines(&filtered);
+    }
 
     std::fs::write(&shell_config, filtered)
         .map_err(|e| AppError::Config(format!("failed to write shell config: {e}")))?;
@@ -355,6 +441,18 @@ fn remove_managed_lines(content: &str, var_name: &str) -> String {
         .filter(|line| {
             // Keep lines that are NOT managed exports for this variable
             !(line.contains(RUSTVERSE_MARKER) && line.contains(&format!("export {var_name}=")))
+        })
+        .collect::<Vec<&str>>()
+        .join("\n")
+}
+
+#[cfg(not(windows))]
+fn remove_managed_path_lines(content: &str) -> String {
+    content
+        .lines()
+        .filter(|line| {
+            // Keep lines that are NOT managed PATH entries for CARGO_HOME
+            !(line.contains(&format!("{RUSTVERSE_MARKER}_PATH")) && line.contains("CARGO_HOME/bin"))
         })
         .collect::<Vec<&str>>()
         .join("\n")

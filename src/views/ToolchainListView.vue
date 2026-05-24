@@ -66,8 +66,8 @@ async function uninstallToolchain(name: string) {
     confirmUninstall.value = null
     notifyToolchainChange()
     await refresh()
-  } catch (e) {
-    console.error('Failed to uninstall:', e)
+  } catch {
+    // ignore
   }
 }
 
@@ -76,8 +76,8 @@ async function setDefault(name: string) {
     await doSetDefault(name)
     notifyToolchainChange()
     await refresh()
-  } catch (e) {
-    console.error('Failed to set default:', e)
+  } catch {
+    // ignore
   }
 }
 

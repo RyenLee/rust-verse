@@ -37,8 +37,8 @@ async function loadComponents() {
   try {
     components.value = await listComponents(selectedToolchain.value)
     loaded.value = true
-  } catch (e) {
-    console.error('Failed to load components:', e)
+  } catch {
+    // ignore
   } finally {
     loading.value = false
   }

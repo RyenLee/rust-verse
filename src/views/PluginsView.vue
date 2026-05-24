@@ -45,8 +45,8 @@ async function refresh() {
   loading.value = true
   try {
     plugins.value = await listCargoPlugins()
-  } catch (e) {
-    console.error('Failed to list plugins:', e)
+  } catch {
+    // ignore
   } finally {
     loading.value = false
   }
@@ -105,8 +105,8 @@ async function uninstallPlugin(crateName: string) {
     await doUninstall(crateName)
     confirmUninstall.value = null
     await refresh()
-  } catch (e) {
-    console.error('Failed to uninstall:', e)
+  } catch {
+    // ignore
   }
 }
 

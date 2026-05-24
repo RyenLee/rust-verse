@@ -5,23 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-05-24
+
+### Added
+
+- **CARGO_HOME PATH auto-management** — When CARGO_HOME is applied, `%CARGO_HOME%\bin` (Windows) / `$CARGO_HOME/bin` (Unix) is automatically added to the user PATH; when deactivated, it is automatically removed
+  - Windows: writes/removes `%CARGO_HOME%\bin` in the registry `HKEY_CURRENT_USER\Environment\Path`
+  - Unix: writes/removes `export PATH="$CARGO_HOME/bin:$PATH"` in shell config with managed markers
+- **Updater signing key automation** — New `scripts/generate-signer-key.cjs` script to generate or verify Tauri updater signing key pairs
+  - Integrated into `push-release.cjs` release workflow
+  - Auto-updates public key in `tauri.conf.json` and `.tauri-signer-key.pub`
+  - CI environment variable `TAURI_SIGNING_PRIVATE_KEY` configured in release workflow
+- Enabled `createUpdaterArtifacts` in Tauri bundle config for signed update artifacts
+- Updated critical variable confirmation dialog with PATH auto-management info (blue info banner)
+- Added `effect4` entry in critical variable confirmation: warns if Rust tools not installed under new path
+
+### Changed
+
+- **Build version sync fix** — Moved `bump-version.cjs` from `beforeBuildCommand` to `pnpm tauri` script to ensure version is synced before Tauri CLI reads `tauri.conf.json`, fixing installer filename showing stale version
+- Updated `deactivateEffect2` i18n text: now states PATH will be automatically removed (was: "system will NOT remove")
+- Updated `pathNote` i18n text: now describes automatic PATH add/remove behavior (was: manual PATH instructions)
+- Changed PATH note banner color from red (warning) to blue (informational)
+
+### Fixed
+
+- Removed all `console.log` / `console.error` / `console.warn` statements from frontend production code (14+ files)
+- Fixed `tsconfig.app.json` referencing non-existent `interface-extensions.d.ts` in include list
+- Fixed `bump-version.cjs` regex to correctly match `version` in `[app]` section of `config.toml`
+
+---
+
 ## [1.2.5] - 2025-05-23
 
 ### Added
 
-- **Crates镜像源管理** - 集成crm工具管理crates.io镜像源，支持自动最优切换、镜像列表展示、手动切换、延迟测试等功能
-  - 新增crm安装引导功能，初次使用时自动提示安装
-  - 支持自动最优（best）功能，评估网络延迟并自动切换
-  - 支持镜像列表展示、切换、测试
-  - 固定表头布局，提升大数据量时的体验
-- 环境变量列表组件支持动态宽度调整
+- **Crates Mirror Management** — Integrated `crm` tool for managing crates.io mirror sources with auto-optimal switching, mirror list display, manual switching, and latency testing
+  - Added crm installation guide for first-time users
+  - Auto-optimal (best) feature: evaluates network latency and switches automatically
+  - Mirror list display, switching, and testing
+  - Fixed table header layout for better experience with large datasets
+- Environment variable list component supports dynamic width adjustment
 
 ### Fixed
 
 - Fixed input box icon and text overlapping issue by adjusting padding (pl-9 → pl-10)
-- Fixed mirror list parsing for * marker, current mirror highlighting, and index address prefix removal
-- Fixed mirror type detection: sparse+ prefix → sparse, .git suffix → git, others → other
-- Fixed "测试全部" button position, moved to "自动最优" button after
+- Fixed mirror list parsing for `*` marker, current mirror highlighting, and index address prefix removal
+- Fixed mirror type detection: `sparse+` prefix → sparse, `.git` suffix → git, others → other
+- Fixed "Test All" button position, moved after "Auto-optimal" button
 - Fixed left sidebar width and language switch Chinese text wrapping issue
 - Fixed local installed plugins display issue
 - Fixed crm version number display in status bar
@@ -31,8 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `scripts/push-release.cjs` - Automated release script with version bump, git stash, and CHANGES.md integration
-- `CHANGES.md` - Changelog document following Keep a Changelog format
+- `scripts/push-release.cjs` — Automated release script with version bump, git stash, and CHANGES.md integration
+- `CHANGES.md` — Changelog document following Keep a Changelog format
 - Upload build artifacts (deb, rpm, AppImage) in test-build workflow
 
 ### Fixed
@@ -68,6 +98,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo plugins management
 - Dashboard with system status
 
+[1.3.0]: https://github.com/RyenLee/rust-verse/compare/v1.2.5...v1.3.0
+[1.2.5]: https://github.com/RyenLee/rust-verse/compare/v1.2.3...v1.2.5
 [1.2.3]: https://github.com/RyenLee/rust-verse/compare/v1.2.1...v1.2.3
 [1.2.1]: https://github.com/RyenLee/rust-verse/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/RyenLee/rust-verse/releases/tag/v1.2.0
+
+---
+
+<a id="chinese"></a>
+
+## 中文说明
+
+本文件记录了 RustVerse 项目的所有重要变更。
+
+- [最新版本 1.3.0](#130---2025-05-24) — CARGO_HOME PATH 自动管理、更新签名自动化、构建版本号修复
+- [版本 1.2.5](#125---2025-05-23) — Crates 镜像源管理
+- [版本 1.2.3](#123---2025-05-23) — 发布脚本与安全加固
+- [版本 1.2.1](#121---2025-05-23) — GitHub Actions 自动发布
+- [版本 1.2.0](#120---2025-05-22) — 首次发布
+
+详细项目说明请参阅 [README.md](./README.md#chinese)。

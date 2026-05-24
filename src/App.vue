@@ -35,8 +35,6 @@ const splashStatusText = ref('')
 const startupErrors = ref<string[]>([])
 
 function logStartup(step: string, msg: string) {
-  const ts = new Date().toISOString().split('T')[1].slice(0, 12)
-  console.log(`[${ts}] [startup] ${step}: ${msg}`)
   try {
     appLog.info('App', `${step}: ${msg}`)
   } catch {
@@ -45,8 +43,6 @@ function logStartup(step: string, msg: string) {
 }
 
 function logStartupError(step: string, msg: string) {
-  const ts = new Date().toISOString().split('T')[1].slice(0, 12)
-  console.error(`[${ts}] [startup] ${step} ERROR: ${msg}`)
   startupErrors.value.push(`[${step}] ${msg}`)
   try {
     appLog.error('App', `${step} ERROR: ${msg}`)
@@ -80,7 +76,6 @@ function skipToMain() {
 onErrorCaptured((err: unknown, instance, info) => {
   const msg = err instanceof Error ? err.message : String(err)
   const stack = err instanceof Error ? err.stack : null
-  console.error('[ErrorBoundary] Caught error:', msg, stack, 'info:', info)
   logStartupError('welcome-render', `${msg} [info: ${info}]`)
 
   // Only show error UI if WelcomeView is active
@@ -134,8 +129,7 @@ async function recheckEnv() {
       // Non-critical
     }
     envCheck.value = await checkEnv()
-  } catch (e) {
-    console.error('Failed to check environment:', e)
+  } catch {
     envCheck.value = {
       rustup_installed: false,
       cargo_installed: false,
@@ -239,14 +233,12 @@ function triggerUninstall() {
 provide('triggerUninstall', triggerUninstall)
 
 window.addEventListener('unhandledrejection', event => {
-  console.error('[unhandledrejection]', event.reason)
   startupErrors.value.push(`[unhandled] ${event.reason}`)
   event.preventDefault()
 })
 
 onMounted(async () => {
   const t0 = performance.now()
-  console.log('=== RustVerse frontend onMounted ===')
   logStartup('step0', 'onMounted started')
   startupErrors.value = []
 
@@ -325,14 +317,12 @@ onMounted(async () => {
   )
 
   // Transition to welcome phase
-  console.log('[App] About to switch phase to welcome, document.readyState:', document.readyState)
   phase.value = 'welcome'
   await nextTick()
   logStartup(
     'done',
-    `Phase switched to welcome. WelcomeView mounted, document.body has ${document.body.children.length} children`
+    `Phase switched to welcome. WelcomeView mounted.`
   )
-  console.log('[App] Phase switched to welcome, children:', document.body.children.length)
 
   // Deferred: check Rust environment in background
   recheckEnv().then(() => {

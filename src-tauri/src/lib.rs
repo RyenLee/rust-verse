@@ -2,6 +2,7 @@ mod commands;
 mod config;
 mod db;
 mod error;
+mod installer;
 mod logger;
 mod state;
 mod system;
@@ -31,11 +32,9 @@ use config::get_config;
 use state::AppState;
 use system::env::binary_exists;
 use tauri::{WebviewUrl, WebviewWindowBuilder};
-use utils::exec::run_command_with_streaming;
 
-/// Refresh the current process PATH from the Windows Registry.
-#[tauri::command]
-fn refresh_process_path() -> crate::error::AppResult<String> {
+/// Internal logic for refreshing process PATH and Rust-related env vars.
+fn refresh_process_path_inner() -> crate::error::AppResult<String> {
     #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
     let mut added: Vec<String> = Vec::new();
 
@@ -83,6 +82,12 @@ fn refresh_process_path() -> crate::error::AppResult<String> {
     } else {
         Ok(format!("Updated: {}", added.join(", ")))
     }
+}
+
+/// Refresh the current process PATH from the Windows Registry.
+#[tauri::command]
+fn refresh_process_path() -> crate::error::AppResult<String> {
+    refresh_process_path_inner()
 }
 
 /// Uninstall rustup via `rustup self uninstall`.
@@ -212,6 +217,9 @@ async fn try_elevated_uninstall(rustup: &str) -> Result<(), String> {
 /// Install rustup using the official installer with streaming output.
 #[tauri::command]
 async fn install_rustup(app: tauri::AppHandle) -> crate::error::AppResult<()> {
+    // Refresh PATH first to detect any partially-completed installations
+    let _ = refresh_process_path_inner();
+
     // Block installation only when both rustup and cargo are *functionally* available.
     // Using `binary_exists` is insufficient after uninstall because residual files
     // may remain on disk (e.g. ~/.cargo/bin/rustup.exe) while the toolchain is
@@ -253,134 +261,29 @@ async fn is_binary_functional(name: &str) -> bool {
 
 #[cfg(target_os = "windows")]
 async fn install_rustup_windows(app: tauri::AppHandle) -> crate::error::AppResult<()> {
-    use tauri::Emitter;
+    // Ensure installer is available (cached or downloaded) and verified
+    let installer_path = installer::ensure_installer(&app).await?;
 
-    let temp_dir = std::env::temp_dir().join("rustverse-rustup-init");
-    std::fs::create_dir_all(&temp_dir)
-        .map_err(|e| crate::error::AppError::Command(format!("failed to create temp dir: {e}")))?;
+    // Execute the installer
+    installer::execute_installer(app, &installer_path).await?;
 
-    let installer_path = temp_dir.join("rustup-init.exe");
-    let _ = app.emit("rustup-install-log", "Downloading rustup-init.exe...");
+    // Refresh process PATH so that newly installed rustup/cargo can be found
+    let _ = refresh_process_path_inner();
 
-    let url = "https://win.rustup.rs/x86_64";
-    let ps_script = format!(
-        "Invoke-WebRequest -Uri '{}' -OutFile '{}' -UseBasicParsing",
-        url,
-        installer_path.to_string_lossy()
-    );
-
-    let download_result = tokio::time::timeout(
-        std::time::Duration::from_secs(120), // 2 minute timeout for download
-        tokio::process::Command::new("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &ps_script])
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
-            .output(),
-    )
-    .await;
-
-    let download_output = download_result
-        .map_err(|_| crate::error::AppError::Timeout(120))?
-        .map_err(|e| crate::error::AppError::Network(format!("failed to download rustup: {e}")))?;
-
-    if !download_output.status.success() {
-        let stderr = String::from_utf8_lossy(&download_output.stderr)
-            .trim()
-            .to_string();
-        return Err(crate::error::AppError::Network(format!(
-            "failed to download rustup-init.exe: {stderr}"
-        )));
-    }
-
-    if !installer_path.exists() {
-        return Err(crate::error::AppError::Network(
-            "rustup-init.exe was not downloaded successfully".to_string(),
-        ));
-    }
-
-    let _ = app.emit(
-        "rustup-install-log",
-        "Download complete. Running installer...",
-    );
-
-    run_command_with_streaming(
-        app,
-        &installer_path.to_string_lossy(),
-        &["-y", "--default-toolchain", "stable"],
-        "C",
-        "rustup-install-log",
-        "rustup-install-finished",
-        600, // 10 minute timeout for rustup installation
-    )
-    .await?;
-
-    let _ = std::fs::remove_file(&installer_path);
-    let _ = std::fs::remove_dir(&temp_dir);
     Ok(())
 }
 
 #[cfg(not(target_os = "windows"))]
 async fn install_rustup_unix(app: tauri::AppHandle) -> crate::error::AppResult<()> {
-    use tauri::Emitter;
+    // Ensure installer is available (cached or downloaded) and verified
+    let installer_path = installer::ensure_installer(&app).await?;
 
-    let _ = app.emit("rustup-install-log", "Downloading rustup installer...");
+    // Execute the installer
+    installer::execute_installer(app, &installer_path).await?;
 
-    let temp_dir = std::env::temp_dir().join("rustverse-rustup-init");
-    std::fs::create_dir_all(&temp_dir)
-        .map_err(|e| crate::error::AppError::Command(format!("failed to create temp dir: {e}")))?;
+    // Refresh process PATH so that newly installed rustup/cargo can be found
+    let _ = refresh_process_path_inner();
 
-    let script_path = temp_dir.join("rustup-init.sh");
-
-    let download_result = tokio::time::timeout(
-        std::time::Duration::from_secs(120), // 2 minute timeout for download
-        tokio::process::Command::new("curl")
-            .args([
-                "-sSf",
-                "https://sh.rustup.rs",
-                "-o",
-                &script_path.to_string_lossy(),
-            ])
-            .output(),
-    )
-    .await;
-
-    let download_output = download_result
-        .map_err(|_| crate::error::AppError::Timeout(120))?
-        .map_err(|e| {
-            crate::error::AppError::Network(format!("failed to download rustup installer: {e}"))
-        })?;
-
-    if !download_output.status.success() {
-        let stderr = String::from_utf8_lossy(&download_output.stderr)
-            .trim()
-            .to_string();
-        return Err(crate::error::AppError::Network(format!(
-            "failed to download rustup installer: {stderr}"
-        )));
-    }
-
-    let _ = app.emit(
-        "rustup-install-log",
-        "Download complete. Running installer...",
-    );
-
-    run_command_with_streaming(
-        app,
-        "sh",
-        &[
-            &script_path.to_string_lossy(),
-            "-y",
-            "--default-toolchain",
-            "stable",
-        ],
-        "C",
-        "rustup-install-log",
-        "rustup-install-finished",
-        600, // 10 minute timeout for rustup installation
-    )
-    .await?;
-
-    let _ = std::fs::remove_file(&script_path);
-    let _ = std::fs::remove_dir(&temp_dir);
     Ok(())
 }
 

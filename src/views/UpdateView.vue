@@ -34,8 +34,8 @@ async function checkUpdates() {
   loading.value = true
   try {
     updates.value = await doCheck()
-  } catch (e) {
-    console.error('Failed to check updates:', e)
+  } catch {
+    // ignore
   } finally {
     loading.value = false
   }

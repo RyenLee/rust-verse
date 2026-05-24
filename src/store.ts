@@ -28,8 +28,7 @@ export const useStore = defineStore('main', {
         this.appName = config.app?.name || 'RustVerse'
         this.appVersion = config.app?.version || '0.0.0'
         this.appDescription = config.app?.description || ''
-      } catch (e) {
-        console.warn('Failed to load app metadata, using defaults:', e)
+      } catch {
         this.appName = 'RustVerse'
         this.appVersion = '0.0.0'
         this.appDescription = ''

@@ -59,10 +59,26 @@ function hasUnstagedChanges() {
 
 function getStashCount() {
   try {
-    const out = execSync('git stash list --quiet', { stdio: 'pipe' }).toString().trim()
+    const out = execSync('git stash list', { stdio: 'pipe' }).toString().trim()
     return out ? out.split('\n').length : 0
   } catch {
     return 0
+  }
+}
+
+function getModifiedFiles() {
+  try {
+    const out = execSync('git diff --name-only', { stdio: 'pipe' }).toString().trim()
+    return out ? out.split('\n').filter(Boolean) : []
+  } catch {
+    return []
+  }
+}
+
+function restoreModifiedFiles(files, dryRun) {
+  if (files.length === 0) return
+  for (const file of files) {
+    run(`git checkout -- "${file}"`, dryRun)
   }
 }
 
@@ -79,6 +95,22 @@ function runBumpVersion(newVersion, dryRun) {
   const result = spawnSync('node', args, { stdio: 'inherit' })
   if (result.status !== 0) {
     console.error('bump-version.cjs failed')
+    process.exit(1)
+  }
+}
+
+function runGenerateSignerKey(dryRun) {
+  const scriptPath = path.join(process.cwd(), 'scripts', 'generate-signer-key.cjs')
+
+  if (dryRun) {
+    console.log(`[dry-run] node ${scriptPath}`)
+    return
+  }
+
+  console.log(`> node ${scriptPath}`)
+  const result = spawnSync('node', [scriptPath], { stdio: 'inherit' })
+  if (result.status !== 0) {
+    console.error('generate-signer-key.cjs failed')
     process.exit(1)
   }
 }
@@ -103,8 +135,19 @@ function main() {
   run('git pull --rebase origin main', dryRun)
   if (hadUnstaged) {
     console.log('=== Restoring stashed changes ===')
+    // After pull, CRLF/LF normalization may cause files to appear modified,
+    // which blocks git stash pop. Discard those phantom changes first.
+    const phantomFiles = getModifiedFiles()
+    if (phantomFiles.length > 0) {
+      console.log('Discarding CRLF/LF phantom changes before stash pop...')
+      restoreModifiedFiles(phantomFiles, dryRun)
+    }
     run('git stash pop', dryRun)
   }
+  console.log()
+
+  console.log('=== Generating/verifying signer key ===')
+  runGenerateSignerKey(dryRun)
   console.log()
 
   if (!skipBump) {
