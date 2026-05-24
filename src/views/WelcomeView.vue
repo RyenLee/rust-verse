@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { useRustup, type EnvCheck } from '@/composables/useRustup'
 import { useAppStore } from '@/composables/useAppStore'
 import { useStore } from '@/store'
+import { appLog } from '@/composables/useLogger'
 
 // Safely initialize i18n
 let t: ReturnType<typeof useI18n>['t']
@@ -83,6 +84,7 @@ async function handleDetect() {
   // Listen for real-time check progress events
   const unlisten: UnlistenFn = await listen<string>('env-check-log', event => {
     detectLogs.value.push(event.payload)
+    appLog.info('welcome-detect', event.payload)
   })
 
   try {
@@ -94,12 +96,15 @@ async function handleDetect() {
     // Both rustup AND cargo must be available
     if (envCheck.value.rustup_installed && envCheck.value.cargo_installed) {
       phase.value = 'configured'
+      appLog.info('welcome-detect', 'Environment check passed: rustup and cargo available')
     } else {
       phase.value = 'not-configured'
+      appLog.info('welcome-detect', `Environment check: rustup=${envCheck.value.rustup_installed}, cargo=${envCheck.value.cargo_installed}`)
     }
   } catch (e: any) {
     detectError.value = e?.message || e?.toString?.() || String(e)
     phase.value = 'idle'
+    appLog.error('welcome-detect', `Detection failed: ${detectError.value}`)
   } finally {
     unlisten()
   }
@@ -116,6 +121,7 @@ async function handleInstall() {
   // Listen for Tauri events
   const unlistenLog = await listen<string>('rustup-install-log', event => {
     installLogs.value.push(event.payload)
+    appLog.info('welcome-install', event.payload)
     // Parse real download progress from log messages like "Downloading... 45% (4.2 MB)"
     const match = event.payload.match(/Downloading\.\.\.\s+(\d+)%/)
     if (match) {
@@ -126,12 +132,14 @@ async function handleInstall() {
   })
   const unlistenDone = await listen<void>('rustup-install-finished', () => {
     installProgress.value = 100
+    appLog.info('welcome-install', 'Installation process finished')
   })
 
   try {
     await invoke('install_rustup')
     clearInterval(progressInterval)
     installProgress.value = 100
+    appLog.info('welcome-install', 'install_rustup command completed successfully')
 
     // Re-check environment after install
     await refreshProcessPath()
@@ -139,15 +147,18 @@ async function handleInstall() {
 
     if (envCheck.value.rustup_installed && envCheck.value.cargo_installed) {
       phase.value = 'configured'
+      appLog.info('welcome-install', 'Environment check passed: rustup and cargo available')
     } else {
       installError.value = t('app.installCompleteButNotFound')
       phase.value = 'install-failed'
+      appLog.warn('welcome-install', 'Install completed but rustup/cargo not found in environment')
     }
   } catch (e: any) {
     clearInterval(progressInterval)
     const msg = e?.message || e?.toString?.() || String(e)
     installError.value = msg
     phase.value = 'install-failed'
+    appLog.error('welcome-install', `Install failed: ${msg}`)
   } finally {
     unlistenLog()
     unlistenDone()
@@ -165,6 +176,23 @@ function handleRetry() {
   // is broken. Re-detecting refreshes envCheck with the actual state.
   handleDetect()
 }
+
+// Check if the error is a download failure (to show manual guide)
+const isDownloadError = computed(() => {
+  return installError.value.toLowerCase().includes('download failed')
+})
+
+// Extract download URL from error message
+const manualDownloadUrl = computed(() => {
+  const match = installError.value.match(/download from\s+(https?:\/\/\S+)/i)
+  return match ? match[1] : 'https://rustup.rs'
+})
+
+// Extract save path from error message
+const manualSavePath = computed(() => {
+  const match = installError.value.match(/save as\s+(\S+)/i)
+  return match ? match[1] : '<app_dir>/data/rustup-init.exe'
+})
 
 function resetToIdle() {
   detectError.value = ''
@@ -297,11 +325,29 @@ onMounted(() => {
       <Transition name="fade-up" mode="out-in">
         <div v-if="phase === 'install-failed'" key="install-failed" class="flex flex-col items-center gap-4 w-full">
           <div
-            class="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-4 py-2 rounded-lg text-sm w-full"
+            class="flex items-start gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-4 py-2 rounded-lg text-sm w-full"
           >
-            <iconify-icon icon="mdi:close-circle-outline" width="20" class="shrink-0"></iconify-icon>
+            <iconify-icon icon="mdi:close-circle-outline" width="20" class="shrink-0 mt-0.5"></iconify-icon>
             <span class="break-all min-w-0">{{ installError }}</span>
           </div>
+
+          <!-- Manual placement guide when download fails -->
+          <div
+            v-if="isDownloadError"
+            class="w-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-200 space-y-1.5"
+          >
+            <p class="font-semibold text-sm">{{ t('app.manualGuideTitle') }}</p>
+            <p>{{ t('app.manualGuideStep1') }}</p>
+            <p class="font-mono bg-white dark:bg-gray-900 px-2 py-1 rounded text-xs break-all">
+              {{ manualDownloadUrl }}
+            </p>
+            <p>{{ t('app.manualGuideStep2') }}</p>
+            <p class="font-mono bg-white dark:bg-gray-900 px-2 py-1 rounded text-xs break-all">
+              {{ manualSavePath }}
+            </p>
+            <p>{{ t('app.manualGuideStep3') }}</p>
+          </div>
+
           <button
             class="w-full py-3 px-6 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-sm transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98] cursor-pointer inline-flex items-center justify-center gap-1.5"
             @click="handleRetry"

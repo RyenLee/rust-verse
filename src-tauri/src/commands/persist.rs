@@ -141,8 +141,11 @@ fn persist_env_var_windows(name: &str, value: &str) -> AppResult<()> {
 }
 
 #[cfg(windows)]
-fn add_cargo_home_bin_to_path_windows(env: &winreg::RegKey, cargo_home_value: &str) -> AppResult<()> {
-    let bin_entry = format!(r"%{}\bin", "CARGO_HOME"); // Use %CARGO_HOME%\bin for expandability
+fn add_cargo_home_bin_to_path_windows(
+    env: &winreg::RegKey,
+    cargo_home_value: &str,
+) -> AppResult<()> {
+    let bin_entry = format!("%{}%\\bin", "CARGO_HOME"); // Use %CARGO_HOME%\bin for expandability
 
     let current_path: Result<String, _> = env.get_value("Path");
     let new_path = match current_path {
@@ -154,7 +157,10 @@ fn add_cargo_home_bin_to_path_windows(env: &winreg::RegKey, cargo_home_value: &s
             }
             // Also check for the resolved path
             let resolved_bin = format!(r"{}\bin", cargo_home_value);
-            if entries.iter().any(|e| e.eq_ignore_ascii_case(&resolved_bin)) {
+            if entries
+                .iter()
+                .any(|e| e.eq_ignore_ascii_case(&resolved_bin))
+            {
                 return Ok(()); // Already present (resolved form)
             }
             // Append to PATH

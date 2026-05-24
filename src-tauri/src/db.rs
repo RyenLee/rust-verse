@@ -692,14 +692,27 @@ pub fn migrate_from_toml(db: &Database, toml_path: &Path) -> Result<bool, String
 // Default value functions (single source of truth)
 // ---------------------------------------------------------------------------
 
+/// Read a field from the compiled-in config.toml [app] section.
+/// Returns None if parsing fails or the field is missing.
+fn config_toml_app_field(field: &str) -> Option<String> {
+    let content = include_str!("../config.toml");
+    let value: toml::Value = toml::from_str(content).ok()?;
+    value
+        .get("app")?
+        .get(field)?
+        .as_str()
+        .map(|s| s.to_string())
+}
+
 pub fn default_app_name() -> String {
-    "RustVerse".to_string()
+    config_toml_app_field("name").unwrap_or_else(|| "RustVerse".to_string())
 }
 pub fn default_app_version() -> String {
-    "1.2.5".to_string()
+    config_toml_app_field("version").unwrap_or_else(|| "1.2.5".to_string())
 }
 pub fn default_app_description() -> String {
-    "Rust Toolchain Visual Version Manager".to_string()
+    config_toml_app_field("description")
+        .unwrap_or_else(|| "Rust Toolchain Visual Version Manager".to_string())
 }
 
 pub fn default_rustup() -> String {

@@ -24,9 +24,6 @@ pub enum AppError {
 
     #[error("network error: {0}")]
     Network(String),
-
-    #[error("integrity check failed: {0}")]
-    Integrity(String),
 }
 
 impl Serialize for AppError {
@@ -47,7 +44,6 @@ impl Serialize for AppError {
             AppError::Parse(_) => "parse",
             AppError::Config(_) => "config",
             AppError::Network(_) => "network",
-            AppError::Integrity(_) => "integrity",
         };
 
         ErrorResponse {

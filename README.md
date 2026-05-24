@@ -108,6 +108,7 @@ rust-verse/
 │   │   ├── config.rs                 # App configuration
 │   │   ├── db.rs                     # redb database layer
 │   │   ├── error.rs                  # Error types
+│   │   ├── installer.rs              # Rustup installer download & execution
 │   │   ├── logger.rs                 # Structured logging
 │   │   ├── state.rs                  # App state management
 │   │   ├── commands.rs               # Command module re-exports

@@ -217,6 +217,9 @@ async fn try_elevated_uninstall(rustup: &str) -> Result<(), String> {
 /// Install rustup using the official installer with streaming output.
 #[tauri::command]
 async fn install_rustup(app: tauri::AppHandle) -> crate::error::AppResult<()> {
+    let log = logger::logger();
+    log.info("install", "Install rustup requested");
+
     // Refresh PATH first to detect any partially-completed installations
     let _ = refresh_process_path_inner();
 
@@ -228,19 +231,32 @@ async fn install_rustup(app: tauri::AppHandle) -> crate::error::AppResult<()> {
     let cargo_ok = is_binary_functional("cargo").await;
 
     if rustup_ok && cargo_ok {
+        log.info("install", "rustup and cargo are already installed, aborting");
         return Err(crate::error::AppError::Command(
             "rustup and cargo are already installed".to_string(),
         ));
     }
 
+    log.info("install", "Starting rustup installation...");
+
     #[cfg(target_os = "windows")]
     {
-        install_rustup_windows(app).await
+        let result = install_rustup_windows(app).await;
+        match &result {
+            Ok(()) => log.info("install", "Rustup installation completed successfully"),
+            Err(e) => log.error("install", &format!("Rustup installation failed: {e}")),
+        }
+        result
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        install_rustup_unix(app).await
+        let result = install_rustup_unix(app).await;
+        match &result {
+            Ok(()) => log.info("install", "Rustup installation completed successfully"),
+            Err(e) => log.error("install", &format!("Rustup installation failed: {e}")),
+        }
+        result
     }
 }
 

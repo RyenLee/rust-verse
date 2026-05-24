@@ -23,11 +23,8 @@ pub async fn run_command(bin: &str, args: &[&str], timeout_secs: u64) -> AppResu
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
 
-    let result = tokio::time::timeout(
-        std::time::Duration::from_secs(timeout_secs),
-        cmd.output(),
-    )
-    .await;
+    let result =
+        tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), cmd.output()).await;
 
     match result {
         Ok(Ok(output)) => {
@@ -97,11 +94,8 @@ pub async fn run_command_with_streaming(
         spawn_line_reader(app.clone(), stdout, log_event.to_string());
     }
 
-    let result = tokio::time::timeout(
-        std::time::Duration::from_secs(timeout_secs),
-        child.wait(),
-    )
-    .await;
+    let result =
+        tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), child.wait()).await;
 
     match result {
         Ok(Ok(status)) => {
@@ -131,6 +125,7 @@ pub async fn run_command_with_streaming(
 }
 
 /// Read lines from a child process output stream and emit them as Tauri events.
+/// Also writes each line to the log file for persistent logging.
 fn spawn_line_reader(
     app: AppHandle,
     stream: impl tokio::io::AsyncRead + Unpin + Send + 'static,
@@ -141,6 +136,8 @@ fn spawn_line_reader(
     tokio::spawn(async move {
         while let Ok(Some(line)) = lines.next_line().await {
             let _ = app.emit(&event_name, &line);
+            // Write streaming output to log file
+            crate::logger::logger().info("stream", &format!("[{}] {}", event_name, line));
         }
     });
 }
@@ -150,7 +147,12 @@ fn spawn_line_reader(
 /// Used by `rustup override set/unset` which need to run in the target directory.
 ///
 /// If the command does not complete within `timeout_secs`, `AppError::Timeout` is returned.
-pub async fn run_command_with_cwd(bin: &str, args: &[&str], cwd: &str, timeout_secs: u64) -> AppResult<String> {
+pub async fn run_command_with_cwd(
+    bin: &str,
+    args: &[&str],
+    cwd: &str,
+    timeout_secs: u64,
+) -> AppResult<String> {
     let mut cmd = Command::new(bin);
     cmd.args(args)
         .env("LC_ALL", "C")
@@ -163,11 +165,8 @@ pub async fn run_command_with_cwd(bin: &str, args: &[&str], cwd: &str, timeout_s
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
 
-    let result = tokio::time::timeout(
-        std::time::Duration::from_secs(timeout_secs),
-        cmd.output(),
-    )
-    .await;
+    let result =
+        tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), cmd.output()).await;
 
     match result {
         Ok(Ok(output)) => {

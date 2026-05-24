@@ -1,4 +1,5 @@
 use crate::db;
+use crate::logger;
 use crate::state::AppState;
 use crate::system::env::find_binary;
 use crate::utils::exec::run_command;
@@ -15,9 +16,10 @@ pub struct EnvCheck {
     pub rustup_home: Option<String>,
 }
 
-/// Emit a log event so the frontend can display real-time progress.
+/// Emit a log event so the frontend can display real-time progress AND write to the log file.
 fn emit_log<R: tauri::Runtime>(app: &tauri::AppHandle<R>, msg: &str) {
     let _ = app.emit("env-check-log", msg);
+    logger::logger().info("env-check", msg);
 }
 
 /// Check rustup by running `rustup --version` with a 10s timeout.

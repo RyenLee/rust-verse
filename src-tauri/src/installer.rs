@@ -1,21 +1,27 @@
-//! Installer module: download, cache, verify, and execute rustup installer.
+//! Installer module: download, cache, and execute rustup installer.
 //!
 //! Flow:
 //! 1. Check if cached installer exists in `[exe_dir]/data/`
-//! 2. If cached, verify SHA256 integrity
-//! 3. If no cache or integrity fails, download with progress and save to cache
-//! 4. Verify downloaded file integrity
-//! 5. If verification fails, delete and retry (up to MAX_RETRIES)
-//! 6. Execute the installer
+//! 2. If cached, use it directly (no hash verification)
+//! 3. If no cache, download with progress and save to cache
+//! 4. If download fails, guide user to manually place the installer in the data directory
+//! 5. Execute the installer
 
 use std::path::{Path, PathBuf};
 
-use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter};
 
 use crate::error::{AppError, AppResult};
+use crate::logger;
 
-/// Maximum download+verify retry attempts.
+/// Emit a log event to the frontend AND write to the log file.
+fn install_log(app: &AppHandle, msg: impl AsRef<str>) {
+    let msg = msg.as_ref();
+    let _ = app.emit("rustup-install-log", msg);
+    logger::logger().info("install", msg);
+}
+
+/// Maximum download retry attempts.
 const MAX_RETRIES: u32 = 3;
 
 /// Download timeout in seconds.
@@ -27,8 +33,6 @@ const DOWNLOAD_TIMEOUT_SECS: u64 = 300;
 struct InstallerMeta {
     /// URL to download the installer from.
     url: String,
-    /// URL to download the SHA256 hash file from.
-    hash_url: String,
     /// File name for the cached installer.
     file_name: &'static str,
 }
@@ -42,7 +46,6 @@ fn get_installer_meta() -> InstallerMeta {
     };
     InstallerMeta {
         url: format!("https://win.rustup.rs/{}", arch),
-        hash_url: format!("https://win.rustup.rs/{}.sha256", arch),
         file_name: "rustup-init.exe",
     }
 }
@@ -57,10 +60,6 @@ fn get_installer_meta() -> InstallerMeta {
     InstallerMeta {
         url: format!(
             "https://static.rust-lang.org/rustup/dist/{}/rustup-init",
-            arch
-        ),
-        hash_url: format!(
-            "https://static.rust-lang.org/rustup/dist/{}/rustup-init.sha256",
             arch
         ),
         file_name: "rustup-init",
@@ -79,10 +78,6 @@ fn get_installer_meta() -> InstallerMeta {
             "https://static.rust-lang.org/rustup/dist/{}/rustup-init",
             arch
         ),
-        hash_url: format!(
-            "https://static.rust-lang.org/rustup/dist/{}/rustup-init.sha256",
-            arch
-        ),
         file_name: "rustup-init",
     }
 }
@@ -91,7 +86,6 @@ fn get_installer_meta() -> InstallerMeta {
 fn get_installer_meta() -> InstallerMeta {
     InstallerMeta {
         url: "https://sh.rustup.rs".to_string(),
-        hash_url: String::new(),
         file_name: "rustup-init.sh",
     }
 }
@@ -119,76 +113,12 @@ fn get_cached_installer_path() -> AppResult<PathBuf> {
     Ok(get_data_dir()?.join(meta.file_name))
 }
 
-// ── SHA256 verification ───────────────────────────────────────────────────
-
-/// Compute SHA256 hash of a file, returning hex string.
-fn compute_file_sha256(path: &Path) -> AppResult<String> {
-    let mut hasher = Sha256::new();
-    let mut file = std::fs::File::open(path)
-        .map_err(|e| AppError::Integrity(format!("failed to open file for hashing: {e}")))?;
-    std::io::copy(&mut file, &mut hasher)
-        .map_err(|e| AppError::Integrity(format!("failed to read file for hashing: {e}")))?;
-    Ok(format!("{:x}", hasher.finalize()))
-}
-
-/// Fetch the expected SHA256 hash from the official hash URL.
-async fn fetch_expected_hash(hash_url: &str) -> AppResult<String> {
-    if hash_url.is_empty() {
-        // No hash URL available (e.g. sh.rustup.rs script); skip verification
-        return Ok(String::new());
-    }
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|e| AppError::Network(format!("failed to create HTTP client: {e}")))?;
-
-    let response = client
-        .get(hash_url)
-        .send()
-        .await
-        .map_err(|e| AppError::Network(format!("failed to fetch hash file: {e}")))?;
-
-    let text = response
-        .text()
-        .await
-        .map_err(|e| AppError::Network(format!("failed to read hash response: {e}")))?;
-
-    // Hash file format: "<hash>  <filename>" or just "<hash>"
-    let hash = text.split_whitespace().next().unwrap_or(&text).to_string();
-    Ok(hash)
-}
-
-/// Verify file integrity by comparing SHA256 hash.
-/// Returns Ok(()) if hash matches or no expected hash available.
-/// Returns Err if hash mismatch.
-fn verify_integrity(file_path: &Path, expected_hash: &str) -> AppResult<()> {
-    if expected_hash.is_empty() {
-        // No expected hash available, skip verification
-        return Ok(());
-    }
-
-    let actual_hash = compute_file_sha256(file_path)?;
-
-    if actual_hash.eq_ignore_ascii_case(expected_hash) {
-        Ok(())
-    } else {
-        Err(AppError::Integrity(format!(
-            "SHA256 mismatch: expected {}, got {}",
-            expected_hash, actual_hash
-        )))
-    }
-}
-
 // ── Download with progress ────────────────────────────────────────────────
 
 /// Download installer to cache directory with streaming progress.
 /// Emits `rustup-install-log` events with download progress.
 async fn download_installer(app: &AppHandle, url: &str, dest: &Path) -> AppResult<()> {
-    let _ = app.emit(
-        "rustup-install-log",
-        format!("Downloading installer from {}...", url),
-    );
+    install_log(app, format!("Downloading installer from {}...", url));
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
@@ -210,8 +140,8 @@ async fn download_installer(app: &AppHandle, url: &str, dest: &Path) -> AppResul
 
     let total_size = response.content_length();
     if let Some(size) = total_size {
-        let _ = app.emit(
-            "rustup-install-log",
+        install_log(
+            app,
             format!("Download size: {:.1} MB", size as f64 / 1_048_576.0),
         );
     }
@@ -236,8 +166,8 @@ async fn download_installer(app: &AppHandle, url: &str, dest: &Path) -> AppResul
         if last_progress_emit.elapsed() >= std::time::Duration::from_millis(500) {
             if let Some(total) = total_size {
                 let pct = (downloaded as f64 / total as f64 * 100.0) as u8;
-                let _ = app.emit(
-                    "rustup-install-log",
+                install_log(
+                    app,
                     format!(
                         "Downloading... {}% ({:.1} MB)",
                         pct,
@@ -245,8 +175,8 @@ async fn download_installer(app: &AppHandle, url: &str, dest: &Path) -> AppResul
                     ),
                 );
             } else {
-                let _ = app.emit(
-                    "rustup-install-log",
+                install_log(
+                    app,
                     format!("Downloading... {:.1} MB", downloaded as f64 / 1_048_576.0),
                 );
             }
@@ -258,8 +188,8 @@ async fn download_installer(app: &AppHandle, url: &str, dest: &Path) -> AppResul
     std::io::Write::flush(&mut file)
         .map_err(|e| AppError::Network(format!("file flush error: {e}")))?;
 
-    let _ = app.emit(
-        "rustup-install-log",
+    install_log(
+        app,
         format!(
             "Download complete: {:.1} MB",
             downloaded as f64 / 1_048_576.0
@@ -286,8 +216,8 @@ pub fn cleanup_stale_cache() -> AppResult<()> {
         let path = entry.path();
         if path.is_file() {
             if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                // Keep current platform installer and hash files
-                if name == current_file || name.ends_with(".sha256") {
+                // Keep current platform installer
+                if name == current_file {
                     continue;
                 }
                 // Remove old installers
@@ -300,16 +230,17 @@ pub fn cleanup_stale_cache() -> AppResult<()> {
     Ok(())
 }
 
-// ── Main entry: ensure installer with cache + verify + retry ──────────────
+// ── Main entry: ensure installer with cache + download ────────────────────
 
-/// Ensure the installer is available (cached or downloaded) and verified.
+/// Ensure the installer is available (cached or downloaded).
 ///
-/// This implements the full flow:
-/// 1. Check cache → verify integrity → return path if valid
-/// 2. Download → verify → return path if valid
-/// 3. On integrity failure: delete file → retry download (up to MAX_RETRIES)
+/// This implements the flow:
+/// 1. Check cache → return path if cached installer exists
+/// 2. Download → return path if download succeeds
+/// 3. On download failure: retry (up to MAX_RETRIES)
+/// 4. After all retries exhausted: return a descriptive error with manual placement instructions
 ///
-/// Returns the path to the verified installer.
+/// Returns the path to the installer.
 pub async fn ensure_installer(app: &AppHandle) -> AppResult<PathBuf> {
     let meta = get_installer_meta();
     let cached_path = get_cached_installer_path()?;
@@ -317,147 +248,82 @@ pub async fn ensure_installer(app: &AppHandle) -> AppResult<PathBuf> {
     // Clean up stale cache files from other platforms
     let _ = cleanup_stale_cache();
 
-    for attempt in 0..=MAX_RETRIES {
-        // Step 1: Check if cached installer exists
-        if cached_path.exists() && cached_path.metadata().map(|m| m.len() > 0).unwrap_or(false) {
-            let _ = app.emit(
-                "rustup-install-log",
-                "Found cached installer, verifying integrity...",
-            );
+    // Step 1: Check if cached installer exists
+    if cached_path.exists() && cached_path.metadata().map(|m| m.len() > 0).unwrap_or(false) {
+        install_log(app, "Found cached installer.");
+        return Ok(cached_path);
+    }
 
-            // Step 2: Fetch expected hash
-            let expected_hash = match fetch_expected_hash(&meta.hash_url).await {
-                Ok(h) => h,
-                Err(e) => {
-                    let _ = app.emit(
-                        "rustup-install-log",
-                        format!("Warning: could not fetch hash for verification: {}", e),
-                    );
-                    // If we can't fetch the hash, trust the cached file on first attempt
-                    // but re-download on subsequent attempts
-                    if attempt == 0 {
-                        let _ = app.emit(
-                            "rustup-install-log",
-                            "Using cached installer (verification unavailable).",
-                        );
-                        return Ok(cached_path);
-                    }
-                    String::new()
-                }
-            };
-
-            // Step 3: Verify integrity
-            match verify_integrity(&cached_path, &expected_hash) {
-                Ok(()) => {
-                    let _ = app.emit("rustup-install-log", "Integrity verification passed.");
-                    return Ok(cached_path);
-                }
-                Err(e) => {
-                    let _ = app.emit(
-                        "rustup-install-log",
-                        format!("Integrity check failed: {}. Deleting cached file.", e),
-                    );
-                    let _ = std::fs::remove_file(&cached_path);
-
-                    if attempt >= MAX_RETRIES {
-                        return Err(AppError::Integrity(format!(
-                            "installer integrity check failed after {} retries: {}",
-                            MAX_RETRIES, e
-                        )));
-                    }
-
-                    let _ = app.emit(
-                        "rustup-install-log",
-                        format!(
-                            "Retrying download (attempt {}/{})...",
-                            attempt + 1,
-                            MAX_RETRIES
-                        ),
-                    );
-                    continue;
-                }
-            }
-        }
-
-        // Step 4: Download installer
+    // Step 2: Download installer with retries
+    for attempt in 0..MAX_RETRIES {
         if attempt > 0 {
-            let _ = app.emit(
-                "rustup-install-log",
-                format!("Retrying download (attempt {}/{})...", attempt, MAX_RETRIES),
+            install_log(
+                app,
+                format!(
+                    "Retrying download (attempt {}/{})...",
+                    attempt + 1,
+                    MAX_RETRIES
+                ),
             );
         }
 
         match download_installer(app, &meta.url, &cached_path).await {
-            Ok(()) => {}
+            Ok(()) => return Ok(cached_path),
             Err(e) => {
                 // Clean up partial download
                 let _ = std::fs::remove_file(&cached_path);
 
-                if attempt >= MAX_RETRIES {
+                if attempt < MAX_RETRIES - 1 {
+                    install_log(app, format!("Download failed: {}. Retrying...", e));
+                    continue;
+                } else {
+                    // All retries exhausted — provide manual placement guidance
+                    let data_dir = get_data_dir()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|_| "<app_dir>/data".to_string());
+
+                    install_log(app, "All download attempts failed.");
+                    install_log(
+                        app,
+                        format!(
+                            "You can manually download the installer from:\n  {}",
+                            meta.url
+                        ),
+                    );
+                    install_log(
+                        app,
+                        format!(
+                            "Place the file as: {}{}{}",
+                            data_dir,
+                            std::path::MAIN_SEPARATOR,
+                            meta.file_name
+                        ),
+                    );
+                    install_log(app, "Then click \"Retry\" to continue installation.");
+
                     return Err(AppError::Network(format!(
-                        "download failed after {} retries: {}",
-                        MAX_RETRIES, e
-                    )));
-                }
-                let _ = app.emit(
-                    "rustup-install-log",
-                    format!("Download failed: {}. Retrying...", e),
-                );
-                continue;
-            }
-        }
-
-        // Step 5: Verify downloaded file
-        let expected_hash = match fetch_expected_hash(&meta.hash_url).await {
-            Ok(h) => h,
-            Err(e) => {
-                let _ = app.emit(
-                    "rustup-install-log",
-                    format!("Warning: could not fetch hash: {}", e),
-                );
-                // If hash unavailable, trust the freshly downloaded file
-                return Ok(cached_path);
-            }
-        };
-
-        match verify_integrity(&cached_path, &expected_hash) {
-            Ok(()) => {
-                let _ = app.emit("rustup-install-log", "Integrity verification passed.");
-                return Ok(cached_path);
-            }
-            Err(e) => {
-                let _ = std::fs::remove_file(&cached_path);
-
-                if attempt >= MAX_RETRIES {
-                    return Err(AppError::Integrity(format!(
-                        "integrity check failed after {} retries: {}",
-                        MAX_RETRIES, e
-                    )));
-                }
-
-                let _ = app.emit(
-                    "rustup-install-log",
-                    format!(
-                        "Integrity check failed: {}. Re-downloading (attempt {}/{})...",
+                        "download failed after {} retries: {}\n\nManual install: download from {}\nand save as {}{}{}",
+                        MAX_RETRIES,
                         e,
-                        attempt + 1,
-                        MAX_RETRIES
-                    ),
-                );
-                continue;
+                        meta.url,
+                        data_dir,
+                        std::path::MAIN_SEPARATOR,
+                        meta.file_name
+                    )));
+                }
             }
         }
     }
 
-    // Should not reach here, but just in case
-    Err(AppError::Integrity(
-        "failed to obtain a valid installer after all retries".to_string(),
+    // Should not reach here
+    Err(AppError::Network(
+        "failed to obtain installer after all retries".to_string(),
     ))
 }
 
 /// Execute the rustup installer with streaming output.
 pub async fn execute_installer(app: AppHandle, installer_path: &Path) -> AppResult<()> {
-    let _ = app.emit("rustup-install-log", "Running installer...");
+    install_log(&app, "Running installer...");
 
     #[cfg(target_os = "windows")]
     {
@@ -543,19 +409,6 @@ mod tests {
         assert!(path.to_string_lossy().contains("rustup-init.exe"));
         #[cfg(not(target_os = "windows"))]
         assert!(path.to_string_lossy().contains("rustup-init"));
-    }
-
-    #[test]
-    fn test_compute_sha256_of_nonexistent_file() {
-        let result = compute_file_sha256(Path::new("/nonexistent/file.xyz"));
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_verify_integrity_empty_hash() {
-        // Empty expected hash should pass (skip verification)
-        let result = verify_integrity(Path::new("/nonexistent/file.xyz"), "");
-        assert!(result.is_ok());
     }
 
     #[test]

@@ -14,9 +14,11 @@ const fs = require('fs')
 const path = require('path')
 
 const PROJECT_ROOT = path.join(__dirname, '..')
-const PRIVATE_KEY_PATH = path.join(PROJECT_ROOT, '.tauri-signer-key')
-const PUBLIC_KEY_PATH = path.join(PROJECT_ROOT, 'src-tauri', '.tauri-signer-key.pub')
+const TAURI_DIR = path.join(PROJECT_ROOT, '.tauri')
+const PRIVATE_KEY_PATH = path.join(TAURI_DIR, 'rust-verse.key')
+const PUBLIC_KEY_PATH = path.join(TAURI_DIR, 'rust-verse.key.pub')
 const TAURI_CONF_PATH = path.join(PROJECT_ROOT, 'src-tauri', 'tauri.conf.json')
+const ENV_PATH = path.join(PROJECT_ROOT, '.env')
 
 function readPrivateKey() {
   try {
@@ -46,15 +48,37 @@ function updateTauriConfPubkey(pubkey) {
   }
 }
 
+function updateEnvFile(privateKey) {
+  let envContent = ''
+  try {
+    envContent = fs.readFileSync(ENV_PATH, 'utf8')
+  } catch {
+    // .env doesn't exist yet
+  }
+
+  const line = `TAURI_SIGNING_PRIVATE_KEY=${privateKey}`
+  if (envContent.includes('TAURI_SIGNING_PRIVATE_KEY=')) {
+    envContent = envContent.replace(
+      /TAURI_SIGNING_PRIVATE_KEY=.*/,
+      line
+    )
+  } else {
+    envContent = envContent.trimEnd() + '\n' + line + '\n'
+  }
+
+  fs.writeFileSync(ENV_PATH, envContent)
+  console.log('Updated TAURI_SIGNING_PRIVATE_KEY in .env')
+}
+
 function generateKeyPair() {
   console.log('Generating new Tauri signer key pair...')
 
   // Use tauri signer generate command
   // -w writes the private key to the specified file
   // The public key is written to the same file with .pub suffix
-  const privateKeyDir = path.dirname(PRIVATE_KEY_PATH)
-  if (!fs.existsSync(privateKeyDir)) {
-    fs.mkdirSync(privateKeyDir, { recursive: true })
+  const tauriDir = TAURI_DIR
+  if (!fs.existsSync(tauriDir)) {
+    fs.mkdirSync(tauriDir, { recursive: true })
   }
 
   try {
@@ -112,15 +136,16 @@ function main() {
 
   if (privateKey && !forceRegenerate) {
     // Private key exists, verify it matches the public key
-    console.log('Private key found at .tauri-signer-key')
+    console.log('Private key found at .tauri/rust-verse.key')
 
     if (publicKey) {
-      console.log('Public key found at src-tauri/.tauri-signer-key.pub')
+      console.log('Public key found at .tauri/rust-verse.key.pub')
       // Ensure tauri.conf.json has the correct pubkey
       updateTauriConfPubkey(publicKey)
     }
 
     console.log('Signing key pair is ready.')
+    updateEnvFile(privateKey)
   } else {
     // Need to generate a new key pair
     const result = generateKeyPair()
@@ -134,6 +159,7 @@ function main() {
     updateTauriConfPubkey(publicKey)
 
     console.log('New signing key pair generated.')
+    updateEnvFile(privateKey)
     console.log('')
     console.log('IMPORTANT: Add the private key to your CI secrets:')
     console.log('  GitHub: Settings > Secrets > TAURI_SIGNING_PRIVATE_KEY')

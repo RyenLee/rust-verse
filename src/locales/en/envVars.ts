@@ -10,7 +10,7 @@ export default {
     delete: 'Delete',
   },
   placeholder: {
-    search: '  Search variable name or description...',
+    search: 'Search variable name or description...',
     nameInput: 'Select or type a variable name...',
     valueInput: 'Enter value...',
     editValue: 'Enter value for {name}...',

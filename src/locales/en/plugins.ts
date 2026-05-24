@@ -6,9 +6,9 @@ export default {
     installByName: 'Install by crate name',
   },
   placeholder: {
-    search: '  Search plugins (e.g. cargo-audit)...',
-    installByName: '  Install by crate name (e.g. cargo-audit)...',
-    filter: '  Filter installed...',
+    search: 'Search plugins (e.g. cargo-audit)...',
+    installByName: 'Install by crate name (e.g. cargo-audit)...',
+    filter: 'Filter installed...',
   },
   status: {
     serverError: 'crates.io server error. Please try again later.',

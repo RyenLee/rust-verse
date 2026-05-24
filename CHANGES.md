@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-05-24
+
+### Added
+
+- **Welcome page install logging** — All terminal output during installation (progress, status, errors) is now synced to the log file (`data/logs/rustverse.log`)
+  - Backend: `installer.rs`, `env_check.rs`, `exec.rs` now write to both Tauri events and log file
+  - Frontend: `WelcomeView.vue` logs environment detection and install events via `appLog`
+- **Manual install guide** — When installer download fails after 3 retries, the UI shows a step-by-step guide for manually placing the installer in the `data/` directory, then retrying
+  - Added i18n keys: `manualGuideTitle`, `manualGuideStep1/2/3` (zh-CN & en)
+- **Search box icon layout fix** — Replaced `position: absolute` icon positioning with `flex` inline layout across all search inputs (PluginsView, EnvVarsView, TargetsView, ComponentsView), eliminating icon-text overlap
+- Added search icon (`mdi:magnify`) to TargetsView and ComponentsView search inputs for UI consistency
+
+### Changed
+
+- **Removed installer SHA256 verification** — The hash endpoint (`*.sha256`) frequently returns XML error pages instead of valid hashes, causing false integrity check failures and unnecessary re-downloads. The installer is now used directly after download without hash verification
+- Removed `sha2` dependency from `Cargo.toml`
+- Removed unused `AppError::Integrity` variant from `error.rs`
+
+### Fixed
+
+- Fixed installer integrity check always failing when hash endpoint returns XML error page (e.g. `expected <?xml, got 86478e53...`)
+- Fixed search box icon overlapping input text in PluginsView and EnvVarsView
+
+---
+
 ## [1.3.2] - 2025-05-24
 
 ### Fixed
@@ -117,6 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo plugins management
 - Dashboard with system status
 
+[1.3.3]: https://github.com/RyenLee/rust-verse/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/RyenLee/rust-verse/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/RyenLee/rust-verse/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/RyenLee/rust-verse/compare/v1.2.5...v1.3.0
@@ -133,7 +159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 本文件记录了 RustVerse 项目的所有重要变更。
 
-- [最新版本 1.3.2](#132---2025-05-24) — 修复签名密钥密码错误
+- [最新版本 1.3.3](#133---2026-05-24) — 欢迎页安装日志同步、移除安装包验证、手动安装指引、搜索框图标修复
+- [版本 1.3.2](#132---2025-05-24) — 修复签名密钥密码错误
 - [版本 1.3.1](#131---2025-05-24) — 零成本自动更新系统配置
 - [版本 1.3.0](#130---2025-05-24) — CARGO_HOME PATH 自动管理、更新签名自动化、构建版本号修复
 - [版本 1.2.5](#125---2025-05-23) — Crates 镜像源管理

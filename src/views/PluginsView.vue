@@ -143,16 +143,16 @@ onMounted(async () => {
       <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
         <h2 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('plugins.section.searchCrates') }}</h2>
         <div class="flex items-center gap-2 flex-nowrap">
-          <div class="relative flex-1 min-w-0">
+          <div class="flex items-center flex-1 min-w-0 h-9 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg focus-within:ring-2 focus-within:ring-sky-500 focus-within:border-transparent">
             <iconify-icon
               icon="mdi:magnify"
               width="18"
-              class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              class="shrink-0 ml-3 text-gray-400"
             ></iconify-icon>
             <input
               v-model="searchQuery"
               :placeholder="t('plugins.placeholder.search')"
-              class="w-full h-9 box-border pl-10 pr-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+              class="w-full h-full px-2 bg-transparent text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none"
               @keyup.enter="handleSearch"
             />
           </div>

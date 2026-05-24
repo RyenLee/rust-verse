@@ -24,4 +24,8 @@ export default {
   uninstallStepKilling: '正在终止可能锁定 Rust 文件的进程...',
   uninstallStepRemoving: '正在执行 rustup self uninstall...',
   uninstallStepDone: '卸载完成。',
+  manualGuideTitle: '手动安装指引',
+  manualGuideStep1: '1. 从以下地址下载安装包：',
+  manualGuideStep2: '2. 将下载的文件保存到以下路径：',
+  manualGuideStep3: '3. 放置完成后，点击"重试"即可继续安装。',
 }
