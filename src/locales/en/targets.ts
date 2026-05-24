@@ -1,5 +1,6 @@
 export default {
   title: 'Targets',
+  description: 'Manage Rust toolchain compilation targets',
   action: {
     installing: 'Installing',
     removing: 'Removing',

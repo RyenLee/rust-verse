@@ -39,61 +39,85 @@ pub async fn check_update(rustup_path: String, state: State<'_, AppState>) -> Ap
     ))
 }
 
-/// Update all toolchains with streaming output.
+/// Update all toolchains with streaming output and retry support.
 ///
 /// Emits config-specified log events with each line of output,
 /// and a finished event when done.
+/// On failure, retries up to the configured number of times with exponential backoff.
 #[tauri::command]
 pub async fn update_all(app: AppHandle, state: State<'_, AppState>, rustup_path: String) -> AppResult<()> {
     crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
-    let (locale_key, log_event, finished_event) = {
+    let (locale_key, log_event, finished_event, max_retries, retry_delay_ms) = {
         let events = crate::db::get_events_config(&state.db);
         let locale_key = crate::db::get_simple(&state.db, "locale.force_locale")
             .unwrap_or_else(crate::db::default_force_locale);
+        let max_retries: u32 = crate::db::get_simple(&state.db, "retry.update_max_retries")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(2);
+        let retry_delay_ms: u64 = crate::db::get_simple(&state.db, "retry.update_delay_ms")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(3000);
         (
             locale_key,
             events.update_log,
             events.update_finished,
+            max_retries,
+            retry_delay_ms,
         )
     };
 
-    exec::run_command_with_streaming(
+    let result = exec::run_command_with_streaming_retry(
         app,
         &rustup_path,
         &["update"],
         &locale_key,
         &log_event,
         &finished_event,
+        max_retries,
+        retry_delay_ms,
         600, // 10 minute timeout for toolchain updates
     )
-    .await
+    .await;
+
+    result
 }
 
-/// Update rustup itself with streaming output.
+/// Update rustup itself with streaming output and retry support.
 ///
 /// Emits config-specified log events with each line of output,
 /// and a finished event when done.
+/// On failure, retries up to the configured number of times with exponential backoff.
 #[tauri::command]
 pub async fn update_rustup(app: AppHandle, state: State<'_, AppState>, rustup_path: String) -> AppResult<()> {
     crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
-    let (locale_key, log_event, finished_event) = {
+    let (locale_key, log_event, finished_event, max_retries, retry_delay_ms) = {
         let events = crate::db::get_events_config(&state.db);
         let locale_key = crate::db::get_simple(&state.db, "locale.force_locale")
             .unwrap_or_else(crate::db::default_force_locale);
+        let max_retries: u32 = crate::db::get_simple(&state.db, "retry.update_max_retries")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(2);
+        let retry_delay_ms: u64 = crate::db::get_simple(&state.db, "retry.update_delay_ms")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(3000);
         (
             locale_key,
             events.update_log,
             events.update_finished,
+            max_retries,
+            retry_delay_ms,
         )
     };
 
-    exec::run_command_with_streaming(
+    exec::run_command_with_streaming_retry(
         app,
         &rustup_path,
         &["self", "update"],
         &locale_key,
         &log_event,
         &finished_event,
+        max_retries,
+        retry_delay_ms,
         300, // 5 minute timeout for rustup self-update
     )
     .await

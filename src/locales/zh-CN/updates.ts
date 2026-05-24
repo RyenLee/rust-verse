@@ -1,8 +1,14 @@
 export default {
   title: '更新',
+  description: '检查并应用 Rust 工具链和 rustup 更新',
   action: {
     updateRustup: '仅更新 Rustup',
     updateAll: '全部更新',
+    checkAppUpdate: '检查软件更新',
+    downloadUpdate: '下载更新',
+    downloading: '下载中...',
+    installNow: '立即安装',
+    restartLater: '稍后重启',
   },
   status: {
     checking: '正在检查更新...',
@@ -11,10 +17,18 @@ export default {
     updateAvailable: '有可用更新{suffix}',
     noToolchainUpdates: '未发现工具链更新。',
     noToolchains: '未找到工具链。',
+    appUpToDate: 'RustVerse 已是最新版本。',
+    appUpdateAvailable: '新版本 {version} 可用！',
+    appChecking: '正在检查软件更新...',
+    appDownloading: '正在下载更新...',
+    appInstalling: '正在安装更新...',
+    appUpdateReady: '更新已就绪，重启应用后生效。',
+    appUpdateFailed: '更新失败',
   },
   section: {
     rustupUpdate: 'Rustup 更新',
     toolchainUpdates: '工具链更新',
+    appUpdate: 'RustVerse 软件更新',
   },
   progress: {
     updatingAllTitle: '正在更新所有工具链',
@@ -24,5 +38,9 @@ export default {
     allUpdated: '所有工具链更新成功',
     rustupUpdated: 'Rustup 更新成功',
     failed: '更新失败',
+    title: '软件更新',
+    downloadProgress: '下载进度',
+    installComplete: '安装完成，请重启应用以应用更新。',
+    downloadFailed: '下载失败',
   },
 }

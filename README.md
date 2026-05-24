@@ -11,7 +11,7 @@ A cross-platform desktop application for visually managing Rust toolchains, comp
 - **Update Center** — Check and apply toolchain updates with streaming progress
 - **Cargo Plugins** — Install and uninstall cargo subcommands
 - **Environment Variables** — View, set, and persist environment variables with CARGO_HOME PATH auto-management
-- **Auto Update** — Built-in application auto-update via tauri-plugin-updater with signed artifacts
+- **Auto Update** — Built-in application auto-update with version check, download progress, and one-click install (System > App Update)
 - **Crates Mirror** — Integrated crm tool for managing crates.io mirror sources with auto-optimal switching
 
 ## Prerequisites
@@ -59,6 +59,7 @@ rust-verse/
 │   │   └── Toast.vue
 │   ├── composables/                  # Vue composables (shared logic)
 │   │   ├── useAppStore.ts            # Store access helper
+│   │   ├── useAppUpdater.ts           # App auto-update (check/download/install)
 │   │   ├── useDataRefresh.ts         # Auto-refresh data polling
 │   │   ├── useEnvVars.ts             # Environment variable operations
 │   │   ├── useLogger.ts              # Frontend logging bridge
@@ -73,6 +74,7 @@ rust-verse/
 │   │   └── zh-CN/                    # Chinese translations
 │   ├── views/                        # Page components
 │   │   ├── DashboardView.vue         # Overview & quick links
+│   │   ├── AppUpdateView.vue         # App software update
 │   │   ├── ToolchainListView.vue     # Toolchain CRUD
 │   │   ├── ComponentsView.vue        # Component management
 │   │   ├── TargetsView.vue           # Target management
@@ -121,6 +123,7 @@ rust-verse/
 ├── scripts/                          # Build & release scripts
 │   ├── bump-version.cjs              # Sync version across config files
 │   ├── generate-locale-config.cjs    # Generate locale config from metadata
+│   ├── generate-latest-json.cjs      # Generate Tauri updater manifest
 │   ├── generate-signer-key.cjs       # Generate/verify updater signing keys
 │   └── push-release.cjs              # Automated release workflow
 ├── tests/
@@ -221,7 +224,7 @@ RustVerse 是一个跨平台桌面应用，用于可视化管理 Rust 工具链�
 | 更新中心 | 流式进度展示工具链更新 |
 | Cargo 插件 | 安装和卸载 cargo 子命令 |
 | 环境变量 | 查看、设置、持久化环境变量，CARGO_HOME 自动管理 PATH |
-| 自动更新 | 通过 tauri-plugin-updater 实现签名自动更新 |
+| 自动更新 | 内置应用自动更新，支持版本检查、下载进度和一键安装（系统 > 软件更新） |
 | Crates 镜像 | 集成 crm 工具管理 crates.io 镜像源，支持自动最优切换 |
 
 ### 快速开始

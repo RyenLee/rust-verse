@@ -1,5 +1,6 @@
 export default {
   title: 'Cargo 插件',
+  description: '搜索、安装和管理 Cargo 插件',
   section: {
     searchCrates: '在 crates.io 上搜索',
     installedPlugins: '已安装插件',

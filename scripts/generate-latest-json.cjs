@@ -1,0 +1,220 @@
+#!/usr/bin/env node
+
+/**
+ * Generate latest.json for the Tauri updater plugin.
+ *
+ * This script reads the release artifacts from the Tauri build output
+ * and generates the update manifest JSON that the updater plugin
+ * checks against.
+ *
+ * Usage:
+ *   node scripts/generate-latest-json.cjs [--dry-run] [--release-tag v1.3.5]
+ *
+ * Environment variables:
+ *   GITHUB_REPOSITORY  - e.g., "RyenLee/rust-verse"
+ *   RELEASE_TAG        - e.g., "v1.3.5"
+ *
+ * Output:
+ *   src-tauri/target/release/bundle/latest.json
+ */
+
+const fs = require('fs')
+const path = require('path')
+
+// ── Configuration ──────────────────────────────────────────────────────────
+
+const REPO = process.env.GITHUB_REPOSITORY || 'RyenLee/rust-verse'
+
+function readVersion() {
+  // Try config.toml first (canonical source)
+  const configPath = path.join(process.cwd(), 'src-tauri', 'config.toml')
+  try {
+    const content = fs.readFileSync(configPath, 'utf8')
+    const match = content.match(/^version\s*=\s*"([^"]+)"/m)
+    if (match) return match[1]
+  } catch { /* fall through */ }
+
+  // Fallback to package.json
+  const pkgPath = path.join(process.cwd(), 'package.json')
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+  return pkg.version
+}
+
+function readReleaseNotes(version) {
+  const changesPath = path.join(process.cwd(), 'CHANGES.md')
+  try {
+    const content = fs.readFileSync(changesPath, 'utf8')
+    const lines = content.split('\n')
+    const result = []
+    let inVersion = false
+
+    for (const line of lines) {
+      if (line.match(/^## \[.*\]/)) {
+        if (inVersion) break
+        if (line.includes(`[${version}]`)) {
+          inVersion = true
+          continue
+        }
+      }
+      if (inVersion) {
+        result.push(line)
+      }
+    }
+
+    const notes = result.join('\n').trim()
+    return notes || `Release v${version}`
+  } catch {
+    return `Release v${version}`
+  }
+}
+
+function findSigFile(bundleDir, version) {
+  // Tauri generates signature files with pattern: <AppName>_<version>_<arch>_<lang>.<ext>.sig
+  try {
+    const files = fs.readdirSync(bundleDir)
+    const sigFile = files.find(
+      (f) => f.endsWith('.sig') && f.includes(version)
+    )
+    if (sigFile) {
+      return {
+        path: path.join(bundleDir, sigFile),
+        // Derive the installer name from the sig file name
+        installerName: sigFile.replace('.sig', ''),
+      }
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
+function buildPlatformEntry(bundleDir, version, platform, installerExt, arch) {
+  const sigInfo = findSigFile(bundleDir, version)
+  if (!sigInfo) {
+    console.warn(`  [warn] No .sig file found for version ${version} in ${bundleDir}`)
+    return null
+  }
+
+  let signature
+  try {
+    signature = fs.readFileSync(sigInfo.path, 'utf8').trim()
+  } catch {
+    console.warn(`  [warn] Could not read signature file: ${sigInfo.path}`)
+    return null
+  }
+
+  const url = `https://github.com/${REPO}/releases/download/v${version}/${sigInfo.installerName}`
+
+  return {
+    signature,
+    url,
+  }
+}
+
+function main() {
+  const args = process.argv.slice(2)
+  const dryRun = args.includes('--dry-run') || args.includes('-n')
+  const releaseTagArg = args.find((a) => a.startsWith('--release-tag='))?.split('=')[1]
+
+  const version = readVersion()
+  const tag = releaseTagArg || process.env.RELEASE_TAG || `v${version}`
+  const notes = readReleaseNotes(version)
+  const pubDate = new Date().toISOString()
+
+  console.log(`Version:    ${version}`)
+  console.log(`Tag:        ${tag}`)
+  console.log(`Pub Date:   ${pubDate}`)
+  console.log(`Repository: ${REPO}`)
+  console.log()
+
+  const bundleBase = path.join(
+    process.cwd(),
+    'src-tauri',
+    'target',
+    'release',
+    'bundle'
+  )
+
+  // Platform detection and artifact discovery
+  const platforms = {}
+
+  // Windows NSIS
+  const nsisDir = path.join(bundleBase, 'nsis')
+  if (fs.existsSync(nsisDir)) {
+    const entry = buildPlatformEntry(nsisDir, version, 'windows-x86_64', '.nsis.zip', 'x86_64')
+    if (entry) {
+      platforms['windows-x86_64'] = entry
+      console.log(`  [windows-x86_64] ${entry.url}`)
+    }
+  }
+
+  // macOS (dmg)
+  const dmgDir = path.join(bundleBase, 'dmg')
+  if (fs.existsSync(dmgDir)) {
+    const entry = buildPlatformEntry(dmgDir, version, 'darwin-x86_64', '.app.tar.gz', 'x86_64')
+    if (entry) {
+      platforms['darwin-x86_64'] = entry
+      console.log(`  [darwin-x86_64] ${entry.url}`)
+    }
+
+    const entryArm = buildPlatformEntry(dmgDir, version, 'darwin-aarch64', '.app.tar.gz', 'aarch64')
+    if (entryArm) {
+      platforms['darwin-aarch64'] = entryArm
+      console.log(`  [darwin-aarch64] ${entryArm.url}`)
+    }
+  }
+
+  // Linux (AppImage / deb)
+  const appimageDir = path.join(bundleBase, 'appimage')
+  if (fs.existsSync(appimageDir)) {
+    const entry = buildPlatformEntry(appimageDir, version, 'linux-x86_64', '.AppImage.tar.gz', 'x86_64')
+    if (entry) {
+      platforms['linux-x86_64'] = entry
+      console.log(`  [linux-x86_64] ${entry.url}`)
+    }
+  }
+
+  const debDir = path.join(bundleBase, 'deb')
+  if (fs.existsSync(debDir)) {
+    const entry = buildPlatformEntry(debDir, version, 'linux-x86_64', '.deb', 'x86_64')
+    if (entry) {
+      platforms['linux-x86_64'] = entry
+      console.log(`  [linux-x86_64] ${entry.url}`)
+    }
+  }
+
+  if (Object.keys(platforms).length === 0) {
+    console.error(
+      'Error: No platform artifacts found. Make sure you ran `pnpm tauri build` first.'
+    )
+    console.error(`  Looked in: ${bundleBase}`)
+    process.exit(1)
+  }
+
+  const latestJson = {
+    version,
+    notes,
+    pub_date: pubDate,
+    platforms,
+  }
+
+  const outputPath = path.join(bundleBase, 'latest.json')
+
+  if (dryRun) {
+    console.log()
+    console.log('[dry-run] Would write:')
+    console.log(JSON.stringify(latestJson, null, 2))
+  } else {
+    fs.writeFileSync(outputPath, JSON.stringify(latestJson, null, 2) + '\n')
+    console.log()
+    console.log(`Written: ${outputPath}`)
+    console.log()
+    console.log('Next steps:')
+    console.log(
+      `  Upload ${path.basename(outputPath)} to your GitHub release as an asset`
+    )
+    console.log(
+      `  The updater will check: https://github.com/${REPO}/releases/latest/download/latest.json`
+    )
+  }
+}
+
+main()

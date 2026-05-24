@@ -1,6 +1,6 @@
 [package]
 name = "rustverse"
-version = "1.3.3"
+version = "1.3.4"
 description = "Rust Toolchain Visual Version Manager"
 authors = ["ryenlii"]
 edition = "2024"

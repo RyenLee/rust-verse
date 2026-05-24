@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] - 2026-05-24
+
+### Added
+
+- **App online update frontend UI** — New `AppUpdateView.vue` page with version check, download progress, and install capabilities
+  - Composable `useAppUpdater.ts` wrapping `@tauri-apps/plugin-updater` with error classification and progress tracking
+  - Added "系统 (System)" navigation group in sidebar with "软件更新 (App Update)" menu item
+  - Included project homepage link on the app update page
+- **Toolchain update retry mechanism** — `run_command_with_streaming_retry()` in `exec.rs` with exponential backoff (3s → 6s → 12s, max 60s) and streaming retry log events to frontend
+- **CI/CD `latest.json` generation script** — `scripts/generate-latest-json.cjs` scans build artifacts and auto-generates the Tauri updater manifest JSON
+
+### Changed
+
+- **Moved app update out of UpdateView** — The "RustVerse 软件更新" section is now a standalone page under "系统 (System)" nav group, avoiding conflicts with the Rust toolchain update page
+- **Improved update error handling** — `useAppUpdater` now classifies errors: missing `latest.json` is treated as "up to date" (expected), network failures show a warning banner in the UI
+
+### Fixed
+
+- Fixed update check console error "Could not fetch a valid release JSON from the remote" — when no release JSON is published, the app now silently treats it as up-to-date instead of showing an error
+
+---
+
 ## [1.3.3] - 2026-05-24
 
 ### Added
@@ -142,6 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo plugins management
 - Dashboard with system status
 
+[1.3.4]: https://github.com/RyenLee/rust-verse/compare/v1.3.3...v1.3.4
 [1.3.3]: https://github.com/RyenLee/rust-verse/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/RyenLee/rust-verse/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/RyenLee/rust-verse/compare/v1.3.0...v1.3.1
@@ -159,7 +182,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 本文件记录了 RustVerse 项目的所有重要变更。
 
-- [最新版本 1.3.3](#133---2026-05-24) — 欢迎页安装日志同步、移除安装包验证、手动安装指引、搜索框图标修复
+- [最新版本 1.3.4](#134---2026-05-24) — App 在线更新前端 UI、工具链更新重试机制、latest.json 生成脚本、更新错误分类处理
+- [版本 1.3.3](#133---2026-05-24) — 欢迎页安装日志同步、移除安装包验证、手动安装指引、搜索框图标修复
 - [版本 1.3.2](#132---2025-05-24) — 修复签名密钥密码错误
 - [版本 1.3.1](#131---2025-05-24) — 零成本自动更新系统配置
 - [版本 1.3.0](#130---2025-05-24) — CARGO_HOME PATH 自动管理、更新签名自动化、构建版本号修复

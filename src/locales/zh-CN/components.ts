@@ -1,5 +1,6 @@
 export default {
   title: '组件',
+  description: '管理 Rust 工具链的组件',
   action: {
     installing: '正在安装',
     removing: '正在移除',

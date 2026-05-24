@@ -24,5 +24,6 @@ export default {
     reloadApp: '重新加载应用',
     toggleDevTools: '切换开发者工具（仅调试版本）',
     about: '{name} v{version} — 基于 Tauri 2 + Vue 3 + Rust 构建。',
+    githubLink: '访问 GitHub 仓库',
   },
 }

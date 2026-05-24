@@ -1,5 +1,6 @@
 export default {
   title: '目录覆盖',
+  description: '为不同目录指定使用的工具链版本',
   action: {
     addOverride: '添加覆盖',
   },

@@ -48,10 +48,10 @@ const router = createRouter({
       name: 'mirrors',
       component: () => import('@/views/MirrorView.vue'),
     },
-    {
-      path: '/help',
-      name: 'help',
-      component: () => import('@/views/HelpView.vue'),
+  {
+      path: '/about',
+      name: 'about',
+      component: () => import('@/views/AppUpdateView.vue'),
     },
   ],
 })

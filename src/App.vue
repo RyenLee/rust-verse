@@ -6,6 +6,7 @@ import Toast from './components/Toast.vue'
 import ProgressDialog from './components/ProgressDialog.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import SplashScreen from './components/SplashScreen.vue'
+import TopBar from './components/TopBar.vue'
 import WelcomeView from './views/WelcomeView.vue'
 import { useAppStore } from './composables/useAppStore'
 import { useStore } from './store'
@@ -14,7 +15,7 @@ import { useToast } from './composables/useToast'
 import { useDataRefresh } from './composables/useDataRefresh'
 import { appLog } from './composables/useLogger'
 import { withTimeout } from './composables/useWithTimeout'
-import { initLocale, setLocale, getLocale, getAvailableLocales, type LocaleInfo } from './locales'
+import { initLocale } from './locales'
 
 const { t } = useI18n()
 const { checkEnv, refreshProcessPath, uninstallRustup } = useRustup()
@@ -28,6 +29,28 @@ const envCheck = ref<EnvCheck | null>(null)
 const uninstalling = ref(false)
 const route = useRoute()
 const router = useRouter()
+
+// Sidebar collapsed state (persisted)
+const sidebarCollapsed = ref(false)
+try {
+  const saved = localStorage.getItem('sidebar-collapsed')
+  if (saved !== null) sidebarCollapsed.value = saved === 'true'
+} catch { /* ignore */ }
+
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+  try {
+    localStorage.setItem('sidebar-collapsed', String(sidebarCollapsed.value))
+  } catch { /* ignore */ }
+}
+
+// Keyboard shortcut: Ctrl+B to toggle sidebar
+function handleKeydown(e: KeyboardEvent) {
+  if (e.ctrlKey && e.key === 'b') {
+    e.preventDefault()
+    toggleSidebar()
+  }
+}
 
 // Splash screen state
 const splashProgress = ref(0)
@@ -78,48 +101,81 @@ onErrorCaptured((err: unknown, instance, info) => {
   const stack = err instanceof Error ? err.stack : null
   logStartupError('welcome-render', `${msg} [info: ${info}]`)
 
-  // Only show error UI if WelcomeView is active
   if (phase.value === 'welcome') {
     welcomeError.value = msg
     welcomeErrorStack.value = stack
   }
 
-  // Prevent propagation to Vue's default error handler (which would unmount the app)
   return false
 })
-// === End error boundary ===
 
-const currentLocale = ref(getLocale())
-const availableLocales = ref<LocaleInfo[]>(getAvailableLocales())
-const localeDropdownOpen = ref(false)
-const localeDropdownRef = ref<HTMLElement | null>(null)
-
-function handleClickOutside(e: MouseEvent) {
-  if (localeDropdownRef.value && !localeDropdownRef.value.contains(e.target as Node)) {
-    localeDropdownOpen.value = false
-  }
+// ===== Navigation config with groups =====
+interface NavItem {
+  path: string
+  label: string
+  icon: string
 }
 
-const navItems = computed(() => [
-  { path: '/', label: t('nav.dashboard'), icon: 'mdi:view-dashboard-outline' },
-  { path: '/env-vars', label: t('nav.envVars'), icon: 'mdi:variable' },
-  { path: '/mirrors', label: t('nav.mirrors'), icon: 'mdi:mirror' },
-  { path: '/toolchains', label: t('nav.toolchains'), icon: 'mdi:cog-outline' },
-  { path: '/components', label: t('nav.components'), icon: 'mdi:puzzle-outline' },
-  { path: '/targets', label: t('nav.targets'), icon: 'mdi:target' },
-  { path: '/overrides', label: t('nav.overrides'), icon: 'mdi:folder-marker-outline' },
-  { path: '/updates', label: t('nav.updates'), icon: 'mdi:cloud-download-outline' },
-  { path: '/plugins', label: t('nav.plugins'), icon: 'mdi:power-plug-outline' },
-  { path: '/help', label: t('nav.help'), icon: 'mdi:help-circle-outline' },
+interface NavGroup {
+  key: string
+  label: string
+  icon: string
+  color: string
+  items: NavItem[]
+}
+
+const navGroups = computed<NavGroup[]>(() => [
+  {
+    key: 'overview',
+    label: t('nav.group.overview'),
+    icon: 'mdi:view-dashboard-outline',
+    color: 'orange',
+    items: [
+      { path: '/', label: t('nav.dashboard'), icon: 'mdi:view-dashboard-outline' },
+    ],
+  },
+  {
+    key: 'toolchain',
+    label: t('nav.group.toolchain'),
+    icon: 'mdi:cog-outline',
+    color: 'sky',
+    items: [
+      { path: '/toolchains', label: t('nav.toolchains'), icon: 'mdi:cog-outline' },
+      { path: '/components', label: t('nav.components'), icon: 'mdi:puzzle-outline' },
+      { path: '/targets', label: t('nav.targets'), icon: 'mdi:target' },
+    ],
+  },
+  {
+    key: 'config',
+    label: t('nav.group.config'),
+    icon: 'mdi:tune-vertical',
+    color: 'violet',
+    items: [
+      { path: '/env-vars', label: t('nav.envVars'), icon: 'mdi:variable' },
+      { path: '/mirrors', label: t('nav.mirrors'), icon: 'mdi:mirror' },
+      { path: '/overrides', label: t('nav.overrides'), icon: 'mdi:folder-marker-outline' },
+    ],
+  },
+  {
+    key: 'extend',
+    label: t('nav.group.extend'),
+    icon: 'mdi:rocket-launch-outline',
+    color: 'emerald',
+    items: [
+      { path: '/updates', label: t('nav.updates'), icon: 'mdi:cloud-download-outline' },
+      { path: '/plugins', label: t('nav.plugins'), icon: 'mdi:power-plug-outline' },
+    ],
+  },
+  {
+    key: 'system',
+    label: t('nav.group.system'),
+    icon: 'mdi:desktop-tower-monitor',
+    color: 'slate',
+    items: [
+      { path: '/about', label: t('nav.appUpdate'), icon: 'mdi:update' },
+    ],
+  },
 ])
-
-const currentLocaleInfo = computed(() => availableLocales.value.find(l => l.code === currentLocale.value))
-
-function selectLocale(code: string) {
-  currentLocale.value = code
-  setLocale(code)
-  localeDropdownOpen.value = false
-}
 
 async function recheckEnv() {
   try {
@@ -179,7 +235,6 @@ async function handleUninstallRustup() {
     uninstallProgressStatus.value = 'success'
     uninstallProgressStatusText.value = t('app.uninstallSuccess')
 
-    // After a brief pause, recheck environment then return to welcome page
     setTimeout(async () => {
       showUninstallProgress.value = false
       await recheckEnv()
@@ -242,10 +297,12 @@ onMounted(async () => {
   logStartup('step0', 'onMounted started')
   startupErrors.value = []
 
+  // Register keyboard shortcuts
+  document.addEventListener('keydown', handleKeydown)
+
   advanceSplash(0)
 
   try {
-    // Step 0: Init locale
     const tLocale = performance.now()
     logStartup('step0', 'Starting initLocale (timeout 8s)...')
     const localeResult = await withTimeout(initLocale(), 8000)
@@ -255,11 +312,8 @@ onMounted(async () => {
       logStartup('step0', `initLocale completed in ${Math.round(performance.now() - tLocale)}ms`)
     }
 
-    currentLocale.value = getLocale()
-    availableLocales.value = getAvailableLocales()
     advanceSplash(1)
 
-    // Step 1: Init theme
     const tTheme = performance.now()
     logStartup('step1', 'Starting initTheme (timeout 5s)...')
     const themeResult = await withTimeout(initTheme(), 5000)
@@ -270,7 +324,6 @@ onMounted(async () => {
     }
     advanceSplash(2)
 
-    // Step 1.5: Load app metadata from config.toml [app]
     const tMeta = performance.now()
     logStartup('step1.5', 'Starting loadAppMeta (timeout 5s)...')
     const metaResult = await withTimeout(store.loadAppMeta(), 5000)
@@ -285,7 +338,6 @@ onMounted(async () => {
       )
     }
 
-    // Step 2: Refresh PATH (non-critical)
     const tPath = performance.now()
     logStartup('step2', 'Starting refreshProcessPath...')
     const pathResult = await withTimeout(refreshProcessPath(), 5000)
@@ -295,7 +347,6 @@ onMounted(async () => {
       logStartup('step2', `refreshProcessPath completed in ${Math.round(performance.now() - tPath)}ms`)
     }
 
-    // Step 3: Restore window bounds
     const tBounds = performance.now()
     logStartup('step3', 'Starting restoreWindowBounds...')
     const boundsResult = await withTimeout(restoreWindowBounds(), 5000)
@@ -316,15 +367,10 @@ onMounted(async () => {
     `Startup completed in ${Math.round(performance.now() - t0)}ms, errors=${startupErrors.value.length}`
   )
 
-  // Transition to welcome phase
   phase.value = 'welcome'
   await nextTick()
-  logStartup(
-    'done',
-    `Phase switched to welcome. WelcomeView mounted.`
-  )
+  logStartup('done', `Phase switched to welcome. WelcomeView mounted.`)
 
-  // Deferred: check Rust environment in background
   recheckEnv().then(() => {
     logStartup('deferred', 'Environment check completed in background')
   })
@@ -336,13 +382,12 @@ function handleWelcomeEnter() {
   router.push('/')
 }
 
-// Watch for env var changes and re-check environment
 const stopEnvVarWatch = onEnvVarChange(() => {
   recheckEnv()
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('click', handleClickOutside, true)
+  document.removeEventListener('keydown', handleKeydown)
   stopEnvVarWatch()
 })
 </script>
@@ -388,138 +433,82 @@ onBeforeUnmount(() => {
     </div>
   </div>
 
-  <!-- Main app layout (fade-in on enter) -->
+  <!-- Main app layout -->
   <Transition name="main-appear">
     <div v-if="phase === 'main'" class="flex h-screen overflow-hidden">
       <!-- Sidebar -->
       <nav
-        class="sidebar w-64 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col shrink-0"
+        class="sidebar bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col shrink-0 transition-[width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]"
+        :class="sidebarCollapsed ? 'w-16' : 'w-60'"
       >
         <!-- Brand -->
-        <div class="sidebar-brand px-5 py-5 flex items-center gap-3">
+        <div class="px-5 py-4 flex items-center gap-3" :class="sidebarCollapsed && 'justify-center px-0'">
           <iconify-icon icon="mdi:language-rust" width="24" class="text-orange-500 shrink-0"></iconify-icon>
-          <h1 class="text-base font-semibold text-gray-900 dark:text-gray-100 tracking-tight truncate">
+          <h1
+            v-if="!sidebarCollapsed"
+            class="text-base font-semibold text-gray-900 dark:text-gray-100 tracking-tight truncate"
+          >
             {{ store.appName || 'RustVerse' }}
           </h1>
         </div>
 
-        <!-- Navigation -->
-        <div class="flex-1 overflow-y-auto px-3 py-1 space-y-0.5">
-          <router-link
-            v-for="item in navItems"
-            :key="item.path"
-            :to="item.path"
-            :class="[
-              'sidebar-nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150',
-              route.path === item.path
-                ? 'active bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800/60',
-            ]"
-          >
-            <iconify-icon
-              :icon="item.icon"
-              width="18"
-              :class="[
-                'shrink-0 transition-colors duration-150',
-                route.path === item.path ? 'text-sky-600 dark:text-sky-400' : 'text-gray-400 dark:text-gray-500',
-              ]"
-            ></iconify-icon>
-            <span class="truncate">{{ item.label }}</span>
-          </router-link>
-        </div>
-
-        <!-- Bottom controls -->
-        <div class="sidebar-footer border-t border-gray-200 dark:border-gray-800 p-3 space-y-1">
-          <!-- Language switcher -->
-          <div ref="localeDropdownRef" class="relative">
-            <button
-              class="sidebar-control flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-all duration-150"
-              @click="localeDropdownOpen = !localeDropdownOpen"
+        <!-- Navigation with groups -->
+        <div class="flex-1 overflow-y-auto px-3 py-1 space-y-4">
+          <div v-for="group in navGroups" :key="group.key" :class="`nav-group-${group.color}`">
+            <!-- Group label (hidden when collapsed) -->
+            <div
+              v-if="!sidebarCollapsed"
+              class="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"
             >
-              <iconify-icon icon="mdi:translate" width="18" class="text-gray-400 dark:text-gray-500"></iconify-icon>
-              <span class="flex-1 text-left truncate whitespace-nowrap">{{ currentLocaleInfo?.name || currentLocale }}</span>
-              <iconify-icon
-                icon="mdi:chevron-down"
-                width="16"
-                class="text-gray-400 transition-transform duration-200"
-                :class="localeDropdownOpen ? 'rotate-180' : ''"
-              ></iconify-icon>
-            </button>
-            <!-- Dropdown -->
-            <Transition name="dropdown">
-              <div
-                v-if="localeDropdownOpen"
-                class="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg shadow-gray-200/50 dark:shadow-black/30 overflow-hidden z-50"
+              {{ group.label }}
+            </div>
+
+            <!-- Nav items -->
+            <div class="space-y-0.5">
+              <router-link
+                v-for="item in group.items"
+                :key="item.path"
+                :to="item.path"
+                :class="[
+                  'sidebar-nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150',
+                  sidebarCollapsed && 'justify-center px-0',
+                  route.path === item.path
+                    ? 'active'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800/60',
+                ]"
+                :title="sidebarCollapsed ? item.label : undefined"
               >
-                <button
-                  v-for="loc in availableLocales"
-                  :key="loc.code"
+                <iconify-icon
+                  :icon="item.icon"
+                  width="18"
                   :class="[
-                    'flex items-center gap-3 w-full px-3 py-2 text-[13px] transition-colors',
-                    loc.code === currentLocale
-                      ? 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50',
+                    'shrink-0 transition-colors duration-150',
+                    route.path === item.path ? '' : 'text-gray-400 dark:text-gray-500',
                   ]"
-                  @click="selectLocale(loc.code)"
-                >
-                  <iconify-icon
-                    icon="mdi:check"
-                    width="16"
-                    class="shrink-0"
-                    :class="loc.code === currentLocale ? 'text-sky-600 dark:text-sky-400' : 'text-transparent'"
-                  ></iconify-icon>
-                  <span class="flex-1 text-left">{{ loc.name }}</span>
-                  <span class="text-xs text-gray-400 dark:text-gray-500">{{ loc.english_name }}</span>
-                </button>
-              </div>
-            </Transition>
+                ></iconify-icon>
+                <span v-if="!sidebarCollapsed" class="truncate">{{ item.label }}</span>
+              </router-link>
+            </div>
           </div>
-
-          <!-- Theme toggle -->
-          <button
-            class="sidebar-control flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-all duration-150"
-            @click="toggleTheme"
-          >
-            <Transition name="theme-icon" mode="out-in">
-              <iconify-icon
-                v-if="isDark"
-                key="sun"
-                icon="mdi:weather-sunny"
-                width="18"
-                class="text-amber-400"
-              ></iconify-icon>
-              <iconify-icon
-                v-else
-                key="moon"
-                icon="mdi:weather-night"
-                width="18"
-                class="text-indigo-400"
-              ></iconify-icon>
-            </Transition>
-            <span class="truncate">{{ isDark ? t('app.lightMode') : t('app.darkMode') }}</span>
-          </button>
-
-          <!-- Uninstall rustup (only show if installed) -->
-          <button
-            v-if="envCheck?.rustup_installed"
-            class="sidebar-control flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] font-medium text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-150"
-            :disabled="uninstalling"
-            @click="showUninstallConfirm = true"
-          >
-            <iconify-icon icon="mdi:delete-outline" width="18" class="shrink-0"></iconify-icon>
-            <span class="truncate">{{ uninstalling ? t('app.uninstalling') : t('app.uninstallRustup') }}</span>
-          </button>
         </div>
       </nav>
 
-      <!-- Main content -->
-      <main class="flex-1 bg-white dark:bg-gray-950 overflow-hidden">
-        <router-view v-slot="{ Component }">
-          <keep-alive>
-            <component :is="Component" />
-          </keep-alive>
-        </router-view>
-      </main>
+      <!-- Main area: TopBar + Content -->
+      <div class="flex-1 flex flex-col bg-white dark:bg-gray-950 overflow-hidden">
+        <!-- Global TopBar -->
+        <TopBar @toggle-sidebar="toggleSidebar" />
+
+        <!-- Page content -->
+        <main class="flex-1 overflow-hidden">
+          <router-view v-slot="{ Component }">
+            <Transition name="route" mode="out-in">
+              <keep-alive>
+                <component :is="Component" />
+              </keep-alive>
+            </Transition>
+          </router-view>
+        </main>
+      </div>
 
       <Toast />
     </div>
@@ -547,29 +536,16 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* Dropdown animation */
-.dropdown-enter-active,
-.dropdown-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
+/* Route transition */
+.route-enter-active {
+  transition: opacity 0.15s ease-out;
 }
-.dropdown-enter-from,
-.dropdown-leave-to {
+.route-leave-active {
+  transition: opacity 0.1s ease-in;
+}
+.route-enter-from,
+.route-leave-to {
   opacity: 0;
-  transform: translateY(4px);
-}
-
-/* Theme icon switch animation */
-.theme-icon-enter-active,
-.theme-icon-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-.theme-icon-enter-from {
-  opacity: 0;
-  transform: rotate(-90deg) scale(0.8);
-}
-.theme-icon-leave-to {
-  opacity: 0;
-  transform: rotate(90deg) scale(0.8);
 }
 
 /* Main app appear animation */

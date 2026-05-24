@@ -2,27 +2,25 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '../components/BaseButton.vue'
+import ListItem from '../components/ListItem.vue'
+import PageLayout from '../components/PageLayout.vue'
 import ProgressDialog from '../components/ProgressDialog.vue'
+import SearchInput from '../components/SearchInput.vue'
+import SectionTitle from '../components/SectionTitle.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import ToolchainSelector from '../components/ToolchainSelector.vue'
 import { useRustup, type ComponentInfo } from '../composables/useRustup'
 import { useToolchainOptions } from '../composables/useToolchainOptions'
 
 const { t } = useI18n()
 const { listComponents, addComponent, removeComponent } = useRustup()
-const { toolchains, refresh: refreshToolchains } = useToolchainOptions()
+const { toolchains } = useToolchainOptions()
 
 const selectedToolchain = ref('')
 const components = ref<ComponentInfo[]>([])
 const loading = ref(false)
 const loaded = ref(false)
-const search = ref('')
-
-// Auto-select default toolchain when shared list changes
-async function ensureSelection() {
-  if (toolchains.value.length > 0 && !selectedToolchain.value) {
-    const def = toolchains.value.find((t) => t.is_default)
-    selectedToolchain.value = def ? def.name : toolchains.value[0].name
-  }
-}
+const searchQuery = ref('')
 
 // Progress dialog state
 const showProgress = ref(false)
@@ -42,6 +40,10 @@ async function loadComponents() {
   } finally {
     loading.value = false
   }
+}
+
+function onToolchainChange() {
+  loaded.value = false
 }
 
 async function toggleComponent(comp: ComponentInfo) {
@@ -76,80 +78,103 @@ function closeProgress() {
   showProgress.value = false
 }
 
-const filteredComponents = computed(() => {
-  const list = search.value
-    ? components.value.filter((c) => c.name.toLowerCase().includes(search.value.toLowerCase()))
-    : components.value
-  return [...list].sort((a, b) => (b.installed ? 1 : 0) - (a.installed ? 1 : 0))
+const installedComponents = computed(() => {
+  const list = searchQuery.value
+    ? components.value.filter((c) => c.installed && c.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
+    : components.value.filter((c) => c.installed)
+  return list
+})
+
+const availableComponents = computed(() => {
+  const list = searchQuery.value
+    ? components.value.filter((c) => !c.installed && c.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
+    : components.value.filter((c) => !c.installed)
+  return list
 })
 </script>
 
 <template>
-  <div class="p-6 space-y-4 flex flex-col h-full relative">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('components.title') }}</h1>
+  <PageLayout :group="t('nav.group.toolchain')" :title="t('components.title')" :description="t('components.description')">
+    <template #actions>
       <BaseButton variant="secondary" :loading="loading" :disabled="!selectedToolchain" @click="loadComponents">
         <iconify-icon icon="mdi:download" width="16"></iconify-icon>
         {{ t('common.action.load') }}
       </BaseButton>
-    </div>
+    </template>
 
-    <div class="flex gap-3 items-center">
-      <select
-        v-model="selectedToolchain"
-        class="bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 border border-gray-200 dark:border-gray-600"
-        @change="loaded = false"
-      >
-        <option disabled value="">{{ t('components.placeholder.toolchainPlaceholder') }}</option>
-        <option v-for="tc in toolchains" :key="tc.name" :value="tc.name">
-          {{ tc.name }}
-        </option>
-      </select>
-      <div class="flex items-center flex-1 min-w-0 h-[38px] bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md focus-within:ring-2 focus-within:ring-sky-500 focus-within:border-transparent">
-        <iconify-icon
-          icon="mdi:magnify"
-          width="18"
-          class="shrink-0 ml-3 text-gray-400"
-        ></iconify-icon>
-        <input
-          v-model="search"
-          :placeholder="t('components.placeholder.search')"
-          class="w-full h-full px-2 bg-transparent text-sm text-gray-900 dark:text-gray-200 placeholder-gray-400 focus:outline-none"
-        />
+    <template #filters>
+      <div class="flex gap-3 items-center">
+        <ToolchainSelector v-model="selectedToolchain" :toolchains="toolchains" @change="onToolchainChange" />
+        <SearchInput v-model="searchQuery" :placeholder="t('common.action.search')" class="flex-1" />
       </div>
-    </div>
+    </template>
 
-    <div v-if="loading" class="text-gray-500 dark:text-gray-400">{{ t('common.status.loading') }}</div>
-    <div v-else-if="!loaded" class="text-gray-400 dark:text-gray-500 text-sm py-8 text-center">
-      {{ t('components.status.selectPrompt') }}
-    </div>
-
-    <div v-else class="flex-1 overflow-y-auto min-h-0 space-y-1">
-      <div
-        v-for="comp in filteredComponents"
-        :key="comp.name"
-        class="bg-white dark:bg-gray-800 rounded-lg px-4 py-3 border border-gray-200 dark:border-gray-700 flex items-center justify-between"
+    <!-- No toolchain prompt -->
+    <div v-if="toolchains.length === 0" class="flex flex-col items-center justify-center py-20">
+      <iconify-icon icon="mdi:cog-off-outline" width="40" class="text-gray-400 dark:text-gray-500"></iconify-icon>
+      <p class="text-gray-500 dark:text-gray-400 text-sm mt-4">{{ t('toolchains.status.installFirst') }}</p>
+      <router-link
+        to="/toolchains"
+        class="inline-flex items-center gap-2 px-4 py-2 mt-4 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors"
       >
-        <div class="flex items-center gap-3">
-          <span
-            class="w-2 h-2 rounded-full"
-            :class="comp.installed ? 'bg-green-500 dark:bg-green-400' : 'bg-gray-300 dark:bg-gray-600'"
-          />
-          <span class="text-gray-800 dark:text-gray-200">{{ comp.name }}</span>
+        <iconify-icon icon="mdi:arrow-right" width="16"></iconify-icon>
+        {{ t('toolchains.status.goInstall') }}
+      </router-link>
+    </div>
+
+    <template v-else>
+      <div v-if="loading" class="text-gray-500 dark:text-gray-400">{{ t('common.status.loading') }}</div>
+      <div v-else-if="!loaded" class="text-gray-400 dark:text-gray-500 text-sm py-8 text-center">
+        {{ t('components.status.selectPrompt') }}
+      </div>
+
+      <div v-else class="space-y-6">
+        <div v-if="installedComponents.length > 0">
+          <SectionTitle title="已安装" :count="installedComponents.length" />
+          <div class="space-y-2">
+            <ListItem
+              v-for="comp in installedComponents"
+              :key="comp.name"
+              :title="comp.name"
+              :active="true"
+            >
+              <template #badges>
+                <StatusBadge type="installed" label="已安装" />
+              </template>
+              <template #actions>
+                <button
+                  class="text-xs bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900 dark:hover:bg-red-800 dark:text-red-300 px-3 py-1.5 rounded transition-colors"
+                  @click="toggleComponent(comp)"
+                >
+                  {{ t('common.action.remove') }}
+                </button>
+              </template>
+            </ListItem>
+          </div>
         </div>
-        <button
-          :class="[
-            'text-xs px-3 py-1.5 rounded transition-colors',
-            comp.installed
-              ? 'bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900 dark:hover:bg-red-800 dark:text-red-300'
-              : 'bg-green-100 hover:bg-green-200 text-green-700 dark:bg-green-900 dark:hover:bg-green-800 dark:text-green-300',
-          ]"
-          @click="toggleComponent(comp)"
-        >
-          {{ comp.installed ? t('common.action.remove') : t('common.action.install') }}
-        </button>
+
+        <div v-if="availableComponents.length > 0">
+          <SectionTitle title="可安装" :count="availableComponents.length" />
+          <div class="space-y-2">
+            <ListItem
+              v-for="comp in availableComponents"
+              :key="comp.name"
+              :title="comp.name"
+              :active="false"
+            >
+              <template #actions>
+                <button
+                  class="text-xs bg-green-100 hover:bg-green-200 text-green-700 dark:bg-green-900 dark:hover:bg-green-800 dark:text-green-300 px-3 py-1.5 rounded transition-colors"
+                  @click="toggleComponent(comp)"
+                >
+                  {{ t('common.action.install') }}
+                </button>
+              </template>
+            </ListItem>
+          </div>
+        </div>
       </div>
-    </div>
+    </template>
 
     <!-- Progress dialog -->
     <ProgressDialog
@@ -160,23 +185,5 @@ const filteredComponents = computed(() => {
       :lines="progressLogs"
       @close="closeProgress"
     />
-
-    <!-- No-toolchain overlay: covers content area but NOT sidebar -->
-    <div
-      v-if="toolchains.length === 0"
-      class="absolute inset-0 bg-white/80 dark:bg-gray-950/80 z-10 flex items-center justify-center"
-    >
-      <div class="flex flex-col items-center gap-4 text-center">
-        <iconify-icon icon="mdi:cog-off-outline" width="40" class="text-gray-400 dark:text-gray-500"></iconify-icon>
-        <p class="text-gray-500 dark:text-gray-400 text-sm">{{ t('toolchains.status.installFirst') }}</p>
-        <router-link
-          to="/toolchains"
-          class="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <iconify-icon icon="mdi:arrow-right" width="16"></iconify-icon>
-          {{ t('toolchains.status.goInstall') }}
-        </router-link>
-      </div>
-    </div>
-  </div>
+  </PageLayout>
 </template>

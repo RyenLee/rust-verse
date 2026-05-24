@@ -1,8 +1,14 @@
 export default {
   title: 'Updates',
+  description: 'Check and apply Rust toolchain and rustup updates',
   action: {
     updateRustup: 'Update Rustup Only',
     updateAll: 'Update All',
+    checkAppUpdate: 'Check for Update',
+    downloadUpdate: 'Download Update',
+    downloading: 'Downloading...',
+    installNow: 'Install Now',
+    restartLater: 'Restart Later',
   },
   status: {
     checking: 'Checking for updates...',
@@ -11,10 +17,18 @@ export default {
     updateAvailable: 'Update available{suffix}',
     noToolchainUpdates: 'No toolchain updates found.',
     noToolchains: 'No toolchains found.',
+    appUpToDate: 'RustVerse is up to date.',
+    appUpdateAvailable: 'New version {version} available!',
+    appChecking: 'Checking for software updates...',
+    appDownloading: 'Downloading update...',
+    appInstalling: 'Installing update...',
+    appUpdateReady: 'Update is ready. Restart the app to apply.',
+    appUpdateFailed: 'Update failed',
   },
   section: {
     rustupUpdate: 'Rustup Update',
     toolchainUpdates: 'Toolchain Updates',
+    appUpdate: 'RustVerse Software Update',
   },
   progress: {
     updatingAllTitle: 'Updating All Toolchains',
@@ -24,5 +38,9 @@ export default {
     allUpdated: 'All toolchains updated successfully',
     rustupUpdated: 'Rustup updated successfully',
     failed: 'Update failed',
+    title: 'Software Update',
+    downloadProgress: 'Download progress',
+    installComplete: 'Installation complete. Please restart the app to apply the update.',
+    downloadFailed: 'Download failed',
   },
 }

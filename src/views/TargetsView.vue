@@ -2,27 +2,25 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '../components/BaseButton.vue'
+import ListItem from '../components/ListItem.vue'
+import PageLayout from '../components/PageLayout.vue'
 import ProgressDialog from '../components/ProgressDialog.vue'
+import SearchInput from '../components/SearchInput.vue'
+import SectionTitle from '../components/SectionTitle.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import ToolchainSelector from '../components/ToolchainSelector.vue'
 import { useRustup, type TargetInfo } from '../composables/useRustup'
 import { useToolchainOptions } from '../composables/useToolchainOptions'
 
 const { t } = useI18n()
 const { listTargets, addTarget, removeTarget } = useRustup()
-const { toolchains, refresh: refreshToolchains } = useToolchainOptions()
+const { toolchains } = useToolchainOptions()
 
 const selectedToolchain = ref('')
 const targets = ref<TargetInfo[]>([])
 const loading = ref(false)
 const loaded = ref(false)
-const search = ref('')
-
-// Auto-select default toolchain when shared list changes
-async function ensureSelection() {
-  if (toolchains.value.length > 0 && !selectedToolchain.value) {
-    const def = toolchains.value.find(t => t.is_default)
-    selectedToolchain.value = def ? def.name : toolchains.value[0].name
-  }
-}
+const searchQuery = ref('')
 
 // Progress dialog state
 const showProgress = ref(false)
@@ -42,6 +40,10 @@ async function loadTargets() {
   } finally {
     loading.value = false
   }
+}
+
+function onToolchainChange() {
+  loaded.value = false
 }
 
 async function toggleTarget(target: TargetInfo) {
@@ -76,80 +78,103 @@ function closeProgress() {
   showProgress.value = false
 }
 
-const filteredTargets = computed(() => {
-  const list = search.value
-    ? targets.value.filter(t => t.name.toLowerCase().includes(search.value.toLowerCase()))
-    : targets.value
-  return [...list].sort((a, b) => (b.installed ? 1 : 0) - (a.installed ? 1 : 0))
+const installedTargets = computed(() => {
+  const list = searchQuery.value
+    ? targets.value.filter((t) => t.installed && t.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
+    : targets.value.filter((t) => t.installed)
+  return list
+})
+
+const availableTargets = computed(() => {
+  const list = searchQuery.value
+    ? targets.value.filter((t) => !t.installed && t.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
+    : targets.value.filter((t) => !t.installed)
+  return list
 })
 </script>
 
 <template>
-  <div class="p-6 space-y-4 flex flex-col h-full relative">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('targets.title') }}</h1>
+  <PageLayout :group="t('nav.group.toolchain')" :title="t('targets.title')" :description="t('targets.description')">
+    <template #actions>
       <BaseButton variant="secondary" :loading="loading" :disabled="!selectedToolchain" @click="loadTargets">
         <iconify-icon icon="mdi:download" width="16"></iconify-icon>
         {{ t('common.action.load') }}
       </BaseButton>
-    </div>
+    </template>
 
-    <div class="flex gap-3 items-center">
-      <select
-        v-model="selectedToolchain"
-        class="bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 border border-gray-200 dark:border-gray-600"
-        @change="loaded = false"
-      >
-        <option disabled value="">{{ t('targets.placeholder.toolchainPlaceholder') }}</option>
-        <option v-for="tc in toolchains" :key="tc.name" :value="tc.name">
-          {{ tc.name }}
-        </option>
-      </select>
-      <div class="flex items-center flex-1 min-w-0 h-[38px] bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md focus-within:ring-2 focus-within:ring-sky-500 focus-within:border-transparent">
-        <iconify-icon
-          icon="mdi:magnify"
-          width="18"
-          class="shrink-0 ml-3 text-gray-400"
-        ></iconify-icon>
-        <input
-          v-model="search"
-          :placeholder="t('targets.placeholder.search')"
-          class="w-full h-full px-2 bg-transparent text-sm text-gray-900 dark:text-gray-200 placeholder-gray-400 focus:outline-none"
-        />
+    <template #filters>
+      <div class="flex gap-3 items-center">
+        <ToolchainSelector v-model="selectedToolchain" :toolchains="toolchains" @change="onToolchainChange" />
+        <SearchInput v-model="searchQuery" :placeholder="t('common.action.search')" class="flex-1" />
       </div>
-    </div>
+    </template>
 
-    <div v-if="loading" class="text-gray-500 dark:text-gray-400">{{ t('common.status.loading') }}</div>
-    <div v-else-if="!loaded" class="text-gray-400 dark:text-gray-500 text-sm py-8 text-center">
-      {{ t('targets.status.selectPrompt') }}
-    </div>
-
-    <div v-else class="flex-1 overflow-y-auto min-h-0 space-y-1">
-      <div
-        v-for="target in filteredTargets"
-        :key="target.name"
-        class="bg-white dark:bg-gray-800 rounded-lg px-4 py-3 border border-gray-200 dark:border-gray-700 flex items-center justify-between"
+    <!-- No toolchain prompt -->
+    <div v-if="toolchains.length === 0" class="flex flex-col items-center justify-center py-20">
+      <iconify-icon icon="mdi:cog-off-outline" width="40" class="text-gray-400 dark:text-gray-500"></iconify-icon>
+      <p class="text-gray-500 dark:text-gray-400 text-sm mt-4">{{ t('toolchains.status.installFirst') }}</p>
+      <router-link
+        to="/toolchains"
+        class="inline-flex items-center gap-2 px-4 py-2 mt-4 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors"
       >
-        <div class="flex items-center gap-3">
-          <span
-            class="w-2 h-2 rounded-full"
-            :class="target.installed ? 'bg-green-500 dark:bg-green-400' : 'bg-gray-300 dark:bg-gray-600'"
-          />
-          <span class="text-gray-800 dark:text-gray-200">{{ target.name }}</span>
+        <iconify-icon icon="mdi:arrow-right" width="16"></iconify-icon>
+        {{ t('toolchains.status.goInstall') }}
+      </router-link>
+    </div>
+
+    <template v-else>
+      <div v-if="loading" class="text-gray-500 dark:text-gray-400">{{ t('common.status.loading') }}</div>
+      <div v-else-if="!loaded" class="text-gray-400 dark:text-gray-500 text-sm py-8 text-center">
+        {{ t('targets.status.selectPrompt') }}
+      </div>
+
+      <div v-else class="space-y-6">
+        <div v-if="installedTargets.length > 0">
+          <SectionTitle title="已安装" :count="installedTargets.length" />
+          <div class="space-y-2">
+            <ListItem
+              v-for="target in installedTargets"
+              :key="target.name"
+              :title="target.name"
+              :active="true"
+            >
+              <template #badges>
+                <StatusBadge type="installed" label="已安装" />
+              </template>
+              <template #actions>
+                <button
+                  class="text-xs bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900 dark:hover:bg-red-800 dark:text-red-300 px-3 py-1.5 rounded transition-colors"
+                  @click="toggleTarget(target)"
+                >
+                  {{ t('common.action.remove') }}
+                </button>
+              </template>
+            </ListItem>
+          </div>
         </div>
-        <button
-          :class="[
-            'text-xs px-3 py-1.5 rounded transition-colors',
-            target.installed
-              ? 'bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900 dark:hover:bg-red-800 dark:text-red-300'
-              : 'bg-green-100 hover:bg-green-200 text-green-700 dark:bg-green-900 dark:hover:bg-green-800 dark:text-green-300',
-          ]"
-          @click="toggleTarget(target)"
-        >
-          {{ target.installed ? t('common.action.remove') : t('common.action.install') }}
-        </button>
+
+        <div v-if="availableTargets.length > 0">
+          <SectionTitle title="可安装" :count="availableTargets.length" />
+          <div class="space-y-2">
+            <ListItem
+              v-for="target in availableTargets"
+              :key="target.name"
+              :title="target.name"
+              :active="false"
+            >
+              <template #actions>
+                <button
+                  class="text-xs bg-green-100 hover:bg-green-200 text-green-700 dark:bg-green-900 dark:hover:bg-green-800 dark:text-green-300 px-3 py-1.5 rounded transition-colors"
+                  @click="toggleTarget(target)"
+                >
+                  {{ t('common.action.install') }}
+                </button>
+              </template>
+            </ListItem>
+          </div>
+        </div>
       </div>
-    </div>
+    </template>
 
     <!-- Progress dialog -->
     <ProgressDialog
@@ -160,23 +185,5 @@ const filteredTargets = computed(() => {
       :lines="progressLogs"
       @close="closeProgress"
     />
-
-    <!-- No-toolchain overlay -->
-    <div
-      v-if="toolchains.length === 0"
-      class="absolute inset-0 bg-white/80 dark:bg-gray-950/80 z-10 flex items-center justify-center"
-    >
-      <div class="flex flex-col items-center gap-4 text-center">
-        <iconify-icon icon="mdi:cog-off-outline" width="40" class="text-gray-400 dark:text-gray-500"></iconify-icon>
-        <p class="text-gray-500 dark:text-gray-400 text-sm">{{ t('toolchains.status.installFirst') }}</p>
-        <router-link
-          to="/toolchains"
-          class="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <iconify-icon icon="mdi:arrow-right" width="16"></iconify-icon>
-          {{ t('toolchains.status.goInstall') }}
-        </router-link>
-      </div>
-    </div>
-  </div>
+  </PageLayout>
 </template>

@@ -24,5 +24,6 @@ export default {
     reloadApp: 'Reload the application',
     toggleDevTools: 'Toggle developer tools (debug builds only)',
     about: '{name} v{version} — Built with Tauri 2 + Vue 3 + Rust.',
+    githubLink: 'Visit GitHub Repository',
   },
 }

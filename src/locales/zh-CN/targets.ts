@@ -1,5 +1,6 @@
 export default {
   title: '编译目标',
+  description: '管理 Rust 工具链的编译目标',
   action: {
     installing: '正在安装',
     removing: '正在移除',

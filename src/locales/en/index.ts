@@ -12,9 +12,10 @@ import plugins from './plugins'
 import envVars from './envVars'
 import help from './help'
 import progress from './progress'
-import splash from './splash'
+import spline from './splash'
 import install from './install'
 import welcome from './welcome'
+import about from './about'
 
 export default {
   app,
@@ -31,7 +32,8 @@ export default {
   envVars,
   help,
   progress,
-  splash,
+  spline,
   install,
   welcome,
+  about,
 }

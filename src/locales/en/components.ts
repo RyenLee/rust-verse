@@ -1,5 +1,6 @@
 export default {
   title: 'Components',
+  description: 'Manage Rust toolchain components',
   action: {
     installing: 'Installing',
     removing: 'Removing',

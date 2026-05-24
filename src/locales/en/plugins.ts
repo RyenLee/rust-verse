@@ -1,5 +1,6 @@
 export default {
   title: 'Cargo Plugins',
+  description: 'Search, install and manage Cargo plugins',
   section: {
     searchCrates: 'Search on crates.io',
     installedPlugins: 'Installed Plugins',

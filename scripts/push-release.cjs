@@ -48,6 +48,23 @@ function run(cmd, dryRun) {
   execSync(cmd, { stdio: 'inherit' })
 }
 
+function runAllowFail(cmd, dryRun) {
+  try {
+    run(cmd, dryRun)
+  } catch {
+    // non-fatal
+  }
+}
+
+function hasStagedChanges() {
+  try {
+    execSync('git diff --cached --quiet', { stdio: 'pipe' })
+    return false
+  } catch {
+    return true
+  }
+}
+
 function hasUnstagedChanges() {
   try {
     execSync('git diff --quiet', { stdio: 'pipe' })
@@ -142,8 +159,13 @@ function main() {
       console.log('Discarding CRLF/LF phantom changes before stash pop...')
       restoreModifiedFiles(phantomFiles, dryRun)
     }
-    run('git stash pop', dryRun)
+    runAllowFail('git stash pop', dryRun)
   }
+  console.log()
+
+  // Discard CRLF/LF line-ending noise that may block commits
+  console.log('=== Normalizing line endings ===')
+  runAllowFail('git add --renormalize .', dryRun)
   console.log()
 
   console.log('=== Generating/verifying signer key ===')
@@ -168,7 +190,11 @@ function main() {
   if (!skipBump) {
     console.log('=== Committing version bump ===')
     run(`git add -A`, dryRun)
-    run(`git commit -m "chore: release v${version}"`, dryRun)
+    if (hasStagedChanges()) {
+      run(`git commit -m "chore: release v${version}"`, dryRun)
+    } else {
+      console.log('No changes to commit (version already up to date)')
+    }
     console.log()
   }
 

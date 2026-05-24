@@ -187,6 +187,76 @@ pub async fn run_command_with_cwd(
     }
 }
 
+/// Run a streaming command with automatic retry on failure.
+///
+/// On each failure, emits a `retry-attempt` event with the attempt number and error,
+/// then waits with exponential backoff before retrying.
+///
+/// - `max_retries`: maximum number of retry attempts (0 = no retry, attempt once only)
+/// - `retry_delay_ms`: base delay in milliseconds; doubles on each retry (exponential backoff)
+pub async fn run_command_with_streaming_retry(
+    app: AppHandle,
+    command: &str,
+    args: &[&str],
+    locale_key: &str,
+    log_event: &str,
+    finished_event: &str,
+    max_retries: u32,
+    retry_delay_ms: u64,
+    timeout_secs: u64,
+) -> AppResult<()> {
+    let mut attempt: u32 = 0;
+
+    loop {
+        attempt += 1;
+
+        if attempt > 1 {
+            // Emit retry event so the frontend can show retry status
+            let retry_msg = format!(
+                "Retry attempt {attempt}/{total}...",
+                attempt = attempt,
+                total = max_retries + 1
+            );
+            let _ = app.emit(log_event, &retry_msg);
+        }
+
+        let result = run_command_with_streaming(
+            app.clone(),
+            command,
+            args,
+            locale_key,
+            log_event,
+            finished_event,
+            timeout_secs,
+        )
+        .await;
+
+        match result {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                let remaining = (max_retries + 1).saturating_sub(attempt);
+                if remaining == 0 {
+                    return Err(e);
+                }
+
+                // Exponential backoff: base_delay * 2^(attempt-2) for retry attempts
+                let delay = retry_delay_ms * 2u64.pow(attempt.saturating_sub(2));
+                let capped_delay = delay.min(60_000); // cap at 60 seconds
+
+                let error_msg = format!(
+                    "Update failed on attempt {attempt}/{total}. Retrying in {delay}s...",
+                    attempt = attempt,
+                    total = max_retries + 1,
+                    delay = capped_delay / 1000
+                );
+                let _ = app.emit(log_event, &error_msg);
+
+                tokio::time::sleep(std::time::Duration::from_millis(capped_delay)).await;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

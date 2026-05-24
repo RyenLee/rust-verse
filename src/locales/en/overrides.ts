@@ -1,5 +1,6 @@
 export default {
   title: 'Directory Overrides',
+  description: 'Specify toolchain versions for different directories',
   action: {
     addOverride: 'Add Override',
   },

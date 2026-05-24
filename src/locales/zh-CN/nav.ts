@@ -1,7 +1,7 @@
 export default {
   dashboard: '仪表盘',
   envVars: '环境变量',
-  mirrors: 'crates镜像源',
+  mirrors: '镜像源',
   toolchains: '工具链',
   components: '组件',
   targets: '编译目标',
@@ -9,4 +9,12 @@ export default {
   updates: '更新',
   plugins: 'Cargo 插件',
   help: '帮助',
+  group: {
+    overview: '概览',
+    toolchain: '工具链管理',
+    config: '配置',
+    extend: '扩展',
+    system: '系统',
+  },
+  appUpdate: '软件更新',
 }

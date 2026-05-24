@@ -1,5 +1,6 @@
 export default {
   title: '工具链',
+  description: '安装、卸载和管理 Rust 工具链',
   action: {
     installNew: '安装新工具链',
     setDefault: '设为默认',

@@ -63,6 +63,10 @@ const aboutText = computed(() => {
     <section class="space-y-3">
       <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">{{ t('help.section.about') }}</h2>
       <p class="text-gray-600 dark:text-gray-400">{{ aboutText }}</p>
+      <a href="https://github.com/RyenLee/rust-verse" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 transition-colors">
+        <iconify-icon icon="mdi:github" width="20"></iconify-icon>
+        <span>{{ t('help.desc.githubLink') }}</span>
+      </a>
     </section>
   </div>
 </template>

@@ -9,4 +9,12 @@ export default {
   updates: 'Updates',
   plugins: 'Cargo Plugins',
   help: 'Help',
+  group: {
+    overview: 'Overview',
+    toolchain: 'Toolchain',
+    config: 'Configuration',
+    extend: 'Extensions',
+    system: 'System',
+  },
+  appUpdate: 'App Update',
 }
