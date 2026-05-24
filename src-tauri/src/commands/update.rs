@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::error::Error;
 use tauri::{AppHandle, State};
 
 use crate::error::AppResult;
@@ -20,8 +21,12 @@ pub struct UpdateInfo {
 
 /// Check for available updates with a configurable timeout.
 #[tauri::command]
-pub async fn check_update(rustup_path: String, state: State<'_, AppState>) -> AppResult<Vec<UpdateInfo>> {
-    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+pub async fn check_update(
+    rustup_path: String,
+    state: State<'_, AppState>,
+) -> AppResult<Vec<UpdateInfo>> {
+    crate::system::env::validate_rust_binary(&rustup_path)
+        .map_err(|e| crate::error::AppError::Command(e))?;
     let timeout = crate::db::get_simple(&state.db, "timeouts.rustup_check_seconds")
         .and_then(|s| s.parse().ok())
         .unwrap_or(30); // default 30s timeout
@@ -45,8 +50,13 @@ pub async fn check_update(rustup_path: String, state: State<'_, AppState>) -> Ap
 /// and a finished event when done.
 /// On failure, retries up to the configured number of times with exponential backoff.
 #[tauri::command]
-pub async fn update_all(app: AppHandle, state: State<'_, AppState>, rustup_path: String) -> AppResult<()> {
-    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+pub async fn update_all(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    rustup_path: String,
+) -> AppResult<()> {
+    crate::system::env::validate_rust_binary(&rustup_path)
+        .map_err(|e| crate::error::AppError::Command(e))?;
     let (locale_key, log_event, finished_event, max_retries, retry_delay_ms) = {
         let events = crate::db::get_events_config(&state.db);
         let locale_key = crate::db::get_simple(&state.db, "locale.force_locale")
@@ -88,8 +98,13 @@ pub async fn update_all(app: AppHandle, state: State<'_, AppState>, rustup_path:
 /// and a finished event when done.
 /// On failure, retries up to the configured number of times with exponential backoff.
 #[tauri::command]
-pub async fn update_rustup(app: AppHandle, state: State<'_, AppState>, rustup_path: String) -> AppResult<()> {
-    crate::system::env::validate_rust_binary(&rustup_path).map_err(|e| crate::error::AppError::Command(e))?;
+pub async fn update_rustup(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    rustup_path: String,
+) -> AppResult<()> {
+    crate::system::env::validate_rust_binary(&rustup_path)
+        .map_err(|e| crate::error::AppError::Command(e))?;
     let (locale_key, log_event, finished_event, max_retries, retry_delay_ms) = {
         let events = crate::db::get_events_config(&state.db);
         let locale_key = crate::db::get_simple(&state.db, "locale.force_locale")
@@ -206,6 +221,95 @@ pub fn parse_check_update(
     updates
 }
 
+/// Network diagnostic result for debugging updater connectivity.
+#[derive(Debug, Clone, Serialize)]
+pub struct NetworkDiagResult {
+    /// Whether the overall test passed
+    pub success: bool,
+    /// DNS resolution result for github.com
+    pub dns: String,
+    /// TCP connection test to github.com:443
+    pub tcp: String,
+    /// HTTP GET result for the update JSON endpoint
+    pub http: String,
+    /// Full HTTP response status code (if any)
+    pub http_status: Option<u16>,
+    /// HTTP response body snippet (first 500 chars)
+    pub http_body: Option<String>,
+    /// Total elapsed time (ms)
+    pub elapsed_ms: u64,
+}
+
+/// Test network connectivity to the update server for diagnostics.
+#[tauri::command]
+pub async fn diag_network() -> AppResult<NetworkDiagResult> {
+    let start = std::time::Instant::now();
+    // Use our own reqwest client that completely ignores system proxy
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .danger_accept_invalid_certs(true)
+        .danger_accept_invalid_hostnames(true)
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| crate::error::AppError::Command(e.to_string()))?;
+
+    // 1. DNS test
+    let dns = match tokio::net::lookup_host("github.com:443").await {
+        Ok(addrs) => {
+            let list: Vec<String> = addrs.map(|a| a.to_string()).collect();
+            format!(
+                "OK: {} addresses resolved ({})",
+                list.len(),
+                list.join(", ")
+            )
+        }
+        Err(e) => format!("FAIL: {e}"),
+    };
+
+    // 2. TCP test
+    let tcp = match tokio::net::TcpStream::connect("github.com:443").await {
+        Ok(_) => "OK: TCP connection succeeded".to_string(),
+        Err(e) => format!("FAIL: {e}"),
+    };
+
+    // 3. HTTP test
+    let url = "https://github.com/RyenLee/rust-verse/releases/latest/download/latest.json";
+    let (http, http_status, http_body) = match client.get(url).send().await {
+        Ok(resp) => {
+            let status = resp.status().as_u16();
+            let body = resp
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("(failed to read body: {e})"));
+            let snippet: String = body.chars().take(500).collect();
+            (format!("OK: HTTP {}", status), Some(status), Some(snippet))
+        }
+        Err(e) => {
+            let msg = format!("FAIL: {e}");
+            // Try to extract the underlying cause
+            let detail = if let Some(src) = e.source() {
+                format!(" | source: {src}")
+            } else {
+                String::new()
+            };
+            (format!("{msg}{detail}"), None, None)
+        }
+    };
+
+    let elapsed_ms = start.elapsed().as_millis() as u64;
+    let success = http_status.is_some();
+
+    Ok(NetworkDiagResult {
+        success,
+        dns,
+        tcp,
+        http,
+        http_status,
+        http_body,
+        elapsed_ms,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -222,7 +326,8 @@ mod tests {
 
     #[test]
     fn test_parse_check_update_available() {
-        let output = "nightly-x86_64-pc-windows-msvc - Update available : 1.77.0-nightly -> 1.78.0-nightly";
+        let output =
+            "nightly-x86_64-pc-windows-msvc - Update available : 1.77.0-nightly -> 1.78.0-nightly";
         let result = parse_check_update(output, " - ", "Up to date", "Update available", " -> ");
         assert_eq!(result.len(), 1);
         assert!(!result[0].up_to_date);

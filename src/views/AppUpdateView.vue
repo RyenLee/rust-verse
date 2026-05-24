@@ -2,12 +2,15 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { open } from '@tauri-apps/plugin-shell'
+import { invoke } from '@tauri-apps/api/core'
+import { useStore } from '../store'
 import BaseButton from '../components/BaseButton.vue'
 import PageLayout from '../components/PageLayout.vue'
 import ProgressDialog from '../components/ProgressDialog.vue'
 import { useAppUpdater } from '../composables/useAppUpdater'
 
 const { t } = useI18n()
+const store = useStore()
 const PROJECT_URL = 'https://github.com/RyenLee/rust-verse'
 const {
   checking: appChecking,
@@ -72,9 +75,42 @@ function openHomepage() {
   open(PROJECT_URL)
 }
 
-watch(downloadPhase, phase => {
+// Network diagnostic
+interface DiagResult {
+  success: boolean
+  dns: string
+  tcp: string
+  http: string
+  http_status: number | null
+  http_body: string | null
+  elapsed_ms: number
+}
+
+const diagRunning = ref(false)
+const diagResult = ref<DiagResult | null>(null)
+const diagError = ref<string | null>(null)
+
+async function runDiag() {
+  diagRunning.value = true
+  diagError.value = null
+  diagResult.value = null
+  try {
+    diagResult.value = await invoke<DiagResult>('diag_network')
+  } catch (e: any) {
+    diagError.value = e?.message || String(e)
+  } finally {
+    diagRunning.value = false
+  }
+}
+
+watch(downloadPhase, async phase => {
   if (phase === 'downloading' || phase === 'installing') {
     showProgress.value = true
+  }
+  if (phase === 'success') {
+    // Reload app metadata so the version display reflects the newly installed version.
+    // The MSI installer has already updated the config; refresh from backend.
+    await store.loadAppMeta()
   }
 })
 </script>
@@ -94,7 +130,7 @@ watch(downloadPhase, phase => {
                 <span class="text-indigo-600 dark:text-indigo-400 font-semibold">{{ appUpdate.version }}</span>
               </p>
               <p v-else class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                {{ t('updates.status.appUpToDate') }}
+                v{{ store.appVersion || '1.0.0' }} • {{ t('updates.status.appUpToDate') }}
               </p>
             </div>
           </div>
@@ -161,6 +197,52 @@ watch(downloadPhase, phase => {
         >
           <div v-html="appUpdate.body"></div>
         </div>
+      </div>
+
+      <!-- Network diagnostic panel -->
+      <div class="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <iconify-icon icon="mdi:network-outline" width="18" class="text-gray-500"></iconify-icon>
+            <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Network Diagnostic</h3>
+          </div>
+          <BaseButton variant="secondary" :loading="diagRunning" @click="runDiag">
+            {{ diagRunning ? 'Running...' : 'Run Diagnostic' }}
+          </BaseButton>
+        </div>
+
+        <!-- Diagnostic output -->
+        <div
+          v-if="diagResult"
+          class="space-y-2 text-xs font-mono bg-gray-100 dark:bg-gray-900 rounded p-3 max-h-48 overflow-y-auto"
+        >
+          <p class="text-gray-600 dark:text-gray-400">Elapsed: {{ diagResult.elapsed_ms }}ms</p>
+          <p
+            :class="
+              diagResult.dns.startsWith('OK') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+            "
+          >
+            DNS: {{ diagResult.dns }}
+          </p>
+          <p
+            :class="
+              diagResult.tcp.startsWith('OK') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+            "
+          >
+            TCP: {{ diagResult.tcp }}
+          </p>
+          <p
+            :class="
+              diagResult.http.startsWith('OK') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+            "
+          >
+            HTTP: {{ diagResult.http }}
+          </p>
+          <p v-if="diagResult.http_body" class="text-gray-500 dark:text-gray-500 break-all">
+            Body: {{ diagResult.http_body }}
+          </p>
+        </div>
+        <p v-if="diagError" class="text-sm text-red-600 dark:text-red-400">{{ diagError }}</p>
       </div>
     </div>
 

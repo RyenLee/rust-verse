@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '../composables/useAppStore'
 import { setLocale, getLocale, getAvailableLocales, type LocaleInfo } from '../locales'
@@ -11,12 +12,19 @@ defineEmits<{
 
 const { t } = useI18n()
 const { isDark, toggleTheme } = useAppStore()
+const router = useRouter()
+
+// Global update notification (injected from App.vue)
+const updateAvailableInfo = inject<Ref<{ version: string; currentVersion: string } | null>>('updateAvailableInfo')
+const dismissUpdateNotification = inject<() => void>('dismissUpdateNotification')
 
 const currentLocale = ref(getLocale())
 const availableLocales = ref<LocaleInfo[]>(getAvailableLocales())
 const langOpen = ref(false)
 const langDropdownRef = ref<HTMLElement | null>(null)
 const showHelp = ref(false)
+
+const hasUpdate = computed(() => !!updateAvailableInfo?.value)
 
 const currentLocaleInfo = computed(() =>
   availableLocales.value.find(l => l.code === currentLocale.value)
@@ -26,6 +34,13 @@ function selectLocale(code: string) {
   currentLocale.value = code
   setLocale(code)
   langOpen.value = false
+}
+
+function handleUpdateClick() {
+  if (dismissUpdateNotification) {
+    dismissUpdateNotification()
+  }
+  router.push('/about')
 }
 
 function handleClickOutside(e: MouseEvent) {
@@ -60,8 +75,20 @@ onBeforeUnmount(() => {
     <!-- Center: slot for breadcrumb/title (filled by PageLayout) -->
     <div class="flex-1"></div>
 
-    <!-- Right: help, theme, language -->
+    <!-- Right: update badge, help, theme, language -->
     <div class="flex items-center gap-1">
+      <!-- Update available badge -->
+      <button
+        v-if="hasUpdate"
+        class="relative p-2 rounded-lg text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+        title="New version available — click to update"
+        @click="handleUpdateClick"
+      >
+        <iconify-icon icon="mdi:update" width="20"></iconify-icon>
+        <!-- Red dot badge -->
+        <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+      </button>
+
       <!-- Help button -->
       <button
         class="p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"

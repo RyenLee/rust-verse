@@ -16,11 +16,22 @@ import { useDataRefresh } from './composables/useDataRefresh'
 import { appLog } from './composables/useLogger'
 import { withTimeout } from './composables/useWithTimeout'
 import { initLocale } from './locales'
+import { useAppUpdater } from './composables/useAppUpdater'
 
 const { t } = useI18n()
 const { checkEnv, refreshProcessPath, uninstallRustup } = useRustup()
 const { onEnvVarChange } = useDataRefresh()
 const store = useStore()
+
+// === Use global update state ===
+const { update, checkForUpdate } = useAppUpdater()
+const updateAvailableInfo = computed(() => update.value)
+provide('updateAvailableInfo', updateAvailableInfo)
+
+function dismissUpdateNotification() {
+  // Keep update data for page, just don't show badge (can be extended if needed)
+}
+provide('dismissUpdateNotification', dismissUpdateNotification)
 
 // App phase: splash → welcome → main
 type AppPhase = 'splash' | 'welcome' | 'main'
@@ -35,13 +46,17 @@ const sidebarCollapsed = ref(false)
 try {
   const saved = localStorage.getItem('sidebar-collapsed')
   if (saved !== null) sidebarCollapsed.value = saved === 'true'
-} catch { /* ignore */ }
+} catch {
+  /* ignore */
+}
 
 function toggleSidebar() {
   sidebarCollapsed.value = !sidebarCollapsed.value
   try {
     localStorage.setItem('sidebar-collapsed', String(sidebarCollapsed.value))
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 // Keyboard shortcut: Ctrl+B to toggle sidebar
@@ -130,9 +145,7 @@ const navGroups = computed<NavGroup[]>(() => [
     label: t('nav.group.overview'),
     icon: 'mdi:view-dashboard-outline',
     color: 'orange',
-    items: [
-      { path: '/', label: t('nav.dashboard'), icon: 'mdi:view-dashboard-outline' },
-    ],
+    items: [{ path: '/', label: t('nav.dashboard'), icon: 'mdi:view-dashboard-outline' }],
   },
   {
     key: 'toolchain',
@@ -171,9 +184,7 @@ const navGroups = computed<NavGroup[]>(() => [
     label: t('nav.group.system'),
     icon: 'mdi:desktop-tower-monitor',
     color: 'slate',
-    items: [
-      { path: '/about', label: t('nav.appUpdate'), icon: 'mdi:update' },
-    ],
+    items: [{ path: '/about', label: t('nav.appUpdate'), icon: 'mdi:update' }],
   },
 ])
 
@@ -380,6 +391,35 @@ function handleWelcomeEnter() {
   logStartup('enter', 'User clicked Enter, switching to main')
   phase.value = 'main'
   router.push('/')
+
+  // Schedule auto-update check after 1 minute
+  scheduleAutoUpdateCheck()
+}
+
+// === Auto-update check (1 minute after app starts) ===
+let autoUpdateTimer: ReturnType<typeof setTimeout> | null = null
+
+async function scheduleAutoUpdateCheck() {
+  // Clear any existing timer
+  if (autoUpdateTimer) {
+    clearTimeout(autoUpdateTimer)
+    autoUpdateTimer = null
+  }
+
+  // Wait 1 minute, then check for updates
+  autoUpdateTimer = setTimeout(async () => {
+    logStartup('auto-update', 'Starting auto-update check...')
+    try {
+      const result = await checkForUpdate()
+      if (result) {
+        logStartup('auto-update', `Update available: ${result.version}`)
+      } else {
+        logStartup('auto-update', 'App is up to date')
+      }
+    } catch (e: any) {
+      logStartup('auto-update', `Update check failed: ${e?.message || e}`)
+    }
+  }, 60_000)
 }
 
 const stopEnvVarWatch = onEnvVarChange(() => {
@@ -389,6 +429,10 @@ const stopEnvVarWatch = onEnvVarChange(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleKeydown)
   stopEnvVarWatch()
+  if (autoUpdateTimer) {
+    clearTimeout(autoUpdateTimer)
+    autoUpdateTimer = null
+  }
 })
 </script>
 

@@ -38,7 +38,21 @@ pub async fn run_command(bin: &str, args: &[&str], timeout_secs: u64) -> AppResu
                 )))
             }
         }
-        Ok(Err(e)) => Err(AppError::Command(format!("failed to execute '{bin}': {e}"))),
+        Ok(Err(e)) => {
+            let raw = e.to_string();
+            // os error 448 on Windows: "Cannot traverse this path because it contains an untrusted mount point."
+            // This is typically caused by Windows Controlled Folder Access or Windows Defender Application Guard.
+            if raw.contains("os error 448") || raw.contains("448") {
+                Err(AppError::Command(format!(
+                    "failed to execute '{bin}': Windows security blocked execution (os error 448 - untrusted mount point). \
+                    This is usually caused by Windows Controlled Folder Access. Try adding the Rust toolchain \
+                    directory (D:\\Rust) or this application to Windows Defender exclusions, or add the app to \
+                    Controlled Folder Access allowed apps. Original error: {raw}"
+                )))
+            } else {
+                Err(AppError::Command(format!("failed to execute '{bin}': {raw}")))
+            }
+        }
         Err(_) => Err(AppError::Timeout(timeout_secs)),
     }
 }

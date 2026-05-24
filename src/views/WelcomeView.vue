@@ -182,6 +182,15 @@ const isDownloadError = computed(() => {
   return installError.value.toLowerCase().includes('download failed')
 })
 
+// Check if cargo is blocked by Windows security (os error 448)
+const isBlockedBySecurity = computed(() => {
+  const cargoErr = envCheck.value?.cargo_error || ''
+  return cargoErr.includes('os error 448') || cargoErr.includes('448') ||
+    cargoErr.includes('untrusted mount point') || cargoErr.includes('不受信任')
+})
+
+// Check if the error is a download failure (to show manual guide)
+
 // Extract download URL from error message
 const manualDownloadUrl = computed(() => {
   const match = installError.value.match(/download from\s+(https?:\/\/\S+)/i)
@@ -255,45 +264,79 @@ onMounted(() => {
       <!-- Not Configured: Show Install button -->
       <Transition name="fade-up" mode="out-in">
         <div v-if="phase === 'not-configured'" key="not-configured" class="flex flex-col items-center gap-5 w-full">
+          <!-- Windows Security blocking (os error 448) -->
           <div
-            class="flex items-center gap-2 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-4 py-2 rounded-lg text-sm"
+            v-if="isBlockedBySecurity"
+            class="w-full bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl p-4 space-y-3"
           >
-            <iconify-icon icon="mdi:alert-circle-outline" width="20"></iconify-icon>
-
-            <!-- Detailed reason -->
-            <span v-if="!envCheck?.rustup_installed && !envCheck?.cargo_installed" class="min-w-0">
-              Rust toolchain not found (rustup + cargo)
-            </span>
-            <span v-else-if="!envCheck?.rustup_installed" class="min-w-0">rustup not found</span>
-            <span v-else-if="!envCheck?.cargo_installed" class="min-w-0"
-              >cargo not found — rustup is installed, re-running installer to repair...</span
+            <div class="flex items-start gap-2 text-red-600 dark:text-red-400">
+              <iconify-icon icon="mdi:shield-lock" width="20" class="mt-0.5 flex-shrink-0"></iconify-icon>
+              <div class="text-sm leading-relaxed">
+                <strong>Windows 安全策略阻止了 Rust 工具链访问</strong>
+                <p class="mt-1 text-xs text-red-500 dark:text-red-400">
+                  检测到错误：无法遍历该路径，因为它包含不受信任的装入点 (os error 448)
+                </p>
+                <p class="mt-1 text-xs text-red-500/80 dark:text-red-400/80">
+                  这通常是因为 Windows Defender / 受控文件夹访问 阻止了应用访问 Rust 工具链目录 (D:\Rust)
+                </p>
+              </div>
+            </div>
+            <div class="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+              <p><strong>解决方法：</strong></p>
+              <p>1. 打开「Windows 安全中心」→「病毒和威胁防护」→「管理设置」→「受控文件夹访问」</p>
+              <p>2. 关闭「受控文件夹访问」或将 RustVerse 添加到「允许的应用」</p>
+              <p>3. 或者：将 D:\Rust 目录添加到 Windows Defender 排除项</p>
+            </div>
+            <button
+              class="w-full py-2 px-4 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors cursor-pointer"
+              @click="handleDetect"
             >
+              修复后重新检测
+            </button>
           </div>
 
-          <!-- Show logs from the failed detection -->
-          <div
-            v-if="detectLogs.length > 0"
-            class="w-full max-h-32 overflow-y-auto bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 text-xs font-mono text-gray-600 dark:text-gray-400 space-y-0.5"
-          >
-            <p v-for="(line, i) in detectLogs" :key="i" class="break-all">{{ line }}</p>
-          </div>
+          <!-- Normal not-configured state -->
+          <template v-else>
+            <div
+              class="flex items-center gap-2 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-4 py-2 rounded-lg text-sm"
+            >
+              <iconify-icon icon="mdi:alert-circle-outline" width="20"></iconify-icon>
 
-          <p class="text-xs text-gray-400 dark:text-gray-500 text-center leading-relaxed">
-            {{ t('app.rustNotFoundDesc', { rustup: 'rustup', cargo: 'cargo' }) }}
-          </p>
-          <button
-            class="w-full py-3 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 inline-flex items-center justify-center gap-1.5"
-            @click="handleInstall"
-          >
-            <iconify-icon icon="mdi:download" width="18"></iconify-icon>
-            {{ t('app.installRustup') }}
-          </button>
-          <button
-            class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
-            @click="handleDetect"
-          >
-            {{ t('app.recheckEnv') }}
-          </button>
+              <!-- Detailed reason -->
+              <span v-if="!envCheck?.rustup_installed && !envCheck?.cargo_installed" class="min-w-0">
+                Rust toolchain not found (rustup + cargo)
+              </span>
+              <span v-else-if="!envCheck?.rustup_installed" class="min-w-0">rustup not found</span>
+              <span v-else-if="!envCheck?.cargo_installed" class="min-w-0"
+                >cargo not found — rustup is installed, re-running installer to repair...</span
+              >
+            </div>
+
+            <!-- Show logs from the failed detection -->
+            <div
+              v-if="detectLogs.length > 0"
+              class="w-full max-h-32 overflow-y-auto bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 text-xs font-mono text-gray-600 dark:text-gray-400 space-y-0.5"
+            >
+              <p v-for="(line, i) in detectLogs" :key="i" class="break-all">{{ line }}</p>
+            </div>
+
+            <p class="text-xs text-gray-400 dark:text-gray-500 text-center leading-relaxed">
+              {{ t('app.rustNotFoundDesc', { rustup: 'rustup', cargo: 'cargo' }) }}
+            </p>
+            <button
+              class="w-full py-3 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 inline-flex items-center justify-center gap-1.5"
+              @click="handleInstall"
+            >
+              <iconify-icon icon="mdi:download" width="18"></iconify-icon>
+              {{ t('app.installRustup') }}
+            </button>
+            <button
+              class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
+              @click="handleDetect"
+            >
+              {{ t('app.recheckEnv') }}
+            </button>
+          </template>
         </div>
       </Transition>
 

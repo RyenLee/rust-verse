@@ -32,11 +32,21 @@ async fn check_rustup(app: &tauri::AppHandle, binary_name: &str) -> (bool, Optio
             // to prevent executing a hijacked binary with a different name
             if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                 if stem != binary_name {
-                    emit_log(app, &format!(
-                        "Found binary at {} but stem '{}' does not match expected '{}', skipping",
-                        path.display(), stem, binary_name
-                    ));
-                    return (false, Some(format!("binary name mismatch: expected '{binary_name}', found '{stem}'")));
+                    emit_log(
+                        app,
+                        &format!(
+                            "Found binary at {} but stem '{}' does not match expected '{}', skipping",
+                            path.display(),
+                            stem,
+                            binary_name
+                        ),
+                    );
+                    return (
+                        false,
+                        Some(format!(
+                            "binary name mismatch: expected '{binary_name}', found '{stem}'"
+                        )),
+                    );
                 }
             }
             emit_log(app, &format!("Found {} at {}", binary_name, path.display()));
@@ -56,18 +66,19 @@ async fn check_rustup(app: &tauri::AppHandle, binary_name: &str) -> (bool, Optio
     {
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
-    let version_result = tokio::time::timeout(
-        std::time::Duration::from_secs(10),
-        cmd.output(),
-    )
-    .await;
+    let version_result =
+        tokio::time::timeout(std::time::Duration::from_secs(10), cmd.output()).await;
 
     match version_result {
         Ok(Ok(output)) if output.status.success() => {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
             emit_log(
                 app,
-                &format!("{} version: {}", binary_name, version.lines().next().unwrap_or(&version)),
+                &format!(
+                    "{} version: {}",
+                    binary_name,
+                    version.lines().next().unwrap_or(&version)
+                ),
             );
 
             // Ensure dir is in PATH for subsequent commands
@@ -91,7 +102,11 @@ async fn check_rustup(app: &tauri::AppHandle, binary_name: &str) -> (bool, Optio
         Ok(Ok(output)) => {
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
             let error_msg = if stderr.is_empty() {
-                format!("{} exited with code {:?}", binary_name, output.status.code())
+                format!(
+                    "{} exited with code {:?}",
+                    binary_name,
+                    output.status.code()
+                )
             } else {
                 stderr.chars().take(200).collect()
             };
@@ -99,7 +114,30 @@ async fn check_rustup(app: &tauri::AppHandle, binary_name: &str) -> (bool, Optio
             (false, Some(error_msg))
         }
         Ok(Err(e)) => {
-            let msg = format!("failed to execute {}: {}", binary_name, e);
+            let raw = e.to_string();
+            // os error 448 on Windows: "Cannot traverse this path because it contains an untrusted mount point."
+            // This is typically caused by Windows Controlled Folder Access or Windows Defender Application Guard.
+            let msg = if raw.contains("os error 448") || raw.contains("448") {
+                let hint = "\
+This error is caused by Windows security settings blocking access to the Rust toolchain path.\n\
+Possible causes:\n\
+  1. Windows Controlled Folder Access is enabled (Windows Security > Virus & threat protection > Manage settings > Controlled folder access)\n\
+  2. The D: drive or toolchain path is on a network/virtual drive not trusted by Windows\n\
+  3. Windows Defender Application Guard is blocking the path\n\
+Suggested fixes:\n\
+  - Add the Rust toolchain directory (Installer directory) to Windows Defender exclusions\n\
+  - Add this application to Controlled Folder Access allowed apps\n\
+  - Move the Rust toolchain to the default user directory (C:\\Users\\<name>\\.cargo)";
+                format!(
+                    "failed to execute {}: {}\n\nHint: {}\n\nOriginal: {}",
+                    binary_name,
+                    "Windows security blocked execution (os error 448 - untrusted mount point)",
+                    hint,
+                    raw
+                )
+            } else {
+                format!("failed to execute {}: {}", binary_name, raw)
+            };
             emit_log(app, &msg);
             (false, Some(msg))
         }
@@ -136,7 +174,10 @@ pub async fn check_env(
 
     let both_ok = rustup_installed && cargo_installed;
     if both_ok {
-        emit_log(&app, "Environment check passed: both rustup and cargo are available.");
+        emit_log(
+            &app,
+            "Environment check passed: both rustup and cargo are available.",
+        );
     } else {
         emit_log(
             &app,

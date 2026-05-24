@@ -17,7 +17,10 @@ use commands::env_var::{
     update_env_var_meta,
 };
 use commands::locale::{LocaleScanState, get_locale, list_available_locales, set_locale};
-use commands::mirror::{check_crm_installed, crm_best, crm_current, crm_default, crm_list, crm_test, crm_use, crm_version, install_crm};
+use commands::mirror::{
+    check_crm_installed, crm_best, crm_current, crm_default, crm_list, crm_test, crm_use,
+    crm_version, install_crm,
+};
 use commands::override_cmd::{get_override, list_overrides, remove_override, set_override};
 use commands::persist::{
     is_env_var_persisted, list_persisted_env_vars, persist_env_var, remove_persisted_env_var,
@@ -27,7 +30,7 @@ use commands::target::{add_target, list_targets, remove_target};
 use commands::toolchain::{
     install_toolchain, list_toolchains, set_default_toolchain, uninstall_toolchain,
 };
-use commands::update::{check_update, update_all, update_rustup};
+use commands::update::{check_update, diag_network, update_all, update_rustup};
 use config::get_config;
 use state::AppState;
 use system::env::binary_exists;
@@ -231,7 +234,10 @@ async fn install_rustup(app: tauri::AppHandle) -> crate::error::AppResult<()> {
     let cargo_ok = is_binary_functional("cargo").await;
 
     if rustup_ok && cargo_ok {
-        log.info("install", "rustup and cargo are already installed, aborting");
+        log.info(
+            "install",
+            "rustup and cargo are already installed, aborting",
+        );
         return Err(crate::error::AppError::Command(
             "rustup and cargo are already installed".to_string(),
         ));
@@ -520,6 +526,7 @@ pub fn run() {
             check_update,
             update_all,
             update_rustup,
+            diag_network,
             list_cargo_plugins,
             search_plugins,
             install_plugin,

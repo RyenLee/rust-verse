@@ -255,12 +255,26 @@ onActivated(() => {
         <section class="lg:col-span-2 space-y-4">
           <SectionTitle :title="t('dashboard.section.quickActions')" />
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <router-link to="/updates" class="group bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 hover:border-sky-400 dark:hover:border-sky-600 hover:shadow-sm transition-all block">
+            <router-link to="/toolchains" class="group bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 hover:border-sky-400 dark:hover:border-sky-600 hover:shadow-sm transition-all block">
+              <div class="w-10 h-10 rounded-lg bg-sky-50 dark:bg-sky-900/30 flex items-center justify-center mb-3 group-hover:bg-sky-100 dark:group-hover:bg-sky-900/50 transition-colors">
+                <iconify-icon icon="mdi:cog-outline" width="20" class="text-sky-600 dark:text-sky-400"></iconify-icon>
+              </div>
+              <h3 class="font-semibold text-gray-900 dark:text-gray-100 text-sm">{{ t('nav.toolchains') }}</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{{ t('dashboard.action.manageToolchains') }}</p>
+            </router-link>
+            <router-link to="/updates" class="group bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 hover:border-green-400 dark:hover:border-green-600 hover:shadow-sm transition-all block">
               <div class="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center mb-3 group-hover:bg-green-100 dark:group-hover:bg-green-900/50 transition-colors">
                 <iconify-icon icon="mdi:update" width="20" class="text-green-600 dark:text-green-400"></iconify-icon>
               </div>
               <h3 class="font-semibold text-gray-900 dark:text-gray-100 text-sm">{{ t('nav.updates') }}</h3>
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{{ t('dashboard.action.checkUpdates') }}</p>
+            </router-link>
+            <router-link to="/components" class="group bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 hover:border-violet-400 dark:hover:border-violet-600 hover:shadow-sm transition-all block">
+              <div class="w-10 h-10 rounded-lg bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center mb-3 group-hover:bg-violet-100 dark:group-hover:bg-violet-900/50 transition-colors">
+                <iconify-icon icon="mdi:puzzle-outline" width="20" class="text-violet-600 dark:text-violet-400"></iconify-icon>
+              </div>
+              <h3 class="font-semibold text-gray-900 dark:text-gray-100 text-sm">{{ t('dashboard.label.componentsTargets') }}</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{{ t('dashboard.action.addRemoveComponents') }}</p>
             </router-link>
             <!-- Uninstall rustup -->
             <button v-if="envCheck?.rustup_installed" class="group bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 hover:border-red-400 dark:hover:border-red-600 hover:shadow-sm transition-all block text-left cursor-pointer" @click="triggerUninstall">

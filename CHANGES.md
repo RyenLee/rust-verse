@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 2026-05-25
+
+### Added
+
+- **NSIS uninstall cleanup hook** — Custom NSIS hooks (`windows/hooks.nsh`) with `NSIS_HOOK_POSTUNINSTALL` to recursively remove all runtime-created files (update downloads, data) from install directory on uninstall
+- **Windows Defender exclusion hints** — Friendly error guidance in WelcomeView for os error 448 (untrusted mount point), with detailed resolution steps in backend error messages (`env_check.rs`, `exec.rs`)
+
+### Changed
+
+- **Windows build: NSIS only** — Removed MSI target from bundle config, Windows now produces only NSIS `.exe` installer
+- **Improved `latest.json` generation script** — Fixed macOS updater artifact lookup from `dmg/` to `macos/` directory, added precise version regex matching and `arch`/`installerExt` filtering
+
 ## [1.3.4] - 2026-05-24
 
 ### Added
@@ -164,6 +176,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo plugins management
 - Dashboard with system status
 
+[1.3.5]: https://github.com/RyenLee/rust-verse/compare/v1.3.4...v1.3.5
 [1.3.4]: https://github.com/RyenLee/rust-verse/compare/v1.3.3...v1.3.4
 [1.3.3]: https://github.com/RyenLee/rust-verse/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/RyenLee/rust-verse/compare/v1.3.1...v1.3.2
@@ -182,7 +195,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 本文件记录了 RustVerse 项目的所有重要变更。
 
-- [最新版本 1.3.4](#134---2026-05-24) — App 在线更新前端 UI、工具链更新重试机制、latest.json 生成脚本、更新错误分类处理
+- [最新版本 1.3.5](#135---2026-05-25) — NSIS 卸载清理、Windows 仅保留 exe 安装包、latest.json 生成脚本修复、os error 448 友好提示
+- [版本 1.3.4](#134---2026-05-24) — App 在线更新前端 UI、工具链更新重试机制、latest.json 生成脚本、更新错误分类处理
 - [版本 1.3.3](#133---2026-05-24) — 欢迎页安装日志同步、移除安装包验证、手动安装指引、搜索框图标修复
 - [版本 1.3.2](#132---2025-05-24) — 修复签名密钥密码错误
 - [版本 1.3.1](#131---2025-05-24) — 零成本自动更新系统配置

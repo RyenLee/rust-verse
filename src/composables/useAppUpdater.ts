@@ -15,17 +15,24 @@ export interface AppUpdateState {
   }
 }
 
+// === Global shared state (all useAppUpdater calls share this) ===
+const checking = ref(false)
+// Keep a raw (non-reactive) reference to Update object — reactive proxy breaks private fields!
+let rawUpdate: Update | null = null
+// For UI-only: expose safe props only (no methods/resource rid)
+const update = ref<{
+  version: string
+  currentVersion: string
+  date?: string
+  body?: string
+} | null>(null)
+const downloadPhase = ref<AppUpdateState['downloadProgress']['phase']>('idle')
+const downloadedBytes = ref(0)
+const totalBytes = ref<number | null>(null)
+const downloadError = ref<string | null>(null)
+const checkError = ref<string | null>(null)
+
 export function useAppUpdater() {
-  const checking = ref(false)
-  const update = ref<Update | null>(null)
-  const downloadPhase = ref<AppUpdateState['downloadProgress']['phase']>('idle')
-  const downloadedBytes = ref(0)
-  const totalBytes = ref<number | null>(null)
-  const downloadError = ref<string | null>(null)
-
-  /** Error message suitable for display */
-  const checkError = ref<string | null>(null)
-
   /** Check for app updates */
   async function checkForUpdate(): Promise<Update | null> {
     checking.value = true
@@ -33,12 +40,19 @@ export function useAppUpdater() {
     checkError.value = null
     try {
       const result = await check()
-      update.value = result
+      rawUpdate = result
       if (result) {
+        update.value = {
+          version: result.version,
+          currentVersion: result.currentVersion,
+          date: result.date,
+          body: result.body,
+        }
         console.log(
           `[AppUpdater] Update available: ${result.version} (current: ${result.currentVersion})`,
         )
       } else {
+        update.value = null
         console.log('[AppUpdater] App is up to date')
       }
       return result
@@ -55,12 +69,48 @@ export function useAppUpdater() {
         checkError.value = null
         console.log('[AppUpdater] No release JSON found — app is up to date')
       } else if (
+        msg.includes('proxy') ||
+        msg.includes('tunnel') ||
+        msg.includes('407')
+      ) {
+        // Proxy / tunnel errors — likely Windows system proxy interference
+        checkError.value =
+          'Proxy error: your system proxy configuration may be blocking the connection. ' +
+          'Try disabling system proxy or restarting the application.'
+      } else if (
+        msg.includes('certificate') ||
+        msg.includes('cert') ||
+        msg.includes('SSL') ||
+        msg.includes('TLS')
+      ) {
+        // TLS certificate errors
+        checkError.value = 'TLS certificate error: the update server certificate could not be verified.'
+      } else if (
+        msg.includes('timed out') ||
+        msg.includes('timeout') ||
+        msg.includes('deadline')
+      ) {
+        checkError.value = 'Connection timed out: unable to reach the update server. Please check your network.'
+      } else if (
+        msg.includes('connection refused') ||
+        msg.includes('reset') ||
+        msg.includes('aborted')
+      ) {
+        checkError.value = 'Connection refused: the update server is unreachable. Please check your firewall or network settings.'
+      } else if (
+        msg.includes('dns') ||
+        msg.includes('resolve') ||
+        msg.includes('name') ||
+        msg.includes('host')
+      ) {
+        checkError.value = 'DNS error: unable to resolve the update server domain name.'
+      } else if (
         msg.includes('network') ||
         msg.includes('fetch') ||
-        msg.includes('dns') ||
+        msg.includes('error sending request') ||
         msg.includes('connect')
       ) {
-        checkError.value = 'Network error: unable to reach update server. Please check your connection.'
+        checkError.value = 'Network error: unable to reach the update server. Please check your connection, firewall, and proxy settings.'
       } else {
         checkError.value = msg
       }
@@ -75,7 +125,7 @@ export function useAppUpdater() {
 
   /** Download and install the update */
   async function downloadAndInstall() {
-    const u = update.value
+    const u = rawUpdate
     if (!u) {
       downloadError.value = 'No update available'
       return
@@ -87,6 +137,7 @@ export function useAppUpdater() {
     totalBytes.value = null
 
     try {
+      // Try with progress callback first (preferred UX)
       await u.downloadAndInstall((event: DownloadEvent) => {
         switch (event.event) {
           case 'Started':
@@ -110,7 +161,7 @@ export function useAppUpdater() {
 
   /** Download only (without installing) */
   async function downloadOnly() {
-    const u = update.value
+    const u = rawUpdate
     if (!u) {
       downloadError.value = 'No update available'
       return
@@ -144,7 +195,7 @@ export function useAppUpdater() {
 
   /** Install an already-downloaded update */
   async function installUpdate() {
-    const u = update.value
+    const u = rawUpdate
     if (!u) {
       downloadError.value = 'No update available'
       return
@@ -164,6 +215,7 @@ export function useAppUpdater() {
   /** Reset state */
   function reset() {
     checking.value = false
+    rawUpdate = null
     update.value = null
     downloadPhase.value = 'idle'
     downloadedBytes.value = 0
