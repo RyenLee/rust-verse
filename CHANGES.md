@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2025-05-24
+
+### Fixed
+
+- Removed `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` from release workflow to fix "incorrect updater private key password" error (key was generated without password)
+
+---
+
+## [1.3.1] - 2025-05-24
+
+### Added
+
+- Configured zero-cost auto-update system based on GitHub Releases + `tauri-action` `includeUpdaterJson`
+  - Updated updater endpoint to `https://github.com/RyenLee/rust-verse/releases/latest/download/latest.json`
+  - Enabled `includeUpdaterJson: true` in release workflow for automatic `latest.json` generation
+  - Regenerated Tauri updater signing key pair and updated public key in `tauri.conf.json`
+
+---
+
 ## [1.3.0] - 2025-05-24
 
 ### Added
@@ -98,6 +117,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo plugins management
 - Dashboard with system status
 
+[1.3.2]: https://github.com/RyenLee/rust-verse/compare/v1.3.1...v1.3.2
+[1.3.1]: https://github.com/RyenLee/rust-verse/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/RyenLee/rust-verse/compare/v1.2.5...v1.3.0
 [1.2.5]: https://github.com/RyenLee/rust-verse/compare/v1.2.3...v1.2.5
 [1.2.3]: https://github.com/RyenLee/rust-verse/compare/v1.2.1...v1.2.3
@@ -112,7 +133,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 本文件记录了 RustVerse 项目的所有重要变更。
 
-- [最新版本 1.3.0](#130---2025-05-24) — CARGO_HOME PATH 自动管理、更新签名自动化、构建版本号修复
+- [最新版本 1.3.2](#132---2025-05-24) — 修复签名密钥密码错误
+- [版本 1.3.1](#131---2025-05-24) — 零成本自动更新系统配置
+- [版本 1.3.0](#130---2025-05-24) — CARGO_HOME PATH 自动管理、更新签名自动化、构建版本号修复
 - [版本 1.2.5](#125---2025-05-23) — Crates 镜像源管理
 - [版本 1.2.3](#123---2025-05-23) — 发布脚本与安全加固
 - [版本 1.2.1](#121---2025-05-23) — GitHub Actions 自动发布
