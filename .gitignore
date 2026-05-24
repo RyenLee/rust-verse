@@ -27,6 +27,7 @@ LOCAL_NOTES.md
 target/
 src-tauri/gen/
 .tauri-signer-key
+.tauri/
 .pnpm-store/
 .vscode/
 .trae/
