@@ -3,6 +3,7 @@ export default {
   envVars: 'Environment Variables',
   mirrors: 'Crates Mirror',
   toolchains: 'Toolchains',
+  historyVersions: 'History Versions',
   components: 'Components',
   targets: 'Targets',
   overrides: 'Directory Overrides',

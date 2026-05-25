@@ -4,6 +4,8 @@ export default {
   action: {
     installNew: 'Install New',
     setDefault: 'Set Default',
+    historyVersions: 'History',
+    browseHistory: 'Browse History Versions',
   },
   status: {
     noToolchains: 'No toolchains installed.',
@@ -19,6 +21,7 @@ export default {
     channel: 'Channel',
     date: 'Date',
     dateOptional: '(optional)',
+    datePlaceholder: 'Select date',
   },
   channel: {
     stable: 'Stable',
@@ -26,11 +29,13 @@ export default {
     beta: 'Beta',
     betaDesc: 'Latest beta release',
     nightly: 'Nightly',
-    nightlyDesc: 'Daily build (date optional)',
+    nightlyDesc: 'Daily build',
+    latestVersion: 'Latest version',
   },
   help: {
-    dateHelp: 'Specify a date for a particular nightly build (e.g. 2024-01-15). Leave empty for the latest nightly.',
+    dateHelp: 'Specify a date for a particular version (e.g. 2024-01-15). Leave empty for the latest.',
     stableBetaHelp: '{channel} always installs the latest available version. No date selection needed.',
+    historyHint: 'Need a specific historical version? Browse and select from the history versions page.',
   },
   progress: {
     title: 'Installing Toolchain',

@@ -13,6 +13,8 @@ declare module 'vue' {
   export interface GlobalComponents {
     BaseButton: typeof import('./src/components/BaseButton.vue')['default']
     ConfirmDialog: typeof import('./src/components/ConfirmDialog.vue')['default']
+    DatePicker: typeof import('./src/components/DatePicker.vue')['default']
+    DateRangePicker: typeof import('./src/components/DateRangePicker.vue')['default']
     EmptyState: typeof import('./src/components/EmptyState.vue')['default']
     HelpPanel: typeof import('./src/components/HelpPanel.vue')['default']
     LatencyBar: typeof import('./src/components/LatencyBar.vue')['default']

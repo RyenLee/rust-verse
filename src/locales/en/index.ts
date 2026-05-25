@@ -4,6 +4,7 @@ import common from './common'
 import dashboard from './dashboard'
 import mirror from './mirror'
 import toolchains from './toolchains'
+import histver from './histver'
 import components from './components'
 import targets from './targets'
 import overrides from './overrides'
@@ -24,6 +25,7 @@ export default {
   dashboard,
   mirror,
   toolchains,
+  histver,
   components,
   targets,
   overrides,

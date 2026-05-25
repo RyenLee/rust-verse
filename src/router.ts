@@ -14,6 +14,11 @@ const router = createRouter({
       component: () => import('@/views/ToolchainListView.vue'),
     },
     {
+      path: '/history-versions',
+      name: 'history-versions',
+      component: () => import('@/views/HistoryVersionView.vue'),
+    },
+    {
       path: '/components',
       name: 'components',
       component: () => import('@/views/ComponentsView.vue'),

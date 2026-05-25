@@ -4,6 +4,8 @@ export default {
   action: {
     installNew: '安装新工具链',
     setDefault: '设为默认',
+    historyVersions: '历史版本',
+    browseHistory: '浏览历史版本',
   },
   status: {
     noToolchains: '尚未安装工具链。',
@@ -19,6 +21,7 @@ export default {
     channel: '频道',
     date: '日期',
     dateOptional: '（可选）',
+    datePlaceholder: '选择日期',
   },
   channel: {
     stable: 'Stable',
@@ -26,11 +29,13 @@ export default {
     beta: 'Beta',
     betaDesc: '最新测试版',
     nightly: 'Nightly',
-    nightlyDesc: '每日构建（日期可选）',
+    nightlyDesc: '每日构建',
+    latestVersion: '最新版',
   },
   help: {
-    dateHelp: '指定特定 nightly 构建的日期（如 2024-01-15）。留空则使用最新 nightly。',
+    dateHelp: '指定特定版本的日期（如 2024-01-15）。留空则安装最新版本。',
     stableBetaHelp: '{channel} 频道始终安装最新可用版本，无需选择日期。',
+    historyHint: '需要安装特定历史版本？前往历史版本页面浏览和选择。',
   },
   progress: {
     title: '正在安装工具链',

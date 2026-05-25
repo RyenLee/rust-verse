@@ -3,6 +3,7 @@ export default {
   envVars: '环境变量',
   mirrors: '镜像源',
   toolchains: '工具链',
+  historyVersions: '历史版本',
   components: '组件',
   targets: '编译目标',
   overrides: '目录覆盖',

@@ -16,6 +16,7 @@ use commands::env_var::{
     delete_env_var_meta, get_env_var, list_env_vars, remove_env_var, set_env_var,
     update_env_var_meta,
 };
+use commands::histver::{count_hist_releases, list_hist_releases, search_hist_releases, sync_hist_releases};
 use commands::locale::{LocaleScanState, get_locale, list_available_locales, set_locale};
 use commands::mirror::{
     check_crm_installed, crm_best, crm_current, crm_default, crm_list, crm_test, crm_use,
@@ -553,6 +554,10 @@ pub fn run() {
             crm_best,
             crm_default,
             crm_test,
+            sync_hist_releases,
+            list_hist_releases,
+            search_hist_releases,
+            count_hist_releases,
         ])
         .manage(app_state)
         .manage(locale_scan_state)

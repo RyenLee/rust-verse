@@ -60,6 +60,12 @@ export interface EnvCheck {
   rustup_home: string | null
 }
 
+export interface HistRelease {
+  version: string
+  date: string
+  channel: string
+}
+
 // --- Rustup commands ---
 
 const RUSTUP = 'rustup'
@@ -177,6 +183,23 @@ export function useRustup() {
     return invoke<void>('install_rustup')
   }
 
+  // Historical versions
+  async function syncHistReleases(channel: string, full: boolean = false, days: number = 90) {
+    return invoke<number>('sync_hist_releases', { channel, full, days })
+  }
+
+  async function listHistReleases(channel?: string) {
+    return invoke<HistRelease[]>('list_hist_releases', { channel: channel || null })
+  }
+
+  async function searchHistReleases(keyword: string, channel?: string) {
+    return invoke<HistRelease[]>('search_hist_releases', { keyword, channel: channel || null })
+  }
+
+  async function countHistReleases(channel?: string) {
+    return invoke<number>('count_hist_releases', { channel: channel || null })
+  }
+
   return {
     // Toolchains
     listToolchains,
@@ -211,5 +234,10 @@ export function useRustup() {
     getVersions,
     uninstallRustup,
     installRustup,
+    // Historical versions
+    syncHistReleases,
+    listHistReleases,
+    searchHistReleases,
+    countHistReleases,
   }
 }

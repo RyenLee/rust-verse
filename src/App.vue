@@ -154,6 +154,7 @@ const navGroups = computed<NavGroup[]>(() => [
     color: 'sky',
     items: [
       { path: '/toolchains', label: t('nav.toolchains'), icon: 'mdi:cog-outline' },
+      { path: '/history-versions', label: t('nav.historyVersions'), icon: 'mdi:history' },
       { path: '/components', label: t('nav.components'), icon: 'mdi:puzzle-outline' },
       { path: '/targets', label: t('nav.targets'), icon: 'mdi:target' },
     ],
@@ -582,14 +583,18 @@ onBeforeUnmount(() => {
 <style scoped>
 /* Route transition */
 .route-enter-active {
-  transition: opacity 0.15s ease-out;
+  transition: opacity 0.18s ease-out, transform 0.18s ease-out;
 }
 .route-leave-active {
-  transition: opacity 0.1s ease-in;
+  transition: opacity 0.12s ease-in, transform 0.12s ease-in;
 }
-.route-enter-from,
+.route-enter-from {
+  opacity: 0;
+  transform: translateX(8px);
+}
 .route-leave-to {
   opacity: 0;
+  transform: translateX(-8px);
 }
 
 /* Main app appear animation */

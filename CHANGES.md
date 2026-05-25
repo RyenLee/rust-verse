@@ -5,12 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.7] - 2026-05-25
+
+### Added
+
+- **DateRangePicker component** — New `DateRangePicker.vue` with dropdown calendar for selecting start/end dates in a single interaction; auto-swaps if end < start; highlights range visually with sky-500 endpoints and sky-100/900 range fill
+- **useCalendar composable** — Extracted shared calendar logic (`useCalendar.ts`) from DatePicker into a reusable composable providing `generateCalendarGrid`, `fmtDate`, `parseDate`, `todayStr`, month navigation, and reactive calendar state
+- **Cross-component toolchain refresh** — `useDataRefresh` now exports `onToolchainChange` watcher; HistoryVersionView calls `notifyToolchainChange()` after install, and ToolchainListView auto-refreshes via `onToolchainChange(() => refresh())` (keep-alive safe)
+- **Unit tests for useCalendar** — 24 test cases in `tests/unit/useCalendar.test.ts` covering `fmtDate`, `parseDate`, `todayStr`, `generateCalendarGrid`, and `useCalendar` composable
+
+### Changed
+
+- **DatePicker refactored** — Replaced inline calendar logic with shared `useCalendar` composable; code significantly simplified
+- **History version filters redesigned** — Compact single-row flex layout with channel tabs, DateRangePicker, and SearchInput; responsive wrapping on narrow screens
+- **Install panel simplified** — Removed date picker and "browse history versions" link from toolchain install slide panel; all three channels display "最新版" description
+- **History versions button** — Now navigates directly to the History Versions menu page instead of opening a slide panel
+
+### Fixed
+
+- Fixed history version page not navigating to the correct channel tab when entering from toolchains page
+- Fixed selected version not navigating back to the correct channel in toolchains page
+- Fixed "浏览历史记录" button not closing the slide panel before navigation
+- Fixed future dates not being disabled/greyed out in custom calendar components
+- Fixed date picker width too narrow to display full YYYY-MM-DD format
+- Fixed `@vuepic/vue-datepicker` default export incompatibility — replaced with custom DatePicker/DateRangePicker components
+- Fixed `tsconfig.app.json` configuration errors (removed invalid `types: ["node"]` and `ignoreDeprecations: "6.0"`)
+- Fixed toolchain list page not refreshing after installing from history versions page (keep-alive cache issue)
+
 ## [1.3.6] - 2026-05-25
 
 ### Added
 
 - **Project homepage launched** — New GitHub Pages site at https://ryenlee.github.io/rust-verse/ with auto-update service landing page
+- **History versions page** — New `HistoryVersionView.vue` displaying stable/beta/nightly release history with date range filter, search, and install/select capabilities
+  - Route navigation between toolchain install page and history versions page with channel pre-fill
+  - Date range picker for filtering releases by time period
+  - "Select version" mode that navigates back to install panel with selected channel pre-filled
+  - Sync releases data per channel
+- **Custom DatePicker component** — Native `<input type="date">` based date picker with Tailwind CSS styling, integrated calendar dropdown, today shortcut, and clear button; matches project design system across light/dark themes
 - **Minor improvements and bug fixes** — Various small enhancements and stability improvements
+
+### Changed
+
+- **Toolchain install panel simplified** — Removed date picker and "browse history" link from the slide panel; all three channel options now display "最新版 (Latest version)" description
+- **History page filters redesigned** — Compact single-row layout with channel tabs, date range, and search input using flex wrap for responsive behavior
+
+### Fixed
+
+- Fixed route navigation timing conflict when closing install panel and navigating to history page
+- Fixed TypeScript config errors in `tsconfig.app.json`
 
 ## [1.3.5] - 2026-05-25
 
@@ -183,6 +226,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo plugins management
 - Dashboard with system status
 
+[1.3.7]: https://github.com/RyenLee/rust-verse/compare/v1.3.6...v1.3.7
 [1.3.6]: https://github.com/RyenLee/rust-verse/compare/v1.3.5...v1.3.6
 [1.3.5]: https://github.com/RyenLee/rust-verse/compare/v1.3.4...v1.3.5
 [1.3.4]: https://github.com/RyenLee/rust-verse/compare/v1.3.3...v1.3.4
@@ -203,7 +247,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 本文件记录了 RustVerse 项目的所有重要变更。
 
-- [最新版本 1.3.6](#136---2026-05-25) — 项目主页上线 https://ryenlee.github.io/rust-verse/、小改进和 Bug 修复
+- [最新版本 1.3.7](#137---2026-05-25) — 日期范围选择组件、useCalendar 组合式函数、跨组件工具链刷新、安装面板简化
+- [版本 1.3.6](#136---2026-05-25) — 历史版本页面、自定义日期选择组件、安装面板简化、项目主页上线
 - [版本 1.3.5](#135---2026-05-25) — NSIS 卸载清理、Windows 仅保留 exe 安装包、latest.json 生成脚本修复、os error 448 友好提示
 - [版本 1.3.4](#134---2026-05-24) — App 在线更新前端 UI、工具链更新重试机制、latest.json 生成脚本、更新错误分类处理
 - [版本 1.3.3](#133---2026-05-24) — 欢迎页安装日志同步、移除安装包验证、手动安装指引、搜索框图标修复

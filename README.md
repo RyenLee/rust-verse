@@ -4,13 +4,14 @@ A cross-platform desktop application for visually managing Rust toolchains, comp
 
 ## Features
 
-- **Toolchain Management** — Install, uninstall, and switch between stable/beta/nightly toolchains
+- **Toolchain Management** — Install, uninstall, and switch between stable/beta/nightly toolchains with release history browser
+- **Release History** — Browse and select historical toolchain releases by channel and date range with custom DatePicker/DateRangePicker components
 - **Component Management** — Add or remove rustfmt, clippy, miri and other components per toolchain
 - **Target Management** — Install cross-compilation targets with search and filter
 - **Directory Overrides** — Set per-directory toolchain overrides
 - **Update Center** — Check and apply toolchain updates with streaming progress
 - **Cargo Plugins** — Install and uninstall cargo subcommands
-- **Environment Variables** — View, set, and persist environment variables with CARGO_HOME PATH auto-management
+- **Environment Variables** — View, set, and persist environment variables with CARGO\_HOME PATH auto-management
 - **Auto Update** — Built-in application auto-update with version check, download progress, and one-click install (System > App Update)
 - **Crates Mirror** — Integrated crm tool for managing crates.io mirror sources with auto-optimal switching
 
@@ -34,15 +35,15 @@ pnpm tauri dev
 
 ## Available Commands
 
-| Command | Description |
-|---------|-------------|
-| `pnpm tauri dev` | Start dev server with hot reload |
-| `pnpm test` | Run unit tests (Vitest) |
-| `pnpm test:e2e` | Run E2E tests (Playwright) |
-| `pnpm build` | Build frontend for production |
-| `pnpm tauri build` | Build desktop installer |
-| `pnpm check` | Run `cargo check` on backend |
-| `pnpm type-check` | Run TypeScript type checking |
+| Command            | Description                      |
+| ------------------ | -------------------------------- |
+| `pnpm tauri dev`   | Start dev server with hot reload |
+| `pnpm test`        | Run unit tests (Vitest)          |
+| `pnpm test:e2e`    | Run E2E tests (Playwright)       |
+| `pnpm build`       | Build frontend for production    |
+| `pnpm tauri build` | Build desktop installer          |
+| `pnpm check`       | Run `cargo check` on backend     |
+| `pnpm type-check`  | Run TypeScript type checking     |
 
 ## Project Structure
 
@@ -53,6 +54,8 @@ rust-verse/
 │   ├── components/                   # Reusable UI components
 │   │   ├── BaseButton.vue
 │   │   ├── ConfirmDialog.vue
+│   │   ├── DatePicker.vue
+│   │   ├── DateRangePicker.vue
 │   │   ├── EmptyState.vue
 │   │   ├── ProgressDialog.vue
 │   │   ├── SplashScreen.vue
@@ -60,7 +63,8 @@ rust-verse/
 │   ├── composables/                  # Vue composables (shared logic)
 │   │   ├── useAppStore.ts            # Store access helper
 │   │   ├── useAppUpdater.ts           # App auto-update (check/download/install)
-│   │   ├── useDataRefresh.ts         # Auto-refresh data polling
+│   │   ├── useCalendar.ts            # Calendar grid generation & navigation
+│   │   ├── useDataRefresh.ts         # Auto-refresh data polling & cross-component change notification
 │   │   ├── useEnvVars.ts             # Environment variable operations
 │   │   ├── useLogger.ts              # Frontend logging bridge
 │   │   ├── useMirror.ts              # Crates mirror management
@@ -73,17 +77,18 @@ rust-verse/
 │   │   ├── en/                       # English translations
 │   │   └── zh-CN/                    # Chinese translations
 │   ├── views/                        # Page components
-│   │   ├── DashboardView.vue         # Overview & quick links
 │   │   ├── AppUpdateView.vue         # App software update
-│   │   ├── ToolchainListView.vue     # Toolchain CRUD
 │   │   ├── ComponentsView.vue        # Component management
-│   │   ├── TargetsView.vue           # Target management
-│   │   ├── OverrideView.vue          # Directory overrides
-│   │   ├── UpdateView.vue            # Update center
-│   │   ├── PluginsView.vue           # Cargo plugin management
-│   │   ├── MirrorView.vue            # Crates mirror management
+│   │   ├── DashboardView.vue         # Overview & quick links
 │   │   ├── EnvVarsView.vue           # Environment variable management
 │   │   ├── HelpView.vue              # Help & documentation
+│   │   ├── HistoryVersionView.vue    # Release history & version selection
+│   │   ├── MirrorView.vue            # Crates mirror management
+│   │   ├── OverrideView.vue          # Directory overrides
+│   │   ├── PluginsView.vue           # Cargo plugin management
+│   │   ├── TargetsView.vue           # Target management
+│   │   ├── ToolchainListView.vue     # Toolchain CRUD
+│   │   ├── UpdateView.vue            # Update center
 │   │   └── WelcomeView.vue           # Onboarding welcome screen
 │   ├── App.vue                       # Root layout with sidebar
 │   ├── router.ts                     # Vue Router config
@@ -127,7 +132,7 @@ rust-verse/
 │   ├── generate-signer-key.cjs       # Generate/verify updater signing keys
 │   └── push-release.cjs              # Automated release workflow
 ├── tests/
-│   ├── unit/                         # Vitest unit tests (10 files)
+│   ├── unit/                         # Vitest unit tests (11 files)
 │   ├── e2e/                          # Playwright E2E tests
 │   │   └── smoke.spec.ts
 │   └── setup/                        # Test setup & mocks
@@ -163,9 +168,32 @@ pnpm tauri build
 ```
 
 This generates platform-specific installers in `src-tauri/target/release/bundle/`:
+
 - **Windows**: NSIS installer (`.exe`) with Chinese/English language support
 - **macOS**: `.dmg` and `.app`
 - **Linux**: `.deb` and `.AppImage`
+
+### Build Failure FAQ
+
+**Q: Build fails with "incorrect updater private key password" or missing signing key error?**
+
+Auto-update artifact signing is enabled by default. To build locally, either:
+
+1. **Add the signing key** — Generate a key pair, then set the environment variable before building:
+   ```sh
+   # Step 1: Generate signing key pair (creates .tauri/rust-verse.key)
+   node scripts/generate-signer-key.cjs
+
+   # Step 2: Copy the generated private key content and set it as env var
+   $env:TAURI_SIGNING_PRIVATE_KEY = "<paste-private-key-here>"
+
+   # Step 3: Build
+   pnpm tauri build
+   ```
+2. **Disable auto-update signing** — Temporarily set `createUpdaterArtifacts` to `false` in `src-tauri/tauri.conf.json` under `bundle`:
+   ```json
+   "createUpdaterArtifacts": false
+   ```
 
 ## Auto Update
 
@@ -178,12 +206,9 @@ The app includes `tauri-plugin-updater` for automatic updates with signed artifa
    node scripts/generate-signer-key.cjs
    ```
    This creates `.tauri-signer-key` (private) and updates `.tauri-signer-key.pub` (public).
-
 2. Add the private key to your CI secrets:
-   - GitHub: **Settings > Secrets > `TAURI_SIGNING_PRIVATE_KEY`**
-
+   - GitHub: **Settings > Secrets >** **`TAURI_SIGNING_PRIVATE_KEY`**
 3. Configure `plugins.updater.endpoints` in `tauri.conf.json` to point to your update manifest server.
-
 4. Build with `pnpm tauri build` — signed update artifacts (`.tar.gz` + `.sig`) are generated automatically.
 
 ### Release Workflow
@@ -205,7 +230,7 @@ See [CHANGES.md](./CHANGES.md) for release history.
 
 MIT
 
----
+***
 
 <a id="chinese"></a>
 
@@ -215,17 +240,18 @@ RustVerse 是一个跨平台桌面应用，用于可视化管理 Rust 工具链�
 
 ### 核心功能
 
-| 功能 | 说明 |
-|------|------|
-| 工具链管理 | 安装、卸载、切换 stable/beta/nightly 工具链 |
-| 组件管理 | 添加或移除 rustfmt、clippy、miri 等组件 |
-| 编译目标管理 | 安装交叉编译目标，支持搜索和筛选 |
-| 目录覆盖 | 按目录设置工具链覆盖 |
-| 更新中心 | 流式进度展示工具链更新 |
-| Cargo 插件 | 安装和卸载 cargo 子命令 |
-| 环境变量 | 查看、设置、持久化环境变量，CARGO_HOME 自动管理 PATH |
-| 自动更新 | 内置应用自动更新，支持版本检查、下载进度和一键安装（系统 > 软件更新） |
-| Crates 镜像 | 集成 crm 工具管理 crates.io 镜像源，支持自动最优切换 |
+| 功能        | 说明                                                      |
+| --------- | ------------------------------------------------------- |
+| 工具链管理     | 安装、卸载、切换 stable/beta/nightly 工具链，支持历史版本浏览               |
+| 历史版本      | 按渠道和日期范围浏览/选择历史工具链发行版，自定义 DatePicker/DateRangePicker 组件 |
+| 组件管理      | 添加或移除 rustfmt、clippy、miri 等组件                           |
+| 编译目标管理    | 安装交叉编译目标，支持搜索和筛选                                        |
+| 目录覆盖      | 按目录设置工具链覆盖                                              |
+| 更新中心      | 流式进度展示工具链更新                                             |
+| Cargo 插件  | 安装和卸载 cargo 子命令                                         |
+| 环境变量      | 查看、设置、持久化环境变量，CARGO\_HOME 自动管理 PATH                     |
+| 自动更新      | 内置应用自动更新，支持版本检查、下载进度和一键安装（系统 > 软件更新）                    |
+| Crates 镜像 | 集成 crm 工具管理 crates.io 镜像源，支持自动最优切换                      |
 
 ### 快速开始
 
