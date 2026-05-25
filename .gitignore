@@ -31,7 +31,6 @@ src-tauri/gen/
 .pnpm-store/
 .vscode/
 .trae/
-docs/
 rules/
 
 # Test & coverage

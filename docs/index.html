@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RustVerse — 自动更新服务</title>
+    <style>
+        :root {
+            --bg-primary: #0a0e27;
+            --bg-secondary: #111633;
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0a6;
+            --accent: #7c5cfc;
+            --accent-glow: rgba(124, 92, 252, 0.3);
+            --card-bg: rgba(17, 25, 54, 0.7);
+            --card-border: rgba(124, 92, 252, 0.2);
+            --success: #34d399;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --radius: 16px;
+            --radius-sm: 12px;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+        /* 粒子背景画布 */
+        #particles {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        /* 主容器 */
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        /* 语言切换器 */
+        .lang-switcher {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .lang-btn {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: var(--transition);
+        }
+        .lang-btn.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+        .lang-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+        /* Hero 区域 */
+        .hero {
+            text-align: center;
+            margin: 2rem 0 3rem;
+        }
+        .hero-icon {
+            width: 96px;
+            height: 96px;
+            margin: 0 auto 1.5rem;
+            background: linear-gradient(135deg, #7c5cfc 0%, #f472b6 100%);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            box-shadow: 0 0 48px rgba(124, 92, 252, 0.5);
+        }
+        .hero h1 {
+            font-size: clamp(2rem, 5vw, 3rem);
+            font-weight: 800;
+            background: linear-gradient(135deg, #e8eaed 0%, #c4b5fd 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.75rem;
+        }
+        .hero .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto 1rem;
+        }
+        .version-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 50px;
+            padding: 0.5rem 1.25rem;
+            font-size: 0.95rem;
+            margin: 0.5rem 0;
+        }
+        .version-badge .ver {
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        .version-badge .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        /* 下载区域 */
+        .download-section {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        .dl-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+        .dl-btn:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 24px var(--accent-glow);
+            transform: translateY(-2px);
+        }
+        .dl-btn .icon { font-size: 1.25rem; }
+        /* 内容区毛玻璃卡片 */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            padding: 1.75rem;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+        .card:hover {
+            border-color: rgba(124, 92, 252, 0.4);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+        }
+        .card h2 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .card h2 .icon { font-size: 1.4rem; }
+        /* 功能网格 */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: rgba(124, 92, 252, 0.06);
+            border-radius: var(--radius-sm);
+            border: 1px solid transparent;
+            transition: var(--transition);
+        }
+        .feature-item:hover {
+            background: rgba(124, 92, 252, 0.12);
+            border-color: rgba(124, 92, 252, 0.25);
+        }
+        .feature-item .f-icon {
+            flex-shrink: 0;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(124,92,252,0.3), rgba(244,114,182,0.3));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+        .feature-item .f-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.15rem; }
+        .feature-item .f-desc { color: var(--text-secondary); font-size: 0.85rem; }
+        /* 更新日志 */
+        .changelog { margin: 2rem 0; }
+        .release {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(124, 92, 252, 0.15);
+        }
+        .release:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .release-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .release-ver {
+            font-weight: 700;
+            font-size: 1.15rem;
+            color: var(--accent);
+        }
+        .release-date {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+        .release-badge {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 50px;
+            text-transform: uppercase;
+        }
+        .badge-added { background: rgba(52, 211, 153, 0.2); color: var(--success); }
+        .badge-changed { background: rgba(251, 191, 36, 0.2); color: var(--warning); }
+        .badge-fixed { background: rgba(248, 113, 113, 0.2); color: var(--danger); }
+        .release ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .release li {
+            position: relative;
+            padding-left: 1.25rem;
+            margin-bottom: 0.35rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .release li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0.55rem;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            opacity: 0.6;
+        }
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem 0;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            opacity: 0.7;
+        }
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        footer a:hover { text-decoration: underline; }
+        /* 响应式 */
+        @media (max-width: 640px) {
+            .container { padding: 1.25rem 1rem; }
+            .hero { margin: 1rem 0 2rem; }
+            .features-grid { grid-template-columns: 1fr; }
+            .download-section { flex-direction: column; align-items: center; }
+            .card { padding: 1.25rem; }
+        }
+        /* 隐藏多语言内容 */
+        [data-lang] { display: none; }
+        [data-lang].active { display: block; }
+        [data-lang].active-inline { display: inline; }
+    </style>
+</head>
+<body>
+    <!-- 粒子背景 -->
+    <canvas id="particles"></canvas>
+
+    <div class="container">
+        <!-- 语言切换 -->
+        <div class="lang-switcher">
+            <button class="lang-btn" data-switch="zh-CN" aria-label="切换到中文">🇨🇳 中文</button>
+            <button class="lang-btn" data-switch="en" aria-label="Switch to English">🇺🇸 English</button>
+        </div>
+
+        <!-- Hero -->
+        <header class="hero">
+            <div class="hero-icon">🦀</div>
+            <h1 data-lang="zh-CN">RustVerse 自动更新服务</h1>
+            <h1 data-lang="en">RustVerse Auto‑Update Service</h1>
+            <p class="subtitle" data-lang="zh-CN">跨平台桌面应用 — 可视化 Rust 工具链、组件、编译目标与 Cargo 插件管理</p>
+            <p class="subtitle" data-lang="en">Cross‑platform desktop app — visually manage Rust toolchains, components, targets &amp; cargo plugins</p>
+            <div class="version-badge">
+                <span class="dot"></span>
+                <span data-lang="zh-CN">最新版本：</span>
+                <span data-lang="en">Latest：</span>
+                <span class="ver">v1.3.5</span>
+                <span data-lang="zh-CN">· 发布于 2026-05-24</span>
+                <span data-lang="en">· Released 2026‑05‑24</span>
+            </div>
+        </header>
+
+        <!-- 下载按钮 -->
+        <div class="download-section">
+            <a class="dl-btn" href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.5" target="_blank" rel="noopener">
+                <span class="icon">⬇️</span> <span data-lang="zh-CN">下载最新版本</span><span data-lang="en">Download Latest</span>
+            </a>
+            <a class="dl-btn" href="https://github.com/RyenLee/rust-verse" target="_blank" rel="noopener">
+                <span class="icon">📦</span> GitHub
+            </a>
+            <a class="dl-btn" href="https://github.com/RyenLee/rust-verse/blob/main/CHANGES.md" target="_blank" rel="noopener">
+                <span class="icon">📋</span> <span data-lang="zh-CN">完整更新日志</span><span data-lang="en">Full Changelog</span>
+            </a>
+        </div>
+
+        <!-- 功能特性 -->
+        <div class="card" style="margin-bottom:1.5rem;">
+            <h2><span class="icon">✨</span><span data-lang="zh-CN">核心功能</span><span data-lang="en">Core Features</span></h2>
+            <div class="features-grid">
+                <div class="feature-item"><div class="f-icon">🔧</div><div><div class="f-title" data-lang="zh-CN">工具链管理</div><div class="f-title" data-lang="en">Toolchain Management</div><div class="f-desc" data-lang="zh-CN">安装/卸载/切换 stable·beta·nightly 工具链</div><div class="f-desc" data-lang="en">Install, uninstall &amp; switch between stable/beta/nightly toolchains</div></div></div>
+                <div class="feature-item"><div class="f-icon">🧩</div><div><div class="f-title" data-lang="zh-CN">组件管理</div><div class="f-title" data-lang="en">Component Management</div><div class="f-desc" data-lang="zh-CN">按工具链添加/移除 rustfmt、clippy、miri 等组件</div><div class="f-desc" data-lang="en">Add or remove rustfmt, clippy, miri and other components per toolchain</div></div></div>
+                <div class="feature-item"><div class="f-icon">🎯</div><div><div class="f-title" data-lang="zh-CN">编译目标管理</div><div class="f-title" data-lang="en">Target Management</div><div class="f-desc" data-lang="zh-CN">安装跨平台编译目标，支持搜索与过滤</div><div class="f-desc" data-lang="en">Install cross‑compilation targets with search and filter</div></div></div>
+                <div class="feature-item"><div class="f-icon">📂</div><div><div class="f-title" data-lang="zh-CN">目录覆盖</div><div class="f-title" data-lang="en">Directory Overrides</div><div class="f-desc" data-lang="zh-CN">按目录设置工具链覆盖</div><div class="f-desc" data-lang="en">Set per‑directory toolchain overrides</div></div></div>
+                <div class="feature-item"><div class="f-icon">🔄</div><div><div class="f-title" data-lang="zh-CN">更新中心</div><div class="f-title" data-lang="en">Update Center</div><div class="f-desc" data-lang="zh-CN">检查并应用工具链更新，流式进度显示</div><div class="f-desc" data-lang="en">Check and apply toolchain updates with streaming progress</div></div></div>
+                <div class="feature-item"><div class="f-icon">📦</div><div><div class="f-title" data-lang="zh-CN">Cargo 插件</div><div class="f-title" data-lang="en">Cargo Plugins</div><div class="f-desc" data-lang="zh-CN">安装和卸载 Cargo 子命令</div><div class="f-desc" data-lang="en">Install and uninstall cargo subcommands</div></div></div>
+                <div class="feature-item"><div class="f-icon">⚙️</div><div><div class="f-title" data-lang="zh-CN">环境变量管理</div><div class="f-title" data-lang="en">Environment Variables</div><div class="f-desc" data-lang="zh-CN">查看、设置并持久化环境变量，自动管理 CARGO_HOME/PATH</div><div class="f-desc" data-lang="en">View, set, and persist environment variables with auto‑management of CARGO_HOME &amp; PATH</div></div></div>
+                <div class="feature-item"><div class="f-icon">🔄</div><div><div class="f-title" data-lang="zh-CN">应用自动更新</div><div class="f-title" data-lang="en">Auto Update</div><div class="f-desc" data-lang="zh-CN">内置应用自动更新：版本检查、下载进度、一键安装</div><div class="f-desc" data-lang="en">Built‑in auto‑update with version check, download progress &amp; one‑click install</div></div></div>
+                <div class="feature-item"><div class="f-icon">🪞</div><div><div class="f-title" data-lang="zh-CN">Crates 镜像</div><div class="f-title" data-lang="en">Crates Mirror</div><div class="f-desc" data-lang="zh-CN">集成 crm 工具管理 crates.io 镜像源，支持自动优选切换</div><div class="f-desc" data-lang="en">Integrated crm tool for managing crates.io mirror sources with auto‑optimal switching</div></div></div>
+            </div>
+        </div>
+
+        <!-- 安装包说明 -->
+        <div class="card" style="margin-bottom:1.5rem;">
+            <h2><span class="icon">💿</span><span data-lang="zh-CN">安装包</span><span data-lang="en">Installers</span></h2>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;">
+                <div class="feature-item"><div class="f-icon">🪟</div><div><div class="f-title">Windows</div><div class="f-desc">NSIS installer (.exe) — <span data-lang="zh-CN">支持中/英文安装界面</span><span data-lang="en">Chinese/English language support</span></div></div></div>
+                <div class="feature-item"><div class="f-icon">🍎</div><div><div class="f-title">macOS</div><div class="f-desc">.dmg &amp; .app</div></div></div>
+                <div class="feature-item"><div class="f-icon">🐧</div><div><div class="f-title">Linux</div><div class="f-desc">.deb &amp; .AppImage</div></div></div>
+            </div>
+        </div>
+
+        <!-- 技术栈 -->
+        <div class="card" style="margin-bottom:1.5rem;">
+            <h2><span class="icon">🛠️</span><span data-lang="zh-CN">技术栈</span><span data-lang="en">Tech Stack</span></h2>
+            <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+                <span style="background:rgba(124,92,252,0.15);color:#c4b5fd;padding:0.35rem 0.85rem;border-radius:50px;font-size:0.85rem;font-weight:500;">Tauri 2</span>
+                <span style="background:rgba(124,92,252,0.15);color:#c4b5fd;padding:0.35rem 0.85rem;border-radius:50px;font-size:0.85rem;font-weight:500;">Vue 3</span>
+                <span style="background:rgba(124,92,252,0.15);color:#c4b5fd;padding:0.35rem 0.85rem;border-radius:50px;font-size:0.85rem;font-weight:500;">TypeScript</span>
+                <span style="background:rgba(124,92,252,0.15);color:#c4b5fd;padding:0.35rem 0.85rem;border-radius:50px;font-size:0.85rem;font-weight:500;">Tailwind CSS 4</span>
+                <span style="background:rgba(124,92,252,0.15);color:#c4b5fd;padding:0.35rem 0.85rem;border-radius:50px;font-size:0.85rem;font-weight:500;">Rust</span>
+                <span style="background:rgba(124,92,252,0.15);color:#c4b5fd;padding:0.35rem 0.85rem;border-radius:50px;font-size:0.85rem;font-weight:500;">vue-i18n</span>
+                <span style="background:rgba(124,92,252,0.15);color:#c4b5fd;padding:0.35rem 0.85rem;border-radius:50px;font-size:0.85rem;font-weight:500;">tauri-plugin-updater</span>
+            </div>
+        </div>
+
+        <!-- 更新日志 -->
+        <div class="card changelog">
+            <h2><span class="icon">📝</span><span data-lang="zh-CN">更新日志</span><span data-lang="en">Changelog</span></h2>
+
+            <!-- v1.3.5 -->
+            <div class="release">
+                <div class="release-header">
+                    <span class="release-ver">v1.3.5</span>
+                    <span class="release-date">2026‑05‑25</span>
+                </div>
+                <p style="font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;"><span class="release-badge badge-added" data-lang="zh-CN">新增</span><span class="release-badge badge-added" data-lang="en">Added</span></p>
+                <ul>
+                    <li data-lang="zh-CN">NSIS 卸载清理 Hook — 自定义 NSIS 钩子 (windows/hooks.nsh)，在卸载时递归清理安装目录下所有运行时创建的文件（更新下载、数据等）</li>
+                    <li data-lang="en">NSIS uninstall cleanup hook — Custom NSIS hooks (windows/hooks.nsh) with NSIS_HOOK_POSTUNINSTALL to recursively remove all runtime‑created files (update downloads, data) from install directory on uninstall</li>
+                    <li data-lang="zh-CN">Windows Defender 排除提示 — 在 WelcomeView 中提供友好的错误引导（针对 os error 448：不受信任的挂载点），并在后端错误消息中包含详细解决步骤 (env_check.rs, exec.rs)</li>
+                    <li data-lang="en">Windows Defender exclusion hints — Friendly error guidance in WelcomeView for os error 448 (untrusted mount point), with detailed resolution steps in backend error messages (env_check.rs, exec.rs)</li>
+                </ul>
+                <p style="font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;margin-top:0.5rem;"><span class="release-badge badge-changed" data-lang="zh-CN">变更</span><span class="release-badge badge-changed" data-lang="en">Changed</span></p>
+                <ul>
+                    <li data-lang="zh-CN">Windows 构建：仅 NSIS — 从 bundle 配置中移除 MSI 目标，Windows 现在仅生成 NSIS.exe 安装包</li>
+                    <li data-lang="en">Windows build: NSIS only — Removed MSI target from bundle config, Windows now produces only NSIS.exe installer</li>
+                    <li data-lang="zh-CN">改进 latest.json 生成脚本 — 修复 macOS 更新产物查找路径从 dmg/ 改为 macos/，增加精确版本正则匹配及架构/安装扩展名过滤</li>
+                    <li data-lang="en">Improved latest.json generation script — Fixed macOS updater artifact lookup from dmg/ to macos/ directory, added precise version regex matching and arch/installerExt filtering</li>
+                </ul>
+            </div>
+
+            <!-- v1.3.4 -->
+            <div class="release">
+                <div class="release-header">
+                    <span class="release-ver">v1.3.4</span>
+                    <span class="release-date">2026‑05‑24</span>
+                </div>
+                <p style="font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;"><span class="release-badge badge-added" data-lang="zh-CN">新增</span><span class="release-badge badge-added" data-lang="en">Added</span></p>
+                <ul>
+                    <li data-lang="zh-CN">应用在线更新前端 UI — 新增 AppUpdateView.vue 页面，支持版本检查、下载进度显示与安装功能</li>
+                    <li data-lang="en">App online update frontend UI — New AppUpdateView.vue page with version check, download progress, and install capabilities</li>
+                    <li data-lang="zh-CN">useAppUpdater.ts Composable — 封装 @tauri-apps/plugin-updater，支持错误分类与进度跟踪</li>
+                    <li data-lang="en">useAppUpdater.ts composable — Wraps @tauri-apps/plugin-updater with error classification and progress tracking</li>
+                    <li data-lang="zh-CN">侧边栏新增"系统"导航组，包含"软件更新"菜单项</li>
+                    <li data-lang="en">Added "System" navigation group in sidebar with "App Update" menu item</li>
+                    <li data-lang="zh-CN">工具链更新重试机制 — run_command_with_streaming_retry() 在 exec.rs 中实现指数退避重试（3s→6s→12s，最大60s），并向前端发送流式重试日志事件</li>
+                    <li data-lang="en">Toolchain update retry mechanism — run_command_with_streaming_retry() in exec.rs with exponential backoff (3s → 6s → 12s, max 60s) and streaming retry log events to frontend</li>
+                    <li data-lang="zh-CN">CI/CD latest.json 生成脚本 — scripts/generate-latest-json.cjs 扫描构建产物并自动生成 Tauri 更新器清单 JSON</li>
+                    <li data-lang="en">CI/CD latest.json generation script — scripts/generate-latest-json.cjs scans build artifacts and auto‑generates the Tauri updater manifest JSON</li>
+                </ul>
+                <p style="font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;margin-top:0.5rem;"><span class="release-badge badge-changed" data-lang="zh-CN">变更</span><span class="release-badge badge-changed" data-lang="en">Changed</span></p>
+                <ul>
+                    <li data-lang="zh-CN">将应用更新从 UpdateView 移至独立页面 — "RustVerse 软件更新"现作为独立页面置于"系统"导航组下，避免与 Rust 工具链更新页面冲突</li>
+                    <li data-lang="en">Moved app update out of UpdateView — The app update section is now a standalone page under "System" nav group, avoiding conflicts with the Rust toolchain update page</li>
+                    <li data-lang="zh-CN">改进更新错误处理 — useAppUpdater 现在可分类错误：缺少 latest.json 视为"已是最新"（预期行为），网络故障则在 UI 中显示警告横幅</li>
+                    <li data-lang="en">Improved update error handling — useAppUpdater now classifies errors: missing latest.json is treated as "up to date" (expected), network failures show a warning banner in the UI</li>
+                </ul>
+                <p style="font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;margin-top:0.5rem;"><span class="release-badge badge-fixed" data-lang="zh-CN">修复</span><span class="release-badge badge-fixed" data-lang="en">Fixed</span></p>
+                <ul>
+                    <li data-lang="zh-CN">修复更新检查控制台错误 "Could not fetch a valid release JSON from the remote" — 当未发布 release JSON 时，应用现在静默视其为最新版，而非显示错误</li>
+                    <li data-lang="en">Fixed update check console error "Could not fetch a valid release JSON from the remote" — when no release JSON is published, the app now silently treats it as up‑to‑date instead of showing an error</li>
+                </ul>
+            </div>
+
+            <!-- v1.3.3 -->
+            <div class="release">
+                <div class="release-header">
+                    <span class="release-ver">v1.3.3</span>
+                    <span class="release-date">2026‑05‑24</span>
+                </div>
+                <p style="font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;"><span class="release-badge badge-added" data-lang="zh-CN">新增</span><span class="release-badge badge-added" data-lang="en">Added</span></p>
+                <ul>
+                    <li data-lang="zh-CN">欢迎页面安装日志记录 — 安装过程中的所有终端输出（进度、状态、错误）现在同步写入日志文件 (data/logs/rustverse.log)</li>
+                    <li data-lang="en">Welcome page install logging — All terminal output during installation (progress, status, errors) is now synced to the log file (data/logs/rustverse.log)</li>
+                    <li data-lang="zh-CN">手动安装指南 — 当安装包下载在 3 次重试后失败时，UI 将显示分步指南，指导用户手动将安装包放入 data/ 目录后重试</li>
+                    <li data-lang="en">Manual install guide — When installer download fails after 3 retries, the UI shows a step‑by‑step guide for manually placing the installer in the data/ directory, then retrying</li>
+                </ul>
+                <p style="font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;margin-top:0.5rem;"><span class="release-badge badge-changed" data-lang="zh-CN">变更</span><span class="release-badge badge-changed" data-lang="en">Changed</span></p>
+                <ul>
+                    <li data-lang="zh-CN">移除安装包 SHA256 校验 — 哈希端点 (*.sha256) 经常返回 XML 错误页面而非有效哈希值，导致完整性检查误报和反复重新下载。安装包下载后直接使用，不再进行哈希校验</li>
+                    <li data-lang="en">Removed installer SHA256 verification — The hash endpoint (*.sha256) frequently returns XML error pages instead of valid hashes, causing false integrity check failures and unnecessary re‑downloads. The installer is now used directly after download without hash verification</li>
+                </ul>
+                <p style="font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;margin-top:0.5rem;"><span class="release-badge badge-fixed" data-lang="zh-CN">修复</span><span class="release-badge badge-fixed" data-lang="en">Fixed</span></p>
+                <ul>
+                    <li data-lang="zh-CN">修复搜索框图标布局问题 — 将所有搜索输入框中的 position: absolute 图标定位替换为 flex 内联布局 (PluginsView, EnvVarsView, TargetsView, ComponentsView)，消除图标与文本重叠</li>
+                    <li data-lang="en">Search box icon layout fix — Replaced position: absolute icon positioning with flex inline layout across all search inputs (PluginsView, EnvVarsView, TargetsView, ComponentsView), eliminating icon‑text overlap</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>Built with ❤️ by <a href="https://github.com/RyenLee" target="_blank" rel="noopener">RyenLee</a> · <span data-lang="zh-CN">使用 </span><span data-lang="en">Powered by </span><a href="https://github.com/RyenLee/rust-verse" target="_blank" rel="noopener">RustVerse</a> · <span data-lang="zh-CN">许可证：</span><span data-lang="en">License：</span>MIT</p>
+        </footer>
+    </div>
+
+    <script>
+        (function() {
+            // ===== 粒子背景动画 =====
+            const canvas = document.getElementById('particles');
+            const ctx = canvas.getContext('2d');
+            let particles = [];
+            const maxParticles = 80;
+            const connectionDist = 120;
+
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            class Particle {
+                constructor() {
+                    this.reset();
+                }
+                reset() {
+                    this.x = Math.random() * canvas.width;
+                    this.y = Math.random() * canvas.height;
+                    this.vx = (Math.random() - 0.5) * 0.5;
+                    this.vy = (Math.random() - 0.5) * 0.5;
+                    this.radius = Math.random() * 2 + 1;
+                    this.opacity = Math.random() * 0.5 + 0.2;
+                }
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+                    if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+                }
+                draw(ctx) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(124, 92, 252, ${this.opacity})`;
+                    ctx.fill();
+                }
+            }
+
+            // 初始化粒子
+            while (particles.length < maxParticles) {
+                particles.push(new Particle());
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                // 绘制连线
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        const dx = particles[i].x - particles[j].x;
+                        const dy = particles[i].y - particles[j].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < connectionDist) {
+                            ctx.beginPath();
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.strokeStyle = `rgba(124, 92, 252, ${0.12 * (1 - dist / connectionDist)})`;
+                            ctx.lineWidth = 0.6;
+                            ctx.stroke();
+                        }
+                    }
+                }
+                // 更新并绘制粒子
+                particles.forEach(p => {
+                    p.update();
+                    p.draw(ctx);
+                });
+                requestAnimationFrame(animate);
+            }
+            animate();
+
+            // ===== 多语言切换逻辑 =====
+            const supportedLangs = ['zh-CN', 'en'];
+            const STORAGE_KEY = 'rustverse-lang';
+
+            function getBrowserLang() {
+                const lang = navigator.language || navigator.userLanguage || 'en';
+                // 精确匹配或前缀匹配
+                if (supportedLangs.includes(lang)) return lang;
+                if (lang.startsWith('zh')) return 'zh-CN';
+                return 'en';
+            }
+
+            function getStoredLang() {
+                try {
+                    const stored = localStorage.getItem(STORAGE_KEY);
+                    if (stored && supportedLangs.includes(stored)) return stored;
+                } catch(e) {}
+                return null;
+            }
+
+            function setStoredLang(lang) {
+                try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+            }
+
+            function applyLang(lang) {
+                // 隐藏所有语言元素
+                document.querySelectorAll('[data-lang]').forEach(el => {
+                    el.classList.remove('active', 'active-inline');
+                });
+                // 显示目标语言
+                document.querySelectorAll(`[data-lang="${lang}"]`).forEach(el => {
+                    // 判断是否为内联元素（span, a 等）
+                    const tag = el.tagName.toLowerCase();
+                    const isInline = ['span', 'a', 'strong', 'em', 'code', 'small', 'label'].includes(tag) ||
+                                     window.getComputedStyle(el).display === 'inline';
+                    el.classList.add(isInline ? 'active-inline' : 'active');
+                });
+                // 更新语言切换按钮状态
+                document.querySelectorAll('.lang-btn').forEach(btn => {
+                    const btnLang = btn.getAttribute('data-switch');
+                    btn.classList.toggle('active', btnLang === lang);
+                });
+                // 更新 html lang 属性
+                document.documentElement.lang = lang;
+            }
+
+            function switchLang(lang) {
+                setStoredLang(lang);
+                applyLang(lang);
+            }
+
+            // 初始化语言
+            const initialLang = getStoredLang() || getBrowserLang();
+            applyLang(initialLang);
+
+            // 绑定切换按钮
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const lang = this.getAttribute('data-switch');
+                    if (lang) switchLang(lang);
+                });
+            });
+        })();
+    </script>
+</body>
+</html>
