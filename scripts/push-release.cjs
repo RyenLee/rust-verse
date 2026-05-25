@@ -116,22 +116,6 @@ function runBumpVersion(newVersion, dryRun) {
   }
 }
 
-function runGenerateSignerKey(dryRun) {
-  const scriptPath = path.join(process.cwd(), 'scripts', 'generate-signer-key.cjs')
-
-  if (dryRun) {
-    console.log(`[dry-run] node ${scriptPath}`)
-    return
-  }
-
-  console.log(`> node ${scriptPath}`)
-  const result = spawnSync('node', [scriptPath], { stdio: 'inherit' })
-  if (result.status !== 0) {
-    console.error('generate-signer-key.cjs failed')
-    process.exit(1)
-  }
-}
-
 function main() {
   const args = process.argv.slice(2)
   const dryRun = args.includes('--dry-run') || args.includes('-n')
@@ -166,10 +150,6 @@ function main() {
   // Discard CRLF/LF line-ending noise that may block commits
   console.log('=== Normalizing line endings ===')
   runAllowFail('git add --renormalize .', dryRun)
-  console.log()
-
-  console.log('=== Generating/verifying signer key ===')
-  runGenerateSignerKey(dryRun)
   console.log()
 
   if (!skipBump) {
