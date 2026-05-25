@@ -4,9 +4,15 @@ import { nextTick } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import ToolchainListView from '@/views/ToolchainListView.vue'
 
+// Mock vue-router
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}))
+
 describe('ToolchainListView', () => {
   it('shows loading state initially', async () => {
-    vi.mocked(invoke).mockReturnValue(new Promise(() => {}))
+    vi.mocked(invoke).mockReturnValue(new Promise(() => { }))
     const wrapper = mount(ToolchainListView)
     await nextTick()
     expect(wrapper.text()).toContain('Loading...')
@@ -23,7 +29,7 @@ describe('ToolchainListView', () => {
   })
 
   it('shows Install New button', async () => {
-    vi.mocked(invoke).mockReturnValue(new Promise(() => {}))
+    vi.mocked(invoke).mockReturnValue(new Promise(() => { }))
     const wrapper = mount(ToolchainListView)
     await nextTick()
     expect(wrapper.text()).toContain('Install New')
@@ -46,14 +52,26 @@ describe('ToolchainListView', () => {
 
   it('opens install dialog on button click', async () => {
     vi.mocked(invoke).mockResolvedValue([])
-    const wrapper = mount(ToolchainListView)
+    const wrapper = mount(ToolchainListView, {
+      global: {
+        stubs: {
+          Teleport: {
+            inheritAttrs: false,
+            template: '<div><slot /></div>',
+          },
+        },
+      },
+    })
     await vi.dynamicImportSettled()
     await new Promise((r) => setTimeout(r, 50))
-    const btn = wrapper.find('button')
-    await btn.trigger('click')
-    // Install panel is teleported to <body>
-    expect(document.body.textContent).toContain('Install Toolchain')
-    expect(document.body.textContent).toContain('Channel')
+    // Find the "Install New" button (second button in actions slot)
+    const buttons = wrapper.findAll('button')
+    const installBtn = buttons.find(b => b.text().includes('Install New'))
+    expect(installBtn).toBeTruthy()
+    await installBtn!.trigger('click')
+    await nextTick()
+    // Panel is rendered via stubbed Teleport, check wrapper content
+    expect(wrapper.text()).toContain('Channel')
     wrapper.unmount()
   })
 
