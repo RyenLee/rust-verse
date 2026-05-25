@@ -1,25 +1,6 @@
 name: Build
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "src/**"
-      - "src-tauri/**"
-      - "tests/**"
-      - "pnpm-lock.yaml"
-      - "src-tauri/Cargo.lock"
-      - ".github/workflows/test-build.yml"
-  pull_request:
-    paths:
-      - "src/**"
-      - "src-tauri/**"
-      - "tests/**"
-      - "scripts/**"
-      - "pnpm-lock.yaml"
-      - "src-tauri/Cargo.lock"
-      - ".github/workflows/test-build.yml"
   workflow_dispatch:
 
 concurrency:

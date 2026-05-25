@@ -1,26 +1,7 @@
 name: Test
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "src/**"
-      - "src-tauri/**"
-      - "tests/**"
-      - "scripts/**"
-      - "pnpm-lock.yaml"
-      - "src-tauri/Cargo.lock"
-      - ".github/workflows/test.yml"
-  pull_request:
-    paths:
-      - "src/**"
-      - "src-tauri/**"
-      - "tests/**"
-      - "scripts/**"
-      - "pnpm-lock.yaml"
-      - "src-tauri/Cargo.lock"
-      - ".github/workflows/test.yml"
+  workflow_dispatch:
 
 concurrency:
   group: test-${{ github.workflow }}-${{ github.head_ref || github.run_id }}

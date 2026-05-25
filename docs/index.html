@@ -779,14 +779,14 @@
         <div class="hero-version">
           <span class="ver-label" data-lang="zh-CN">最新版本</span>
           <span class="ver-label" data-lang="en">Latest</span>
-          <span class="ver-num">v1.3.6</span>
+          <span class="ver-num">v1.3.7</span>
           <span class="ver-sep"></span>
           <span class="ver-date">2026-05-25</span>
         </div>
         <div class="cta-row">
           <a
             class="btn btn-primary"
-            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.6"
+            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.7"
             target="_blank"
             rel="noopener"
           >
@@ -824,7 +824,19 @@
         </div>
         <div class="features-grid">
           <div class="feature-card">
-            <div class="feature-icon">🔧</div>
+            <div class="feature-icon">�</div>
+            <div class="feature-name" data-lang="zh-CN">历史版本</div>
+            <div class="feature-name" data-lang="en">Release History</div>
+            <div class="feature-desc" data-lang="zh-CN">
+              按渠道和日期范围浏览历史工具链发行版，自定义 DatePicker/DateRangePicker 组件，选择版本后一键安装
+            </div>
+            <div class="feature-desc" data-lang="en">
+              Browse historical toolchain releases by channel &amp; date range with custom DatePicker/DateRangePicker,
+              one-click install
+            </div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">�🔧</div>
             <div class="feature-name" data-lang="zh-CN">工具链管理</div>
             <div class="feature-name" data-lang="en">Toolchain Management</div>
             <div class="feature-desc" data-lang="zh-CN">
@@ -978,14 +990,91 @@
           <h2 class="section-title" data-lang="en">Release History</h2>
         </div>
         <div class="changelog-timeline">
+          <!-- v1.3.7 -->
+          <div class="release-entry">
+            <div class="release-dot"></div>
+            <div class="release-head">
+              <span class="release-ver">v1.3.7</span>
+              <span class="release-date">2026-05-25</span>
+              <span class="release-latest" data-lang="zh-CN">最新</span>
+              <span class="release-latest" data-lang="en">Latest</span>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-added" data-lang="zh-CN">+ 新增</span>
+              <span class="change-group-label label-added" data-lang="en">+ Added</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">
+                  DateRangePicker 日期范围选择组件 — 下拉式日历，同一交互界面选择起止日期，自动交换顺序，高亮范围区间
+                </li>
+                <li data-lang="en">
+                  DateRangePicker component — Dropdown calendar for selecting start/end dates in one interaction,
+                  auto-swap, range highlight
+                </li>
+                <li data-lang="zh-CN">useCalendar 组合式函数 — 抽离共享日历逻辑，提供网格生成、月份导航与响应式状态</li>
+                <li data-lang="en">
+                  useCalendar composable — Extracted shared calendar logic with grid generation, month navigation &amp;
+                  reactive state
+                </li>
+                <li data-lang="zh-CN">跨组件工具链刷新 — 历史版本安装后自动通知工具链页面刷新（keep-alive 安全）</li>
+                <li data-lang="en">
+                  Cross-component toolchain refresh — Auto-notify toolchain page to refresh after installing from
+                  history (keep-alive safe)
+                </li>
+                <li data-lang="zh-CN">useCalendar 单元测试 — 24 个测试用例覆盖日期格式化、解析、网格生成等</li>
+                <li data-lang="en">
+                  useCalendar unit tests — 24 test cases covering date formatting, parsing, grid generation, etc.
+                </li>
+              </ul>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-changed" data-lang="zh-CN">↻ 变更</span>
+              <span class="change-group-label label-changed" data-lang="en">↻ Changed</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">DatePicker 重构 — 使用共享 useCalendar 组合式函数，代码大幅精简</li>
+                <li data-lang="en">
+                  DatePicker refactored — Uses shared useCalendar composable, code significantly simplified
+                </li>
+                <li data-lang="zh-CN">历史版本筛选栏重设计 — 紧凑单行弹性布局，渠道标签 + 日期范围 + 搜索框</li>
+                <li data-lang="en">
+                  History version filters redesigned — Compact single-row flex layout with channel tabs, date range
+                  &amp; search
+                </li>
+                <li data-lang="zh-CN">安装面板简化 — 移除日期选择器和"浏览历史版本"链接，三个渠道均显示"最新版"</li>
+                <li data-lang="en">
+                  Install panel simplified — Removed date picker &amp; "browse history" link, all channels show "Latest
+                  version"
+                </li>
+              </ul>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-fixed" data-lang="zh-CN">✓ 修复</span>
+              <span class="change-group-label label-fixed" data-lang="en">✓ Fixed</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">修复历史版本页面未跳转到对应渠道标签</li>
+                <li data-lang="en">Fixed history version page not navigating to the correct channel tab</li>
+                <li data-lang="zh-CN">修复日历组件未来日期未置灰禁用</li>
+                <li data-lang="en">Fixed future dates not being disabled/greyed out in calendar components</li>
+                <li data-lang="zh-CN">
+                  替换 @vuepic/vue-datepicker 为自建 DatePicker/DateRangePicker 组件，解决兼容性问题
+                </li>
+                <li data-lang="en">
+                  Replaced @vuepic/vue-datepicker with custom DatePicker/DateRangePicker components, fixing
+                  compatibility issues
+                </li>
+                <li data-lang="zh-CN">修复工具链页面在历史版本安装后不刷新（keep-alive 缓存问题）</li>
+                <li data-lang="en">
+                  Fixed toolchain list page not refreshing after installing from history versions (keep-alive cache
+                  issue)
+                </li>
+              </ul>
+            </div>
+          </div>
           <!-- v1.3.6 -->
           <div class="release-entry">
             <div class="release-dot"></div>
             <div class="release-head">
               <span class="release-ver">v1.3.6</span>
               <span class="release-date">2026-05-25</span>
-              <span class="release-latest" data-lang="zh-CN">最新</span>
-              <span class="release-latest" data-lang="en">Latest</span>
             </div>
             <div class="change-group">
               <span class="change-group-label label-added" data-lang="zh-CN">+ 新增</span>
