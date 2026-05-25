@@ -3,10 +3,24 @@
 /**
  * Generate or verify Tauri updater signing key pair.
  *
- * - If a private key already exists at `.tauri-signer-key`, verify it matches the public key.
- * - If no private key exists, generate a new key pair using `tauri signer generate`.
- * - Update the public key in `tauri.conf.json` and `.tauri-signer-key.pub`.
- * - Output the private key content for CI environment variable setup.
+ * Usage:
+ *   node scripts/generate-signer-key.cjs              # Generate or verify existing key pair
+ *   node scripts/generate-signer-key.cjs --regenerate  # Force regenerate a new key pair
+ *   node scripts/generate-signer-key.cjs --print-key   # Output private key content
+ *
+ * Key pair is generated once and reused across all releases.
+ * Do NOT regenerate for each release — old app versions embed the public key
+ * and cannot verify updates signed with a different private key.
+ *
+ * Files changed when private key already exists:
+ *   - src-tauri/tauri.conf.json  — update "pubkey" if mismatched
+ *   - .env                       — update TAURI_SIGNING_PRIVATE_KEY
+ *
+ * Files changed when generating new key pair (or --regenerate):
+ *   - .tauri/rust-verse.key      — new private key
+ *   - .tauri/rust-verse.key.pub  — new public key
+ *   - src-tauri/tauri.conf.json  — update "pubkey"
+ *   - .env                       — update TAURI_SIGNING_PRIVATE_KEY
  */
 
 const { execSync } = require('child_process')
