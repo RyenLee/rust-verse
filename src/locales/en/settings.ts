@@ -1,0 +1,66 @@
+export default {
+  title: 'Settings',
+  description: 'Configure application preferences and system behavior',
+
+  sections: {
+    general: 'General',
+    proxy: 'Proxy',
+    notifications: 'Notifications',
+    appearance: 'Appearance',
+  },
+
+  minimizeToTray: 'Minimize to system tray',
+  minimizeToTrayDesc: 'When closing the window, the app will minimize to the system tray instead of quitting.',
+
+  proxyType: 'Proxy type',
+  proxyTypeNone: 'No proxy',
+  proxyTypeSystem: 'System proxy',
+  proxyTypeManual: 'Manual proxy',
+  serverAddress: 'Server address',
+  serverAddressPlaceholder: 'e.g. 127.0.0.1',
+  port: 'Port',
+  portPlaceholder: 'e.g. 7890',
+  proxyNote: 'Proxy settings are applied to Cargo and rustup network requests.',
+
+  notificationsMaster: 'Enable notifications',
+  notificationsMasterDesc: 'Receive desktop notifications for installation progress, updates, and other events.',
+  notificationsCategories: 'Per-category notification settings:',
+  notifInstallProgress: 'Install progress',
+  notifInstallProgressDesc: 'Notifications for software/component install, uninstall, and upgrade progress.',
+  notifSystemUpdates: 'System updates',
+  notifSystemUpdatesDesc: 'Notifications for feature updates, security patches, and version upgrades.',
+  notifOperationEvents: 'Operation events',
+  notifOperationEventsDesc: 'Notifications for user operation results and status changes.',
+  notifDnd: 'Do not disturb',
+  notifDndDesc: 'Suppress notification popups (notifications are still recorded).',
+  notifDefaultPriority: 'Default notification priority',
+  notifSoundEnabled: 'Notification sound',
+  notifSoundEnabledDesc: 'Play a sound when a notification arrives.',
+  notifAutoCleanup: 'Auto-cleanup old notifications',
+  notifAutoCleanupDesc: 'Automatically delete read notifications older than the selected duration.',
+  notifAutoCleanupNever: 'Never',
+  notifAutoCleanup30min: '30 min',
+  notifAutoCleanup60min: '60 min',
+  notifAutoCleanupCustom: 'Custom',
+  minutes: 'minutes',
+
+  theme: 'Theme',
+  themeAuto: 'Follow system',
+  themeDark: 'Dark',
+  themeLight: 'Light',
+  themeDesc: 'Choose the appearance for the application.',
+
+  // Per-item action feedback
+  saving: 'Saving...',
+  saved: 'Saved',
+  apply: 'Apply',
+  toggle: 'Toggle',
+  switch: 'Switch',
+  applyProxy: 'Apply proxy',
+
+  // Validation
+  validationPortRange: 'Port must be between 1 and 65535.',
+  validationHostRequired: 'Host address is required for manual proxy.',
+  saveError: 'Failed to save: {error}',
+  loading: 'Loading settings...',
+}

@@ -1,0 +1,66 @@
+export default {
+  title: '设置',
+  description: '配置应用偏好与系统行为',
+
+  sections: {
+    general: '常规',
+    proxy: '代理',
+    notifications: '通知',
+    appearance: '外观',
+  },
+
+  minimizeToTray: '关闭时缩小到系统托盘',
+  minimizeToTrayDesc: '勾选后，关闭窗口时应用将最小化到系统托盘而不是退出。',
+
+  proxyType: '代理类型',
+  proxyTypeNone: '无代理',
+  proxyTypeSystem: '系统代理',
+  proxyTypeManual: '手动代理',
+  serverAddress: '服务器地址',
+  serverAddressPlaceholder: '例如 127.0.0.1',
+  port: '端口号',
+  portPlaceholder: '例如 7890',
+  proxyNote: '代理设置将应用于 Cargo 和 rustup 的网络请求。',
+
+  notificationsMaster: '启用通知',
+  notificationsMasterDesc: '接收关于安装进度、更新及其他事件的桌面通知。',
+  notificationsCategories: '按类别设置通知：',
+  notifInstallProgress: '安装进度',
+  notifInstallProgressDesc: '显示软件/组件安装、卸载、升级的实时进度通知。',
+  notifSystemUpdates: '系统更新',
+  notifSystemUpdatesDesc: '功能更新、安全补丁、版本升级等相关通知。',
+  notifOperationEvents: '操作事件',
+  notifOperationEventsDesc: '用户关键操作的执行结果与状态变化通知。',
+  notifDnd: '免打扰模式',
+  notifDndDesc: '开启后通知仍会记录但不弹出提示（可在通知中心查看）。',
+  notifDefaultPriority: '默认通知优先级',
+  notifSoundEnabled: '通知音效',
+  notifSoundEnabledDesc: '收到通知时播放提示音。',
+  notifAutoCleanup: '自动清理过期通知',
+  notifAutoCleanupDesc: '自动删除超过指定时长的已读通知。',
+  notifAutoCleanupNever: '从不',
+  notifAutoCleanup30min: '30 分钟',
+  notifAutoCleanup60min: '60 分钟',
+  notifAutoCleanupCustom: '自定义',
+  minutes: '分钟',
+
+  theme: '主题',
+  themeAuto: '跟随系统',
+  themeDark: '深色',
+  themeLight: '浅色',
+  themeDesc: '选择应用的外观主题。',
+
+  // Per-item action feedback
+  saving: '保存中...',
+  saved: '已保存',
+  apply: '应用',
+  toggle: '切换',
+  switch: '切换',
+  applyProxy: '应用代理',
+
+  // Validation
+  validationPortRange: '端口号必须在 1 到 65535 之间。',
+  validationHostRequired: '手动代理需要填写服务器地址。',
+  saveError: '保存失败：{error}',
+  loading: '正在加载设置...',
+}
