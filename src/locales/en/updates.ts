@@ -43,4 +43,14 @@ export default {
     installComplete: 'Installation complete. Please restart the app to apply the update.',
     downloadFailed: 'Download failed',
   },
+  networkDiag: {
+    title: 'Network Diagnostic',
+    run: 'Run Diagnostic',
+    running: 'Running...',
+    elapsed: 'Elapsed: {ms}ms',
+    body: 'Body: {body}',
+    dns: 'DNS',
+    tcp: 'TCP',
+    http: 'HTTP',
+  },
 }

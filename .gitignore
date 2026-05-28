@@ -32,6 +32,7 @@ src-tauri/gen/
 .vscode/
 .trae/
 rules/
+.ai/
 
 # Test & coverage
 coverage/

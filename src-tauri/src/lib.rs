@@ -1,313 +1,69 @@
-mod commands;
-mod config;
-mod db;
-mod error;
-mod installer;
-mod logger;
+mod application;
+mod domain;
+mod infrastructure;
+mod interfaces;
 mod state;
-mod system;
-mod utils;
 
 use std::path::PathBuf;
 
-use commands::component::{add_component, list_components, remove_component};
-use commands::env_check::{check_env, get_versions};
-use commands::env_var::{
+use crate::infrastructure::db::{migrate_from_toml, open_or_create};
+use crate::infrastructure::logger;
+use interfaces::commands::component::{add_component, list_components, remove_component};
+use interfaces::commands::env_check::{check_env, get_versions};
+use interfaces::commands::env_var::{
     delete_env_var_meta, get_env_var, list_env_vars, remove_env_var, set_env_var,
     update_env_var_meta,
 };
-use commands::histver::{count_hist_releases, list_hist_releases, search_hist_releases, sync_hist_releases};
-use commands::locale::{LocaleScanState, get_locale, list_available_locales, set_locale};
-use commands::mirror::{
+use interfaces::commands::histver::{
+    count_hist_releases, list_hist_releases, search_hist_releases, sync_hist_releases,
+};
+use interfaces::commands::locale::{
+    LocaleScanState, get_locale, list_available_locales, set_locale,
+};
+use interfaces::commands::mirror::{
     check_crm_installed, crm_best, crm_current, crm_default, crm_list, crm_test, crm_use,
     crm_version, install_crm,
 };
-use commands::override_cmd::{get_override, list_overrides, remove_override, set_override};
-use commands::persist::{
+use interfaces::commands::notification::{
+    notification_delete_read_before, notify_count, notify_create, notify_delete, notify_delete_all,
+    notify_list, notify_mark_read, notify_mark_unread, notify_unread_count,
+};
+use interfaces::commands::override_cmd::{
+    get_override, list_overrides, remove_override, set_override,
+};
+use interfaces::commands::persist::{
     is_env_var_persisted, list_persisted_env_vars, persist_env_var, remove_persisted_env_var,
 };
-use commands::plugin::{install_plugin, list_cargo_plugins, search_plugins, uninstall_plugin};
-use commands::target::{add_target, list_targets, remove_target};
-use commands::toolchain::{
+use interfaces::commands::plugin::{
+    install_plugin, list_cargo_plugins, search_plugins, uninstall_plugin,
+};
+use interfaces::commands::settings::{get_config, get_settings, save_settings};
+use interfaces::commands::system::{
+    cancel_background_task, frontend_log, get_log_dir, install_rustup, is_background_task_running,
+    refresh_process_path, uninstall_rustup,
+};
+use interfaces::commands::target::{add_target, list_targets, remove_target};
+use interfaces::commands::toolchain::{
     install_toolchain, list_toolchains, set_default_toolchain, uninstall_toolchain,
 };
-use commands::update::{check_update, diag_network, update_all, update_rustup};
-use config::get_config;
+use interfaces::commands::update::{check_update, diag_network, update_all, update_rustup};
 use state::AppState;
-use system::env::binary_exists;
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    Emitter, Manager, WebviewUrl, WebviewWindowBuilder,
+    menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
+};
 
-/// Internal logic for refreshing process PATH and Rust-related env vars.
-fn refresh_process_path_inner() -> crate::error::AppResult<String> {
-    #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
-    let mut added: Vec<String> = Vec::new();
-
-    #[cfg(target_os = "windows")]
-    {
-        use system::env::{read_system_env_var, read_user_env_var};
-
-        let mut new_path_parts: Vec<String> = Vec::new();
-        if let Some(system_path) = read_system_env_var("Path") {
-            new_path_parts.push(system_path);
-        }
-        if let Some(user_path) = read_user_env_var("Path") {
-            new_path_parts.push(user_path);
-        }
-
-        if !new_path_parts.is_empty() {
-            let new_path = new_path_parts.join(";");
-            let old_path = std::env::var("PATH").unwrap_or_default();
-            if new_path != old_path {
-                unsafe {
-                    std::env::set_var("PATH", &new_path);
-                }
-                added.push(format!("PATH updated ({} chars)", new_path.len()));
-            }
-        }
-
-        for var_name in &["CARGO_HOME", "RUSTUP_HOME"] {
-            let current = std::env::var(var_name).ok();
-            let from_system = read_system_env_var(var_name);
-            let from_user = read_user_env_var(var_name);
-            let registry_val = from_user.or(from_system);
-            if current != registry_val {
-                if let Some(val) = &registry_val {
-                    unsafe {
-                        std::env::set_var(var_name, val);
-                    }
-                    added.push(format!("{var_name}={val}"));
-                }
-            }
-        }
-    }
-
-    if added.is_empty() {
-        Ok("No changes detected.".to_string())
-    } else {
-        Ok(format!("Updated: {}", added.join(", ")))
-    }
-}
-
-/// Refresh the current process PATH from the Windows Registry.
-#[tauri::command]
-fn refresh_process_path() -> crate::error::AppResult<String> {
-    refresh_process_path_inner()
-}
-
-/// Uninstall rustup via `rustup self uninstall`.
-#[tauri::command]
-async fn uninstall_rustup(state: tauri::State<'_, AppState>) -> crate::error::AppResult<String> {
-    use crate::utils::exec::run_command;
-
-    let (rustup, _) = db::get_binaries_config(&state.db);
-    if !binary_exists(&rustup) {
-        return Err(crate::error::AppError::Command(
-            "rustup is not installed".to_string(),
-        ));
-    }
-
-    let result = run_command(&rustup, &["self", "uninstall", "-y"], 120).await;
-    match result {
-        Ok(output) => {
-            *state.rustup_path.lock().unwrap() = None;
-            *state.cargo_path.lock().unwrap() = None;
-            Ok(output)
-        }
-        Err(e) => {
-            let err_msg = format!("{e}");
-            let is_locked = err_msg.contains("os error 32")
-                || err_msg.contains("being used")
-                || err_msg.contains("another program");
-            let is_access_denied = err_msg.contains("os error 5") || err_msg.contains("拒绝访问");
-
-            if is_locked || is_access_denied {
-                #[cfg(target_os = "windows")]
-                {
-                    let lock_processes = [
-                        "cargo",
-                        "rustc",
-                        "rust-analyzer",
-                        "rustfmt",
-                        "clippy-driver",
-                    ];
-                    for proc_name in lock_processes {
-                        let _ = tokio::process::Command::new("taskkill")
-                            .args(["/F", "/IM", &format!("{proc_name}.exe")])
-                            .stdout(std::process::Stdio::null())
-                            .stderr(std::process::Stdio::null())
-                            .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                            .status()
-                            .await;
-                    }
-                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                }
-
-                let retry = run_command(&rustup, &["self", "uninstall", "-y"], 120).await;
-                match retry {
-                    Ok(output) => {
-                        *state.rustup_path.lock().unwrap() = None;
-                        *state.cargo_path.lock().unwrap() = None;
-                        Ok(output)
-                    }
-                    Err(retry_err) => {
-                        #[cfg(target_os = "windows")]
-                        if is_access_denied {
-                            let elevated = try_elevated_uninstall(&rustup).await;
-                            match elevated {
-                                Ok(()) => {
-                                    *state.rustup_path.lock().unwrap() = None;
-                                    *state.cargo_path.lock().unwrap() = None;
-                                    return Ok("Elevated uninstall completed.".to_string());
-                                }
-                                Err(_) => return Err(retry_err),
-                            }
-                        }
-                        Err(retry_err)
-                    }
-                }
-            } else {
-                Err(e)
-            }
-        }
-    }
-}
-
-#[cfg(target_os = "windows")]
-async fn try_elevated_uninstall(rustup: &str) -> Result<(), String> {
-    // Write the PowerShell command to a temporary script file to avoid
-    // command injection via string interpolation. The rustup path is passed
-    // as a script variable rather than embedded in the command string.
-    let temp_dir = std::env::temp_dir().join("rustverse-elevated-uninstall");
-    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("failed to create temp dir: {e}"))?;
-
-    let script_path = temp_dir.join("uninstall.ps1");
-    let script_content = format!(
-        "$rustupPath = '{escaped}'\nStart-Process -FilePath $rustupPath -ArgumentList 'self','uninstall','-y' -Verb RunAs -Wait",
-        escaped = rustup.replace("'", "''")
-    );
-    std::fs::write(&script_path, &script_content)
-        .map_err(|e| format!("failed to write script: {e}"))?;
-
-    // IMPORTANT: Do NOT use -NonInteractive here. PowerShell in non-interactive
-    // mode conflicts with -Verb RunAs — the UAC dialog may fail to appear,
-    // causing PowerShell to hang indefinitely waiting for a prompt the user
-    // never sees. -NoProfile alone is safe (skips profile load, ~fast startup).
-    // Using -ExecutionPolicy Bypass to avoid script execution policy blocking.
-    let output = tokio::process::Command::new("powershell.exe")
-        .args([
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            &script_path.to_string_lossy(),
-        ])
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
-        .output()
-        .await
-        .map_err(|e| format!("failed to launch elevated process: {e}"))?;
-
-    // Clean up the temporary script
-    let _ = std::fs::remove_file(&script_path);
-    let _ = std::fs::remove_dir(&temp_dir);
-
-    if output.status.success() {
-        Ok(())
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        Err(format!("elevated uninstall failed: {stderr}"))
-    }
-}
-
-/// Install rustup using the official installer with streaming output.
-#[tauri::command]
-async fn install_rustup(app: tauri::AppHandle) -> crate::error::AppResult<()> {
-    let log = logger::logger();
-    log.info("install", "Install rustup requested");
-
-    // Refresh PATH first to detect any partially-completed installations
-    let _ = refresh_process_path_inner();
-
-    // Block installation only when both rustup and cargo are *functionally* available.
-    // Using `binary_exists` is insufficient after uninstall because residual files
-    // may remain on disk (e.g. ~/.cargo/bin/rustup.exe) while the toolchain is
-    // actually broken. We verify by running `--version` instead.
-    let rustup_ok = is_binary_functional("rustup").await;
-    let cargo_ok = is_binary_functional("cargo").await;
-
-    if rustup_ok && cargo_ok {
-        log.info(
-            "install",
-            "rustup and cargo are already installed, aborting",
-        );
-        return Err(crate::error::AppError::Command(
-            "rustup and cargo are already installed".to_string(),
-        ));
-    }
-
-    log.info("install", "Starting rustup installation...");
-
-    #[cfg(target_os = "windows")]
-    {
-        let result = install_rustup_windows(app).await;
-        match &result {
-            Ok(()) => log.info("install", "Rustup installation completed successfully"),
-            Err(e) => log.error("install", &format!("Rustup installation failed: {e}")),
-        }
-        result
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        let result = install_rustup_unix(app).await;
-        match &result {
-            Ok(()) => log.info("install", "Rustup installation completed successfully"),
-            Err(e) => log.error("install", &format!("Rustup installation failed: {e}")),
-        }
-        result
-    }
-}
-
-/// Check whether a binary is functionally available by running `<name> --version`.
-/// Returns `true` only if the command executes successfully.
-async fn is_binary_functional(name: &str) -> bool {
-    let mut cmd = tokio::process::Command::new(name);
-    cmd.arg("--version");
-    #[cfg(windows)]
-    {
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
-    tokio::time::timeout(std::time::Duration::from_secs(5), cmd.output())
-        .await
-        .map(|result| result.map(|o| o.status.success()).unwrap_or(false))
-        .unwrap_or(false)
-}
-
-#[cfg(target_os = "windows")]
-async fn install_rustup_windows(app: tauri::AppHandle) -> crate::error::AppResult<()> {
-    // Ensure installer is available (cached or downloaded) and verified
-    let installer_path = installer::ensure_installer(&app).await?;
-
-    // Execute the installer
-    installer::execute_installer(app, &installer_path).await?;
-
-    // Refresh process PATH so that newly installed rustup/cargo can be found
-    let _ = refresh_process_path_inner();
-
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-async fn install_rustup_unix(app: tauri::AppHandle) -> crate::error::AppResult<()> {
-    // Ensure installer is available (cached or downloaded) and verified
-    let installer_path = installer::ensure_installer(&app).await?;
-
-    // Execute the installer
-    installer::execute_installer(app, &installer_path).await?;
-
-    // Refresh process PATH so that newly installed rustup/cargo can be found
-    let _ = refresh_process_path_inner();
-
-    Ok(())
+macro_rules! dual_log {
+    ($log:expr, $level:expr, $module:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
+        let msg = format!($fmt $(, $arg)*);
+        eprintln!("[{}] {}", $module, msg);
+        $log.info($module, &msg);
+    }};
+    ($log:expr, $level:expr, $module:expr, $fmt:expr) => {{
+        eprintln!("[{}] {}", $module, $fmt);
+        $log.info($module, $fmt);
+    }};
 }
 
 /// Get the WebView2 user data directory path.
@@ -379,7 +135,7 @@ fn try_migrate_from_toml(db: &redb::Database) {
         return;
     }
 
-    match db::migrate_from_toml(db, &toml_path) {
+    match migrate_from_toml(db, &toml_path) {
         Ok(true) => {
             let migrated = exe_dir.join("config.toml.migrated");
             let _ = std::fs::rename(&toml_path, &migrated);
@@ -390,28 +146,42 @@ fn try_migrate_from_toml(db: &redb::Database) {
     }
 }
 
-/// Get the log directory path for the frontend.
-#[tauri::command]
-fn get_log_dir() -> String {
-    logger::logger().log_dir().to_string_lossy().to_string()
-}
+/// Run notification auto-cleanup based on user settings.
+///
+/// Reads `auto_cleanup_minutes` from persisted settings. If > 0, deletes all
+/// read notifications older than the configured threshold and emits a
+/// `notification:cleanup` event so the frontend can refresh.
+fn run_notification_cleanup(
+    store: &dyn crate::domain::repository::DataStore,
+    app: &tauri::AppHandle,
+) {
+    // Read settings to get auto_cleanup_minutes
+    let minutes = match store.get_settings() {
+        Some(json) => serde_json::from_str::<crate::domain::settings::UserSettings>(&json)
+            .map(|s| s.notifications.auto_cleanup_minutes)
+            .unwrap_or(0),
+        None => 0,
+    };
 
-/// Write a log message from the frontend to the backend log file.
-#[tauri::command]
-fn frontend_log(level: String, module: String, message: String) {
-    logger::logger().log(&level, &module, &message);
-}
+    if minutes == 0 {
+        return; // Auto-cleanup disabled
+    }
 
-macro_rules! dual_log {
-    ($log:expr, $level:expr, $module:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
-        let msg = format!($fmt $(, $arg)*);
-        eprintln!("[{}] {}", $module, msg);
-        $log.log($level, $module, &msg);
-    }};
-    ($log:expr, $level:expr, $module:expr, $fmt:expr) => {{
-        eprintln!("[{}] {}", $module, $fmt);
-        $log.log($level, $module, $fmt);
-    }};
+    let cutoff_ms = crate::domain::base::time::chrono_now_ms() - (minutes as i64) * 60 * 1000;
+
+    match store.notification_delete_read_before(cutoff_ms) {
+        Ok(deleted) if deleted > 0 => {
+            eprintln!(
+                "[cleanup] Auto-deleted {deleted} expired read notifications (threshold: {minutes} min)"
+            );
+            // Notify frontend to refresh notification list
+            let _ = app.emit("notification:cleanup", deleted);
+        }
+        Ok(_) => {} // No expired notifications
+        Err(e) => {
+            eprintln!("[cleanup] Failed to auto-delete expired notifications: {e}");
+        }
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -426,7 +196,7 @@ pub fn run() {
 
     let db_path = get_db_path();
     dual_log!(log, "INFO", "startup", "Database path: {:?}", db_path);
-    let db = db::open_or_create(&db_path).unwrap_or_else(|e| {
+    let db = open_or_create(&db_path).unwrap_or_else(|e| {
         dual_log!(
             log,
             "ERROR",
@@ -442,6 +212,12 @@ pub fn run() {
     try_migrate_from_toml(&db);
 
     let app_state = AppState::new(db);
+
+    // Initialize the proxy resolver so that any subprocess execution
+    // (run_command, run_command_with_cancel, etc.) can resolve proxy
+    // settings from user preferences without panicking.
+    crate::infrastructure::proxy::init_proxy_resolver_with_store(app_state.store.clone());
+
     let locale_scan_state = LocaleScanState::new();
     let webview_data_dir = get_webview_data_dir();
 
@@ -487,6 +263,57 @@ pub fn run() {
                 app.handle()
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
             }
+
+            // ── System Tray ──
+            let quit = MenuItem::with_id(app, "quit", "退出 RustVerse", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
+            let tray_menu = Menu::with_items(app, &[&show, &quit])?;
+
+            let tray_icon = app.default_window_icon().cloned();
+
+            let _tray = TrayIconBuilder::new()
+                .icon(tray_icon.unwrap())
+                .menu(&tray_menu)
+                .show_menu_on_left_click(true)
+                .tooltip("RustVerse")
+                .on_menu_event(move |app, event| match event.id().0.as_str() {
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.unminimize();
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    _ => {}
+                })
+                .build(app)?;
+
+            // ── Close-to-tray handler ──
+            if let Some(window) = app.get_webview_window("main") {
+                let app_handle = app.handle().clone();
+                let window_for_event = window.clone();
+                let _ = window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        let state = app_handle.state::<AppState>();
+                        let should_minimize = match (&*state.store).get_settings() {
+                            Some(json) => {
+                                serde_json::from_str::<crate::domain::settings::UserSettings>(&json)
+                                    .map(|s| s.minimize_to_tray)
+                                    .unwrap_or(false)
+                            }
+                            None => false,
+                        };
+                        if should_minimize {
+                            api.prevent_close();
+                            let _ = window_for_event.hide();
+                        }
+                    }
+                });
+            }
+
             #[cfg(debug_assertions)]
             {
                 // DevTools auto-open disabled — use pnpm tauri dev for debugging
@@ -495,6 +322,22 @@ pub fn run() {
             }
             eprintln!("[setup] Tauri setup completed");
             log_for_setup.info("setup", "Tauri setup completed");
+
+            // ── Start periodic notification auto-cleanup task ──
+            {
+                let app_handle = app.handle().clone();
+                let store = app_handle.state::<AppState>().store.clone();
+                std::thread::spawn(move || {
+                    // Initial cleanup on startup
+                    run_notification_cleanup(&*store, &app_handle);
+                    // Then every 5 minutes
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_secs(5 * 60));
+                        run_notification_cleanup(&*store, &app_handle);
+                    }
+                });
+            }
+
             Ok(())
         })
         .plugin(tauri_plugin_shell::init())
@@ -508,6 +351,8 @@ pub fn run() {
             frontend_log,
             uninstall_rustup,
             install_rustup,
+            cancel_background_task,
+            is_background_task_running,
             get_versions,
             get_config,
             list_toolchains,
@@ -558,9 +403,44 @@ pub fn run() {
             list_hist_releases,
             search_hist_releases,
             count_hist_releases,
+            // Settings
+            get_settings,
+            save_settings,
+            // Notifications
+            notify_list,
+            notify_count,
+            notify_create,
+            notify_delete,
+            notify_delete_all,
+            notify_mark_read,
+            notify_mark_unread,
+            notify_unread_count,
+            notification_delete_read_before,
         ])
         .manage(app_state)
         .manage(locale_scan_state)
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let state = window.state::<AppState>();
+                // Check minimize_to_tray setting
+                let should_minimize = (&*state.store)
+                    .get_settings()
+                    .and_then(|json| {
+                        serde_json::from_str::<crate::domain::settings::UserSettings>(&json).ok()
+                    })
+                    .map(|s| s.minimize_to_tray)
+                    .unwrap_or(false);
+
+                if should_minimize {
+                    api.prevent_close();
+                    // Hide to tray — hide the window (tray icon is managed by tauri.conf.json)
+                    if let Some(w) = window.get_webview_window("main") {
+                        w.hide().ok();
+                    }
+                }
+                // Otherwise allow default close behavior
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

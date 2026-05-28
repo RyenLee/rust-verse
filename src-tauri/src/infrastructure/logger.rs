@@ -89,7 +89,7 @@ fn should_log(level: LogLevel) -> bool {
 
 /// A simple file logger with log rotation.
 ///
-/// Writes structured log lines to a file in the `logs/` directory (sibling of `data/`).
+/// Writes structured log lines to a file in the `logs/` directory.
 /// When the current log file exceeds `MAX_LOG_SIZE`, it is rotated
 /// (renamed to `.1`, `.2`, etc.) and a new file is created.
 pub struct FileLogger {
@@ -98,7 +98,7 @@ pub struct FileLogger {
 }
 
 impl FileLogger {
-    /// Create a new logger that writes to `data/logs/rustverse.log`.
+    /// Create a new logger that writes to `logs/rustverse.log`.
     fn init() -> Self {
         let log_dir = get_log_dir();
         fs::create_dir_all(&log_dir).ok();
@@ -195,13 +195,19 @@ impl FileLogger {
         );
     }
 
+    /// Log from string level (for Tauri frontend_log command).
+    pub fn log_from_str(&self, level: &str, module: &str, message: &str) {
+        let log_level = LogLevel::from_str(level).unwrap_or(LogLevel::Info);
+        self.log(log_level, module, message);
+    }
+
     /// Get the log directory path (for frontend to display).
     pub fn log_dir(&self) -> &PathBuf {
         &self.log_dir
     }
 }
 
-/// Get the log directory: `<exe_dir>/logs/` (sibling of `data/`).
+/// Get the log directory: `<exe_dir>/logs/`.
 fn get_log_dir() -> PathBuf {
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(parent) = exe_path.parent() {

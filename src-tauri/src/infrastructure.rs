@@ -11,5 +11,6 @@ pub mod installer;
 pub mod json_store;
 pub mod logger;
 pub mod notifier;
+pub mod pool;
 pub mod proxy;
 pub mod system;

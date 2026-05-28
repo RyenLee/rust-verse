@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { open } from '@tauri-apps/plugin-shell'
 import { invoke } from '@tauri-apps/api/core'
 import { useStore } from '../store'
 import BaseButton from '../components/BaseButton.vue'
@@ -11,7 +10,6 @@ import { useAppUpdater } from '../composables/useAppUpdater'
 
 const { t } = useI18n()
 const store = useStore()
-const PROJECT_URL = 'https://github.com/RyenLee/rust-verse'
 const {
   checking: appChecking,
   update: appUpdate,
@@ -69,10 +67,6 @@ function closeProgress() {
   if (downloadPhase.value === 'success' || downloadPhase.value === 'error') {
     resetAppUpdater()
   }
-}
-
-function openHomepage() {
-  open(PROJECT_URL)
 }
 
 // Network diagnostic
@@ -166,16 +160,6 @@ watch(downloadPhase, async phase => {
         </div>
       </div>
 
-      <!-- Project links -->
-      <a
-        class="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors cursor-pointer"
-        @click.prevent="openHomepage"
-      >
-        <iconify-icon icon="mdi:github" width="18" class="shrink-0"></iconify-icon>
-        <span>{{ t('about.homepage') }}</span>
-        <iconify-icon icon="mdi:open-in-new" width="14" class="ml-auto shrink-0"></iconify-icon>
-      </a>
-
       <!-- Network error banner -->
       <div
         v-if="checkError"
@@ -204,10 +188,10 @@ watch(downloadPhase, async phase => {
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <iconify-icon icon="mdi:network-outline" width="18" class="text-gray-500"></iconify-icon>
-            <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Network Diagnostic</h3>
+            <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('updates.networkDiag.title') }}</h3>
           </div>
           <BaseButton variant="secondary" :loading="diagRunning" @click="runDiag">
-            {{ diagRunning ? 'Running...' : 'Run Diagnostic' }}
+            {{ diagRunning ? t('updates.networkDiag.running') : t('updates.networkDiag.run') }}
           </BaseButton>
         </div>
 
@@ -216,7 +200,7 @@ watch(downloadPhase, async phase => {
           v-if="diagResult"
           class="space-y-2 text-xs font-mono bg-gray-100 dark:bg-gray-900 rounded p-3 max-h-48 overflow-y-auto"
         >
-          <p class="text-gray-600 dark:text-gray-400">Elapsed: {{ diagResult.elapsed_ms }}ms</p>
+          <p class="text-gray-600 dark:text-gray-400">{{ t('updates.networkDiag.elapsed', { ms: diagResult.elapsed_ms }) }}</p>
           <p
             :class="
               diagResult.dns.startsWith('OK') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
@@ -237,9 +221,6 @@ watch(downloadPhase, async phase => {
             "
           >
             HTTP: {{ diagResult.http }}
-          </p>
-          <p v-if="diagResult.http_body" class="text-gray-500 dark:text-gray-500 break-all">
-            Body: {{ diagResult.http_body }}
           </p>
         </div>
         <p v-if="diagError" class="text-sm text-red-600 dark:text-red-400">{{ diagError }}</p>

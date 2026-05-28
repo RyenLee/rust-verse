@@ -334,8 +334,4 @@ pub fn build_app_config_from_db(repo: &dyn crate::domain::repository::DataStore)
     }
 }
 
-/// Tauri command to expose the current config to the frontend.
-#[tauri::command]
-pub fn get_config(state: tauri::State<'_, crate::state::AppState>) -> AppConfig {
-    build_app_config_from_db(&*state.store)
-}
+

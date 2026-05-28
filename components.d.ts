@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    BackgroundTaskOverlay: typeof import('./src/components/BackgroundTaskOverlay.vue')['default']
     BaseButton: typeof import('./src/components/BaseButton.vue')['default']
     ConfirmDialog: typeof import('./src/components/ConfirmDialog.vue')['default']
     DatePicker: typeof import('./src/components/DatePicker.vue')['default']

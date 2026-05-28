@@ -53,10 +53,20 @@ const router = createRouter({
       name: 'mirrors',
       component: () => import('@/views/MirrorView.vue'),
     },
-  {
+    {
       path: '/about',
       name: 'about',
       component: () => import('@/views/AppUpdateView.vue'),
+    },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('@/views/SettingsView.vue'),
+    },
+    {
+      path: '/notifications',
+      name: 'notifications',
+      component: () => import('@/views/NotificationCenter.vue'),
     },
   ],
 })

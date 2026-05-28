@@ -323,10 +323,86 @@ pub async fn ensure_installer(app: &AppHandle) -> AppResult<PathBuf> {
     ))
 }
 
+/// Execute the rustup installer (simple wrapper without cancel support).
+pub async fn execute_installer(app: AppHandle, installer_path: &Path) -> AppResult<()> {
+    install_log(&app, "Running installer...");
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut child = tokio::process::Command::new(installer_path)
+            .args(["-y", "--default-toolchain", "stable"])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .spawn()
+            .map_err(|e| AppError::Command(format!("failed to spawn installer: {e}")))?;
+
+        let status = child
+            .wait()
+            .await
+            .map_err(|e| AppError::Command(format!("installer wait failed: {e}")))?;
+
+        if status.success() {
+            Ok(())
+        } else {
+            Err(AppError::Command(format!(
+                "installer exited with code {}",
+                status.code().unwrap_or(-1)
+            )))
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(installer_path)
+                .map_err(|e| AppError::Command(format!("failed to read installer metadata: {e}")))?
+                .permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(installer_path, perms).map_err(|e| {
+                AppError::Command(format!("failed to set installer permissions: {e}"))
+            })?;
+        }
+
+        let is_script = installer_path.extension().is_some_and(|ext| ext == "sh");
+        let mut child = if is_script {
+            tokio::process::Command::new("sh")
+                .args([
+                    &installer_path.to_string_lossy(),
+                    "-y",
+                    "--default-toolchain",
+                    "stable",
+                ])
+                .spawn()
+                .map_err(|e| AppError::Command(format!("failed to spawn installer: {e}")))?
+        } else {
+            tokio::process::Command::new(installer_path)
+                .args(["-y", "--default-toolchain", "stable"])
+                .spawn()
+                .map_err(|e| AppError::Command(format!("failed to spawn installer: {e}")))?
+        };
+
+        let status = child
+            .wait()
+            .await
+            .map_err(|e| AppError::Command(format!("installer wait failed: {e}")))?;
+
+        if status.success() {
+            Ok(())
+        } else {
+            Err(AppError::Command(format!(
+                "installer exited with code {}",
+                status.code().unwrap_or(-1)
+            )))
+        }
+    }
+}
+
 /// Execute the rustup installer with cancel support.
 ///
 /// Polls `cancel_flag` every 500ms and terminates the installer
 /// process if cancellation is requested.
+#[allow(dead_code)]
 pub async fn execute_installer_with_cancel(
     app: AppHandle,
     installer_path: &Path,

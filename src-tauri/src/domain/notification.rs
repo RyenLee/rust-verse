@@ -175,6 +175,7 @@ impl NotificationsConfig {
 /// `src/locales/{lang}/notifications.ts`.  Adding a new language only
 /// requires creating a new locale file — no Rust code changes needed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum NotificationKey {
     ToolchainInstalled,
     ToolchainUninstalled,

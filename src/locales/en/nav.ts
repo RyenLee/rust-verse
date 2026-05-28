@@ -17,5 +17,7 @@ export default {
     extend: 'Extensions',
     system: 'System',
   },
+  settings: 'Settings',
+  notifications: 'Notifications',
   appUpdate: 'App Update',
 }

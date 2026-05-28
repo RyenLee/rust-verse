@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { listen } from '@tauri-apps/api/event'
-import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
+import { onMounted, onBeforeUnmount, onActivated, onDeactivated, ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '../components/BaseButton.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
-import ListItem from '../components/ListItem.vue'
 import PageLayout from '../components/PageLayout.vue'
 import ProgressDialog from '../components/ProgressDialog.vue'
 import SearchInput from '../components/SearchInput.vue'
@@ -14,14 +13,17 @@ import StatusBadge from '../components/StatusBadge.vue'
 import { useRustup } from '../composables/useRustup'
 import { useDataRefresh } from '../composables/useDataRefresh'
 import { useToolchainOptions } from '../composables/useToolchainOptions'
-import { useResponsiveListHeight } from '../composables/useResponsiveListHeight'
+import { useBackgroundTask } from '../composables/useBackgroundTask'
+import { useToast } from '../composables/useToast'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const toast = useToast()
 const { installToolchain: doInstall, uninstallToolchain: doUninstall, setDefaultToolchain: doSetDefault } = useRustup()
 const { notifyToolchainChange, onToolchainChange } = useDataRefresh()
 const { toolchains, loading, refresh } = useToolchainOptions()
+const bgTask = useBackgroundTask()
 const installing = ref(false)
 const installLogs = ref<string[]>([])
 const installStatus = ref<'running' | 'success' | 'error'>('running')
@@ -30,9 +32,6 @@ const showProgress = ref(false)
 const newChannel = ref('stable')
 const confirmUninstall = ref<string | null>(null)
 const searchQuery = ref('')
-
-// Responsive list height: filters area has SearchInput
-const { listHeight } = useResponsiveListHeight({ filters: 56 })
 
 const filteredToolchains = computed(() => {
   const query = searchQuery.value.toLowerCase().trim()
@@ -61,19 +60,25 @@ watch(
 )
 
 async function installToolchain() {
+  if (!(await bgTask.guardStart())) {
+    return
+  }
+  bgTask.startTask(t('toolchains.progress.title'))
   installing.value = true
   installLogs.value = []
   installStatus.value = 'running'
   showProgress.value = true
+  showInstallPanel.value = false
   try {
     await doInstall(newChannel.value)
     installStatus.value = 'success'
-    showInstallPanel.value = false
+    bgTask.finishTask('completed')
     notifyToolchainChange()
     await refresh()
-  } catch (e) {
+  } catch (e: any) {
     installStatus.value = 'error'
-    installLogs.value.push(`Error: ${e}`)
+    installLogs.value.push(`Error: ${e?.message || e?.toString?.() || String(e)}`)
+    bgTask.finishTask('failed')
   } finally {
     installing.value = false
   }
@@ -106,7 +111,31 @@ function openInstallPanel() {
 }
 
 function closeProgress() {
+  // Don't call reset() here — the background task manages its own lifecycle.
+  // finishTask auto-resets after 3s display period.
+  // If the user hides the dialog, the overlay (if minimized) stays visible.
   showProgress.value = false
+}
+
+function cancelInstall() {
+  bgTask.requestCancel()
+  installStatus.value = 'error'
+  installLogs.value.push(t('toolchains.progress.cancelled'))
+  toast.info(t('toolchains.progress.cancelled'))
+  if (!showProgress.value) {
+    showProgress.value = true
+  }
+}
+
+function minimizeInstall() {
+  bgTask.minimize(
+    () => {
+      showProgress.value = false
+    },
+    () => {
+      showProgress.value = true
+    }
+  )
 }
 
 function goToHistoryVersions() {
@@ -122,6 +151,7 @@ onToolchainChange(() => refresh())
 onMounted(async () => {
   unlistenLog = await listen<string>('install-log', event => {
     installLogs.value.push(event.payload)
+    bgTask.appendLine(event.payload)
   })
   unlistenFinish = await listen('install-finished', () => {
     installing.value = false
@@ -131,6 +161,21 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   unlistenLog?.()
   unlistenFinish?.()
+})
+
+let progressWasVisible = false
+
+onDeactivated(() => {
+  progressWasVisible = showProgress.value
+  showInstallPanel.value = false
+  showProgress.value = false
+})
+
+onActivated(() => {
+  if (progressWasVisible || bgTask.state.status === 'running') {
+    showProgress.value = true
+    progressWasVisible = false
+  }
 })
 </script>
 
@@ -156,35 +201,57 @@ onBeforeUnmount(() => {
 
     <div v-if="loading" class="text-gray-500 dark:text-gray-400">{{ t('common.status.loading') }}</div>
 
-    <div v-else :style="{ maxHeight: listHeight }" class="overflow-y-auto scroll-container space-y-2 rounded-lg">
-      <ListItem
-        v-for="tc in filteredToolchains"
-        :key="tc.name"
-        :title="tc.name"
-        :active="tc.is_default || tc.is_active"
-      >
-        <template #badges>
-          <StatusBadge v-if="tc.is_default" type="default" :label="t('common.status.default')" />
-          <StatusBadge v-if="tc.is_active" type="active" :label="t('common.status.active')" />
-          <StatusBadge type="installed" :label="tc.channel" />
-        </template>
-        <template #actions>
-          <button
-            v-if="!tc.is_default"
-            class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 px-3 py-1.5 rounded transition-colors"
-            @click="setDefault(tc.name)"
-          >
-            {{ t('toolchains.action.setDefault') }}
-          </button>
-          <button
-            v-if="!tc.is_default"
-            class="text-xs bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900 dark:hover:bg-red-800 dark:text-red-300 px-3 py-1.5 rounded transition-colors"
-            @click="confirmUninstall = tc.name"
-          >
-            {{ t('common.action.uninstall') }}
-          </button>
-        </template>
-      </ListItem>
+    <div v-else class="overflow-y-auto scroll-container rounded-lg pr-1">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div
+          v-for="tc in filteredToolchains"
+          :key="tc.name"
+          class="relative rounded-xl border p-4 transition-all hover:shadow-md"
+          :class="[
+            tc.is_default
+              ? 'border-sky-500/50 bg-sky-50 dark:bg-sky-900/15 ring-1 ring-sky-500/20'
+              : tc.is_active
+              ? 'border-green-500/40 bg-green-50 dark:bg-green-900/10'
+              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600',
+          ]"
+        >
+          <div class="flex items-start justify-between gap-3 mb-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 mb-1">
+                <span
+                  class="w-2 h-2 rounded-full shrink-0"
+                  :class="tc.is_default ? 'bg-sky-500' : tc.is_active ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'"
+                />
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{{ tc.name }}</h3>
+              </div>
+              <p class="text-xs text-gray-500 dark:text-gray-400">{{ tc.channel }}</p>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <StatusBadge v-if="tc.is_default" type="default" :label="t('common.status.default')" />
+              <StatusBadge v-if="tc.is_active && !tc.is_default" type="active" :label="t('common.status.active')" />
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              v-if="!tc.is_default"
+              class="flex-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 px-3 py-1.5 rounded-lg transition-colors"
+              @click="setDefault(tc.name)"
+            >
+              {{ t('toolchains.action.setDefault') }}
+            </button>
+            <button
+              v-if="!tc.is_default"
+              class="flex-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-400 px-3 py-1.5 rounded-lg transition-colors"
+              @click="confirmUninstall = tc.name"
+            >
+              {{ t('common.action.uninstall') }}
+            </button>
+            <div v-if="tc.is_default" class="flex-1 text-xs text-gray-400 dark:text-gray-500 text-center py-1.5">
+              {{ t('common.status.default') }}
+            </div>
+          </div>
+        </div>
+      </div>
 
       <EmptyState
         v-if="filteredToolchains.length === 0 && toolchains.length > 0"
@@ -271,6 +338,8 @@ onBeforeUnmount(() => {
       "
       :lines="installLogs"
       @close="closeProgress"
+      @cancel="cancelInstall"
+      @minimize="minimizeInstall"
     />
   </PageLayout>
 </template>

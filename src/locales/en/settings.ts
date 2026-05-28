@@ -61,6 +61,7 @@ export default {
   // Validation
   validationPortRange: 'Port must be between 1 and 65535.',
   validationHostRequired: 'Host address is required for manual proxy.',
+  validationPortRequired: 'Host address specified but port is missing.',
   saveError: 'Failed to save: {error}',
   loading: 'Loading settings...',
 }

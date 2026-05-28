@@ -7,4 +7,3 @@ pub mod env_check;
 pub mod env_var;
 pub mod locale;
 pub mod persist;
-pub mod rustup;

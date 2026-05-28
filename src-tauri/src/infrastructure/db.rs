@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use redb::{Database, ReadableDatabase, ReadableTableMetadata, TableDefinition, WriteTransaction};
+use redb::{Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition, WriteTransaction};
 
 use crate::domain::config_keys::keys;
 use crate::infrastructure::config::EnvVarEntryConfig;
@@ -19,6 +19,12 @@ const PLUGINS: TableDefinition<&str, &[u8]> = TableDefinition::new("config_plugi
 
 /// Environment variable metadata entries.
 const ENV_VARS: TableDefinition<&str, &[u8]> = TableDefinition::new("config_env_vars");
+
+/// Notification records — maps u64 ID → JSON payload.
+const NOTIFICATIONS: TableDefinition<u64, &[u8]> = TableDefinition::new("notifications");
+
+/// Notification auto-increment counter (single key "next_id" → u64).
+const NOTIF_COUNTER: TableDefinition<&str, u64> = TableDefinition::new("notif_counter");
 
 // ---------------------------------------------------------------------------
 // Database lifecycle
@@ -830,42 +836,52 @@ use crate::domain::repository::{
 
 /// Concrete redb-backed implementation of all repository traits.
 ///
-/// Wraps a single `db::Database` handle inside an `Arc`.  Created once in
-/// `lib.rs` and shared via `Arc<dyn DataStore>` throughout the application.
+/// Uses a `MultiDbRegistry` connection pool to obtain the database handle,
+/// enabling future multi-datasource support (e.g. adding SQLite, cache stores).
+/// Created once in `lib.rs` and shared via `Arc<dyn DataStore>` throughout the application.
 #[derive(Clone)]
 pub struct RedbDataStore {
-    db: Arc<redb::Database>,
+    db_registry: Arc<crate::infrastructure::pool::MultiDbRegistry>,
 }
 
 impl RedbDataStore {
-    /// Open or create the database at `path` and seed defaults.
-    pub fn open(path: &std::path::Path) -> Result<Self, redb::Error> {
-        let db = open_or_create(path)?;
-        Ok(Self { db: Arc::new(db) })
+    /// Create a store from a connection pool registry.
+    pub fn from_registry(db_registry: Arc<crate::infrastructure::pool::MultiDbRegistry>) -> Self {
+        Self { db_registry }
     }
 
-    /// Create a store from an already-open database handle.
-    pub fn from_db(db: redb::Database) -> Self {
-        Self { db: Arc::new(db) }
+    /// Create a store from an already-open database handle (legacy convenience method).
+    /// Internally creates a single-pool registry wrapping the given database.
+    pub fn from_db(db: Arc<redb::Database>) -> Self {
+        use crate::infrastructure::pool::{MultiDbRegistry, RedbPool};
+        let registry = Arc::new(MultiDbRegistry::new());
+        registry.register_config_pool(Arc::new(RedbPool::new("config", db)));
+        Self { db_registry: registry }
     }
 
-    /// Access the underlying database handle (for internal migration use).
-    pub fn inner_db(&self) -> &redb::Database {
-        &self.db
+    /// Access the underlying database handle via the pool.
+    #[allow(dead_code)]
+    pub fn inner_db(&self) -> Arc<redb::Database> {
+        self.db_registry.config_db().expect("config pool not registered")
+    }
+
+    /// Get the database handle for internal repository operations.
+    fn db(&self) -> Arc<redb::Database> {
+        self.db_registry.config_db().expect("config pool not registered")
     }
 }
 
 impl ConfigRepository for RedbDataStore {
     fn get_config(&self, key: &str) -> Option<String> {
-        get_simple(&self.db, key)
+        get_simple(&*self.db(), key)
     }
 
     fn set_config(&self, key: &str, value: &str) -> Result<(), RepositoryError> {
-        set_simple(&self.db, key, value).map_err(|e| RepositoryError::Database(e.to_string()))
+        set_simple(&*self.db(), key, value).map_err(|e| RepositoryError::Database(e.to_string()))
     }
 
     fn get_config_batch(&self, keys: &[&str]) -> std::collections::HashMap<String, String> {
-        get_simple_batch(&self.db, keys)
+        get_simple_batch(&*self.db(), keys)
     }
 }
 
@@ -874,7 +890,7 @@ impl EnvVarRepository for RedbDataStore {
         &self,
     ) -> std::collections::HashMap<String, std::collections::HashMap<String, EnvVarEntryConfig>>
     {
-        get_env_vars(&self.db)
+        get_env_vars(&*self.db())
     }
 
     fn set_env_var_meta(
@@ -883,50 +899,266 @@ impl EnvVarRepository for RedbDataStore {
         name: &str,
         entry: &EnvVarEntryConfig,
     ) -> Result<(), RepositoryError> {
-        set_env_var_entry(&self.db, category, name, entry)
+        set_env_var_entry(&*self.db(), category, name, entry)
             .map_err(|e| RepositoryError::Database(e.to_string()))
     }
 
     fn delete_env_var_meta(&self, category: &str, name: &str) -> Result<bool, RepositoryError> {
-        delete_env_var_entry(&self.db, category, name)
+        delete_env_var_entry(&*self.db(), category, name)
             .map_err(|e| RepositoryError::Database(e.to_string()))
     }
 }
 
 impl PluginRepository for RedbDataStore {
     fn get_plugin_names(&self) -> Vec<String> {
-        get_plugin_names(&self.db)
+        get_plugin_names(&*self.db())
     }
 
     fn set_plugin_names(&self, names: &[String]) -> Result<(), RepositoryError> {
-        set_plugin_names(&self.db, names).map_err(|e| RepositoryError::Database(e.to_string()))
+        set_plugin_names(&*self.db(), names).map_err(|e| RepositoryError::Database(e.to_string()))
     }
 }
 
 impl SettingsRepository for RedbDataStore {
     fn get_settings(&self) -> Option<String> {
-        get_settings_json(&self.db)
+        get_settings_json(&*self.db())
     }
 
     fn set_settings(&self, json: &str) -> Result<(), RepositoryError> {
-        set_settings_json(&self.db, json).map_err(|e| RepositoryError::Database(e.to_string()))
+        set_settings_json(&*self.db(), json).map_err(|e| RepositoryError::Database(e.to_string()))
     }
 }
 
+// ---------------------------------------------------------------------------
+// Notification CRUD (infrastructure layer — DB operations for notifications)
+// ---------------------------------------------------------------------------
+
+use crate::domain::base::time::chrono_now_ms;
+use crate::domain::notification::{NewNotification, Notification};
+
+/// Ensure the notifications table exists (no-op in redb — tables are created on first use).
+#[allow(dead_code)]
+pub fn notification_ensure_table(_db: &Database) -> Result<(), String> {
+    Ok(())
+}
+
+/// Insert a new notification, assigning an auto-increment ID.
+pub fn insert_notification(db: &Database, new: &NewNotification) -> Result<u64, String> {
+    let write_tx = db.begin_write().map_err(|e| e.to_string())?;
+    {
+        let mut counter_table = write_tx
+            .open_table(NOTIF_COUNTER)
+            .map_err(|e| e.to_string())?;
+        let next_id = counter_table
+            .get("next_id")
+            .map_err(|e| e.to_string())?
+            .map(|g| g.value())
+            .unwrap_or(1);
+
+        let notification = Notification {
+            id: next_id,
+            category: new.category.clone(),
+            priority: new.priority.clone(),
+            title: new.title.clone(),
+            body: new.body.clone(),
+            notif_key: new.notif_key.clone(),
+            params_json: new.params_json.clone(),
+            action_route: new.action_route.clone(),
+            is_read: false,
+            created_at: chrono_now_ms(),
+        };
+
+        let json = serde_json::to_string(&notification).map_err(|e| e.to_string())?;
+        let mut notif_table = write_tx
+            .open_table(NOTIFICATIONS)
+            .map_err(|e| e.to_string())?;
+        notif_table
+            .insert(next_id, json.as_bytes())
+            .map_err(|e| e.to_string())?;
+
+        counter_table
+            .insert("next_id", next_id + 1)
+            .map_err(|e| e.to_string())?;
+    }
+    write_tx.commit().map_err(|e| e.to_string())?;
+
+    // Return the assigned ID
+    let read_tx = db.begin_read().map_err(|e| e.to_string())?;
+    let counter_table = read_tx
+        .open_table(NOTIF_COUNTER)
+        .map_err(|e| e.to_string())?;
+    Ok(counter_table
+        .get("next_id")
+        .map_err(|e| e.to_string())?
+        .map(|g| g.value())
+        .unwrap_or(1)
+        - 1)
+}
+
+/// List all notifications.
+pub fn list_notifications(db: &Database) -> Result<Vec<Notification>, String> {
+    let read_tx = db.begin_read().map_err(|e| e.to_string())?;
+    let Ok(table) = read_tx.open_table(NOTIFICATIONS) else {
+        return Ok(vec![]);
+    };
+    let mut result = vec![];
+    for res in table.iter().map_err(|e| e.to_string())? {
+        let (_id, guard) = res.map_err(|e| e.to_string())?;
+        let bytes = guard.value();
+        let notif: Notification =
+            serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+        result.push(notif);
+    }
+    Ok(result)
+}
+
+/// Mark a notification as read.
+pub fn mark_read(db: &Database, id: u64) -> Result<(), String> {
+    update_notification_field(db, id, |n| n.is_read = true)
+}
+
+/// Mark a notification as unread.
+pub fn mark_unread(db: &Database, id: u64) -> Result<(), String> {
+    update_notification_field(db, id, |n| n.is_read = false)
+}
+
+/// Delete a notification by ID.
+pub fn delete_notification(db: &Database, id: u64) -> Result<(), String> {
+    let write_tx = db.begin_write().map_err(|e| e.to_string())?;
+    {
+        let mut table = write_tx
+            .open_table(NOTIFICATIONS)
+            .map_err(|e| e.to_string())?;
+        table.remove(id).map_err(|e| e.to_string())?;
+    }
+    write_tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Delete all notifications.
+pub fn delete_all_notifications(db: &Database) -> Result<(), String> {
+    let write_tx = db.begin_write().map_err(|e| e.to_string())?;
+    {
+        let mut table = write_tx
+            .open_table(NOTIFICATIONS)
+            .map_err(|e| e.to_string())?;
+        let keys: Vec<u64> = table
+            .iter()
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .map(|(k, _)| k.value())
+            .collect();
+        for key in keys {
+            table.remove(key).map_err(|e| e.to_string())?;
+        }
+    }
+    write_tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Get unread notification count.
+pub fn unread_count(db: &Database) -> Result<u64, String> {
+    let notifications = list_notifications(db)?;
+    Ok(notifications.iter().filter(|n| !n.is_read).count() as u64)
+}
+
+/// Delete all read notifications created before `cutoff_ms`.
+pub fn delete_read_before(db: &Database, cutoff_ms: i64) -> Result<u64, String> {
+    // Phase 1: collect IDs in a read transaction — no modifications so no cursor invalidation.
+    let to_delete: Vec<u64> = {
+        let read_tx = db.begin_read().map_err(|e| e.to_string())?;
+        let table = read_tx
+            .open_table(NOTIFICATIONS)
+            .map_err(|e| e.to_string())?;
+        table
+            .iter()
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .filter_map(|(k, v)| {
+                let id = k.value();
+                let bytes = v.value();
+                let notif: Notification = serde_json::from_slice(bytes).ok()?;
+                if notif.is_read && notif.created_at < cutoff_ms {
+                    Some(id)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    };
+
+    // Phase 2: delete in a separate write transaction so tree mutations don't
+    // invalidate the Phase-1 read cursor.
+    let deleted = to_delete.len() as u64;
+    if deleted == 0 {
+        return Ok(0);
+    }
+    let write_tx = db.begin_write().map_err(|e| e.to_string())?;
+    {
+        let mut table = write_tx
+            .open_table(NOTIFICATIONS)
+            .map_err(|e| e.to_string())?;
+        for id in &to_delete {
+            table.remove(*id).map_err(|e| e.to_string())?;
+        }
+    }
+    write_tx.commit().map_err(|e| e.to_string())?;
+    Ok(deleted)
+}
+
+/// Helper: update a single notification field by loading, modifying, and re-saving.
+fn update_notification_field(
+    db: &Database,
+    id: u64,
+    f: impl FnOnce(&mut Notification),
+) -> Result<(), String> {
+    // Read phase
+    let notif = {
+        let read_tx = db.begin_read().map_err(|e| e.to_string())?;
+        let table = read_tx
+            .open_table(NOTIFICATIONS)
+            .map_err(|e| e.to_string())?;
+        let guard = table.get(id).map_err(|e| e.to_string())?;
+        let Some(guard) = guard else {
+            return Err(format!("Notification {id} not found"));
+        };
+        let bytes: Vec<u8> = guard.value().to_vec();
+        serde_json::from_slice::<Notification>(&bytes).map_err(|e| e.to_string())?
+    };
+
+    // Write phase
+    let mut notif = notif;
+    f(&mut notif);
+    let json = serde_json::to_string(&notif).map_err(|e| e.to_string())?;
+    let write_tx = db.begin_write().map_err(|e| e.to_string())?;
+    {
+        let mut table = write_tx
+            .open_table(NOTIFICATIONS)
+            .map_err(|e| e.to_string())?;
+        table.insert(id, json.as_bytes()).map_err(|e| e.to_string())?;
+    }
+    write_tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Repository impls
+// ---------------------------------------------------------------------------
+
 impl NotificationRepository for RedbDataStore {
     fn notification_ensure_table(&self) -> Result<(), RepositoryError> {
-        crate::notification::ensure_table(&self.db).map_err(|e| RepositoryError::Database(e))
+        notification_ensure_table(&*self.db()).map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_insert(&self, json: &str) -> Result<u64, RepositoryError> {
-        let new: crate::notification::NewNotification = serde_json::from_str(json)
+        let new: crate::domain::notification::NewNotification = serde_json::from_str(json)
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
-        crate::notification::insert_notification(&self.db, &new)
+        insert_notification(&*self.db(), &new)
             .map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_list(&self) -> Result<Vec<(u64, String)>, RepositoryError> {
-        crate::notification::list_notifications(&self.db)
+        list_notifications(&*self.db())
             .map(|list| {
                 list.into_iter()
                     .map(|n| {
@@ -939,29 +1171,29 @@ impl NotificationRepository for RedbDataStore {
     }
 
     fn notification_mark_read(&self, id: u64) -> Result<(), RepositoryError> {
-        crate::notification::mark_read(&self.db, id).map_err(|e| RepositoryError::Database(e))
+        mark_read(&*self.db(), id).map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_mark_unread(&self, id: u64) -> Result<(), RepositoryError> {
-        crate::notification::mark_unread(&self.db, id).map_err(|e| RepositoryError::Database(e))
+        mark_unread(&*self.db(), id).map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_delete(&self, id: u64) -> Result<(), RepositoryError> {
-        crate::notification::delete_notification(&self.db, id)
+        delete_notification(&*self.db(), id)
             .map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_delete_all(&self) -> Result<(), RepositoryError> {
-        crate::notification::delete_all_notifications(&self.db)
+        delete_all_notifications(&*self.db())
             .map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_unread_count(&self) -> Result<u64, RepositoryError> {
-        crate::notification::unread_count(&self.db).map_err(|e| RepositoryError::Database(e))
+        unread_count(&*self.db()).map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_delete_read_before(&self, cutoff_ms: i64) -> Result<u64, RepositoryError> {
-        crate::notification::delete_read_before(&self.db, cutoff_ms)
+        delete_read_before(&*self.db(), cutoff_ms)
             .map_err(|e| RepositoryError::Database(e))
     }
 }
@@ -1105,7 +1337,7 @@ mod tests {
     fn test_binaries_config() {
         let db = test_db();
         seed_defaults_if_empty(&db).unwrap();
-        let store = RedbDataStore::from_db(db);
+        let store = RedbDataStore::from_db(Arc::new(db));
 
         let (rustup, cargo) = get_binaries_config(&store);
         assert_eq!(rustup, "rustup");
@@ -1116,7 +1348,7 @@ mod tests {
     fn test_events_config() {
         let db = test_db();
         seed_defaults_if_empty(&db).unwrap();
-        let store = RedbDataStore::from_db(db);
+        let store = RedbDataStore::from_db(Arc::new(db));
 
         let events = get_events_config(&store);
         assert_eq!(events.install_log, "install-log");
@@ -1127,7 +1359,7 @@ mod tests {
     fn test_parsing_config() {
         let db = test_db();
         seed_defaults_if_empty(&db).unwrap();
-        let store = RedbDataStore::from_db(db);
+        let store = RedbDataStore::from_db(Arc::new(db));
 
         let parsing = get_parsing_config(&store);
         assert_eq!(parsing.default_marker, "(default)");

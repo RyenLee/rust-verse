@@ -7,10 +7,11 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import PageLayout from '../components/PageLayout.vue'
 import SearchInput from '../components/SearchInput.vue'
 import { useDataRefresh } from '../composables/useDataRefresh'
+import { useResponsiveListHeight } from '../composables/useResponsiveListHeight'
 
 const { t } = useI18n()
 const router = useRouter()
-const { notifyNotificationChange } = useDataRefresh()
+const { notifyNotificationChange, onNotifSettingsChange } = useDataRefresh()
 
 // ── Types ──
 
@@ -45,6 +46,12 @@ const confirmDialog = ref({
   onConfirm: () => {},
 })
 
+// Responsive list height: nav(56) + pageHeader(56) + filters(60) + buffer(80)
+const { listHeight, listContainerRef } = useResponsiveListHeight({
+  filters: 60,
+  buffer: 80,
+})
+
 /** Whether there are more notifications to load. */
 const hasMore = computed(() => notifications.value.length < totalCount.value)
 
@@ -74,10 +81,10 @@ function resolveMessage(n: Notification): { title: string; body: string } {
 // ── Computed ──
 
 const categories = [
-  { value: 'all', label: () => t('notifications.filters.all', { ns: 'notifications' }) },
-  { value: 'install', label: () => t('notifications.categories.install', { ns: 'notifications' }) },
-  { value: 'update', label: () => t('notifications.categories.update', { ns: 'notifications' }) },
-  { value: 'operation', label: () => t('notifications.categories.operation', { ns: 'notifications' }) },
+  { value: 'all', label: () => t('notifications.filters.all') },
+  { value: 'install', label: () => t('notifications.categories.install') },
+  { value: 'update', label: () => t('notifications.categories.update') },
+  { value: 'operation', label: () => t('notifications.categories.operation') },
 ]
 
 const filteredNotifications = computed(() => {
@@ -188,6 +195,30 @@ async function markAllRead() {
   notifyNotificationChange()
 }
 
+async function deleteReadBefore() {
+  // Delete read notifications older than 7 days
+  const cutoff = Date.now()
+  try {
+    const deleted = await invoke<number>('notification_delete_read_before', { beforeMs: cutoff })
+    if (deleted > 0) {
+      await loadNotifications()
+      notifyNotificationChange()
+    }
+  } catch (e) {
+    console.error('[NotificationCenter] deleteReadBefore failed:', e)
+  }
+}
+
+async function refreshUnreadCount() {
+  try {
+    const count = await invoke<number>('notify_unread_count')
+    // Only used for global badge (future), local unreadCount computed remains the source of truth
+    return count
+  } catch {
+    return 0
+  }
+}
+
 async function deleteNotification(id: number) {
   try {
     await invoke('notify_delete', { id })
@@ -202,8 +233,8 @@ function confirmDeleteAll() {
   if (notifications.value.length === 0) return
   confirmDialog.value = {
     open: true,
-    title: '删除全部通知',
-    message: `确定要删除全部 ${notifications.value.length} 条通知吗？此操作无法撤销。`,
+    title: t('notifications.actions.deleteAll'),
+    message: t('notifications.actions.deleteAllConfirm', { count: notifications.value.length }),
     onConfirm: async () => {
       try {
         await invoke('notify_delete_all')
@@ -253,18 +284,24 @@ function formatTime(ts: number) {
   const now = new Date()
   const diff = now.getTime() - d.getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return t('notifications.time.justNow', { ns: 'notifications' })
-  if (mins < 60) return t('notifications.time.minsAgo', { n: mins }, { ns: 'notifications' })
+  if (mins < 1) return t('notifications.time.justNow')
+  if (mins < 60) return t('notifications.time.minsAgo', { n: mins })
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return t('notifications.time.hoursAgo', { n: hours }, { ns: 'notifications' })
+  if (hours < 24) return t('notifications.time.hoursAgo', { n: hours })
   const days = Math.floor(hours / 24)
-  if (days < 7) return t('notifications.time.daysAgo', { n: days }, { ns: 'notifications' })
+  if (days < 7) return t('notifications.time.daysAgo', { n: days })
   return d.toLocaleDateString()
 }
+
+let notifSettingsWatchStop: (() => void) | null = null
 
 onMounted(() => {
   loadNotifications()
   startRealtimeListener()
+  // Watch for notification settings changes (e.g., auto-cleanup triggered)
+  notifSettingsWatchStop = onNotifSettingsChange(() => {
+    loadNotifications()
+  })
 })
 
 onBeforeUnmount(() => {
@@ -272,10 +309,19 @@ onBeforeUnmount(() => {
     unlistenNotif()
     unlistenNotif = null
   }
+  if (unlistenCleanup) {
+    unlistenCleanup()
+    unlistenCleanup = null
+  }
+  if (notifSettingsWatchStop) {
+    notifSettingsWatchStop()
+    notifSettingsWatchStop = null
+  }
 })
 
 // ── Real-time listener ──
 let unlistenNotif: UnlistenFn | null = null
+let unlistenCleanup: UnlistenFn | null = null
 
 async function startRealtimeListener() {
   try {
@@ -284,6 +330,11 @@ async function startRealtimeListener() {
       notifications.value.unshift(event.payload)
       totalCount.value++
     })
+    // Listen for auto-cleanup events from the backend
+    unlistenCleanup = await listen<number>('notification:cleanup', () => {
+      loadNotifications()
+      notifyNotificationChange()
+    })
   } catch {
     // Listener setup failed — non-critical, polling still works
   }
@@ -291,24 +342,12 @@ async function startRealtimeListener() {
 </script>
 
 <template>
-  <PageLayout :group="t('nav.group.system')" :title="t('notifications.title', { ns: 'notifications' })">
-    <!-- Error banner -->
-    <div
-      v-if="error"
-      class="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2"
-    >
-      <span class="w-5 h-5 shrink-0 text-red-400">
-            <iconify-icon icon="mdi:alert-circle" width="20"></iconify-icon>
-          </span>
-      {{ error }}
-    </div>
-
-    <!-- Toolbar -->
-    <div class="flex flex-wrap items-center gap-3 mb-4">
+  <PageLayout :group="t('nav.group.system')" :title="t('notifications.title')">
+    <template #filters>
       <!-- Search -->
       <SearchInput
         v-model="searchQuery"
-        :placeholder="t('notifications.filters.searchPlaceholder', { ns: 'notifications' })"
+        :placeholder="t('notifications.filters.searchPlaceholder')"
         class="flex-1 min-w-[200px] max-w-[320px]"
       />
 
@@ -331,11 +370,7 @@ async function startRealtimeListener() {
           :icon="sortOrder === 'newest' ? 'mdi:sort-clock-descending' : 'mdi:sort-clock-ascending'"
           width="16"
         ></iconify-icon>
-        {{
-          sortOrder === 'newest'
-            ? t('notifications.sort.newest', { ns: 'notifications' })
-            : t('notifications.sort.oldest', { ns: 'notifications' })
-        }}
+        {{ sortOrder === 'newest' ? t('notifications.sort.newest') : t('notifications.sort.oldest') }}
       </button>
 
       <div class="flex-1" />
@@ -351,11 +386,7 @@ async function startRealtimeListener() {
           width="16"
           :class="loading ? 'animate-spin' : ''"
         ></iconify-icon>
-        {{
-          loading
-            ? t('notifications.loading', { ns: 'notifications' })
-            : t('notifications.refresh', { ns: 'notifications' })
-        }}
+        {{ loading ? t('notifications.loading') : t('notifications.refresh') }}
       </button>
 
       <!-- Bulk actions -->
@@ -364,15 +395,34 @@ async function startRealtimeListener() {
         class="px-3 py-2 rounded-lg bg-sky-600/15 border border-sky-500/20 text-sky-400 text-sm hover:bg-sky-600/25 transition-colors"
         @click="markAllRead"
       >
-        {{ t('notifications.actions.markAllRead', { ns: 'notifications' }) }}
+        {{ t('notifications.actions.markAllRead') }}
+      </button>
+      <button
+        v-if="notifications.length"
+        class="px-3 py-2 rounded-lg bg-amber-600/10 border border-amber-500/15 text-amber-400 text-sm hover:bg-amber-600/20 transition-colors"
+        @click="deleteReadBefore"
+        :title="t('notifications.actions.deleteReadBeforeTip') || '清理所有已读通知'"
+      >
+        {{ t('notifications.actions.deleteReadBefore') || '清理已读' }}
       </button>
       <button
         v-if="notifications.length"
         class="px-3 py-2 rounded-lg bg-red-600/10 border border-red-500/15 text-red-400 text-sm hover:bg-red-600/20 transition-colors"
         @click="confirmDeleteAll"
       >
-        {{ t('notifications.actions.deleteAll', { ns: 'notifications' }) }}
+        {{ t('notifications.actions.deleteAll') }}
       </button>
+    </template>
+
+    <!-- Error banner -->
+    <div
+      v-if="error"
+      class="mb-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2"
+    >
+      <span class="w-5 h-5 shrink-0 text-red-400">
+        <iconify-icon icon="mdi:alert-circle" width="20"></iconify-icon>
+      </span>
+      {{ error }}
     </div>
 
     <!-- Loading -->
@@ -386,15 +436,20 @@ async function startRealtimeListener() {
       class="flex flex-col items-center justify-center py-20 text-slate-500"
     >
       <iconify-icon icon="mdi:bell-off-outline" width="64" class="mb-3"></iconify-icon>
-      <p class="text-sm">{{ t('notifications.empty', { ns: 'notifications' }) }}</p>
+      <p class="text-sm">{{ t('notifications.empty') }}</p>
     </div>
 
     <!-- Notification list -->
-    <div v-else class="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+    <div
+      v-else
+      ref="listContainerRef"
+      class="space-y-2 overflow-y-auto pr-1 rounded-lg"
+      :style="{ maxHeight: listHeight }"
+    >
       <div
         v-for="n in filteredNotifications"
         :key="n.id"
-        class="group relative px-4 py-3 rounded-lg border cursor-pointer transition-all"
+        class="group relative py-3 rounded-lg border cursor-pointer transition-all"
         :class="[
           n.is_read
             ? 'bg-gray-50 dark:bg-slate-800/40 border-gray-200 dark:border-slate-700/40 hover:bg-gray-100 dark:hover:bg-slate-800/70'
@@ -416,11 +471,38 @@ async function startRealtimeListener() {
             "
           >
             <!-- Install -->
-            <svg v-if="(n.category || '').toLowerCase() === 'install'" class="text-emerald-400" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M8 17v2h8v-2zm8-7l-4 4l-4-4h2.5V2h3v8zM5 22c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v16c0 1.1-.9 2-2 2zm0-2h14V4H5z"/></svg>
+            <svg
+              v-if="(n.category || '').toLowerCase() === 'install'"
+              class="text-emerald-400"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+            >
+              <path
+                fill="currentColor"
+                d="M8 17v2h8v-2zm8-7l-4 4l-4-4h2.5V2h3v8zM5 22c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v16c0 1.1-.9 2-2 2zm0-2h14V4H5z"
+              />
+            </svg>
             <!-- Update -->
-            <svg v-else-if="(n.category || '').toLowerCase() === 'update'" class="text-cyan-400" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1s-2.73 7.08 0 9.79s7.06 2.7 9.79 0c1.37-1.36 2.13-3.14 2.13-5h2c0 2.39-1 4.62-2.71 6.34c-3.38 3.37-8.86 3.37-12.24 0c-3.37-3.38-3.37-8.86 0-12.24c3.06-3.07 8.29-3.29 11.57-.64L21 3z"/></svg>
+            <svg
+              v-else-if="(n.category || '').toLowerCase() === 'update'"
+              class="text-cyan-400"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+            >
+              <path
+                fill="currentColor"
+                d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1s-2.73 7.08 0 9.79s7.06 2.7 9.79 0c1.37-1.36 2.13-3.14 2.13-5h2c0 2.39-1 4.62-2.71 6.34c-3.38 3.37-8.86 3.37-12.24 0c-3.37-3.38-3.37-8.86 0-12.24c3.06-3.07 8.29-3.29 11.57-.64L21 3z"
+              />
+            </svg>
             <!-- Default: System / Operation / Security -->
-            <svg v-else class="text-violet-400" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97s-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98L14.5 2.42c-.04-.24-.25-.42-.5-.42h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.12.22-.07.49.12.64l2.11 1.63c-.04.32-.07.65-.07.97s.03.65.07.97l-2.11 1.66c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64z"/></svg>
+            <svg v-else class="text-violet-400" width="16" height="16" viewBox="0 0 24 24">
+              <path
+                fill="currentColor"
+                d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97s-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98L14.5 2.42c-.04-.24-.25-.42-.5-.42h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.12.22-.07.49.12.64l2.11 1.63c-.04.32-.07.65-.07.97s.03.65.07.97l-2.11 1.66c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64z"
+              />
+            </svg>
           </span>
 
           <!-- Body -->
@@ -446,12 +528,12 @@ async function startRealtimeListener() {
                 class="text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wider"
                 :class="priorityClass(n.priority)"
               >
-                {{ t(`notifications.priority.${n.priority}`, { ns: 'notifications' }) }}
+                {{ t(`notifications.priority.${n.priority}`) }}
               </span>
               <span class="text-[11px] text-gray-400 dark:text-slate-500">{{ formatTime(n.created_at) }}</span>
               <span v-if="n.action_route" class="text-[11px] text-sky-500 flex items-center gap-0.5">
                 <iconify-icon icon="mdi:open-in-new" width="12"></iconify-icon>
-                {{ t('notifications.clickable', { ns: 'notifications' }) }}
+                {{ t('notifications.clickable') }}
               </span>
             </div>
           </div>
@@ -464,21 +546,17 @@ async function startRealtimeListener() {
           <!-- Hover actions -->
           <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             <button
-              :title="
-                n.is_read
-                  ? t('notifications.actions.markUnread', { ns: 'notifications' })
-                  : t('notifications.actions.markRead', { ns: 'notifications' })
-              "
+              :title="n.is_read ? t('notifications.actions.markUnread') : t('notifications.actions.markRead')"
               class="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-sky-400 hover:bg-slate-700/50 transition-colors"
               @click.stop="n.is_read ? markUnread(n.id) : markRead(n.id)"
             >
               <iconify-icon
-              :icon="n.is_read ? 'mdi:email-outline' : 'mdi:email-open-outline'"
-              width="16"
-            ></iconify-icon>
+                :icon="n.is_read ? 'mdi:email-outline' : 'mdi:email-open-outline'"
+                width="16"
+              ></iconify-icon>
             </button>
             <button
-              :title="t('notifications.actions.delete', { ns: 'notifications' })"
+              :title="t('notifications.actions.delete')"
               class="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
               @click.stop="deleteNotification(n.id)"
             >
@@ -498,17 +576,15 @@ async function startRealtimeListener() {
       >
         <iconify-icon v-if="loadingMore" icon="mdi:loading" width="16" class="animate-spin"></iconify-icon>
         <iconify-icon v-else icon="mdi:chevron-down" width="16"></iconify-icon>
-        {{ loadingMore ? t('notifications.loading', { ns: 'notifications' }) : t('notifications.loadMore', { ns: 'notifications' }) }}
+        {{ loadingMore ? t('notifications.loading') : t('notifications.loadMore') }}
       </button>
     </div>
 
     <!-- Footer stats -->
     <div v-if="!loading" class="mt-4 text-xs text-gray-500 dark:text-slate-500 flex items-center gap-2">
-      <span>{{ t('notifications.stats.total', { n: totalCount }, { ns: 'notifications' }) }}</span>
+      <span>{{ t('notifications.stats.total', { n: totalCount }) }}</span>
       <span class="text-gray-400 dark:text-slate-600">|</span>
-      <span class="text-sky-400">{{
-        t('notifications.stats.unread', { n: unreadCount }, { ns: 'notifications' })
-      }}</span>
+      <span class="text-sky-400">{{ t('notifications.stats.unread', { n: unreadCount }) }}</span>
     </div>
 
     <!-- Confirm dialog for deleteAll -->

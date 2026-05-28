@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Toast from './components/Toast.vue'
 import ProgressDialog from './components/ProgressDialog.vue'
+import BackgroundTaskOverlay from './components/BackgroundTaskOverlay.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import SplashScreen from './components/SplashScreen.vue'
 import TopBar from './components/TopBar.vue'
@@ -185,7 +186,11 @@ const navGroups = computed<NavGroup[]>(() => [
     label: t('nav.group.system'),
     icon: 'mdi:desktop-tower-monitor',
     color: 'slate',
-    items: [{ path: '/about', label: t('nav.appUpdate'), icon: 'mdi:update' }],
+    items: [
+      { path: '/notifications', label: t('nav.notifications'), icon: 'mdi:bell-outline' },
+      { path: '/settings', label: t('nav.settings'), icon: 'mdi:cog-outline' },
+      { path: '/about', label: t('nav.appUpdate'), icon: 'mdi:update' },
+    ],
   },
 ])
 
@@ -488,7 +493,11 @@ onBeforeUnmount(() => {
       >
         <!-- Brand -->
         <div class="px-5 py-4 flex items-center gap-3" :class="sidebarCollapsed && 'justify-center px-0'">
-          <iconify-icon icon="mdi:language-rust" width="24" class="text-orange-500 shrink-0"></iconify-icon>
+          <img
+            src="/icon.png"
+            alt="RustVerse"
+            class="w-6 h-6 shrink-0 rounded-md"
+          />
           <h1
             v-if="!sidebarCollapsed"
             class="text-base font-semibold text-gray-900 dark:text-gray-100 tracking-tight truncate"
@@ -556,6 +565,7 @@ onBeforeUnmount(() => {
       </div>
 
       <Toast />
+      <BackgroundTaskOverlay />
     </div>
   </Transition>
 

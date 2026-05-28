@@ -31,11 +31,11 @@ export interface BackgroundTaskState {
 
 /** Subscription callback type. */
 export type TaskStatusCallback = (status: TaskStatus, state: Readonly<BackgroundTaskState>) => void
-  
- // ── LocalStorage persistence ───────────────────────────────────────────────
-  
- const STORAGE_KEY = 'rustverse_bg_task_state'
-  
+
+// ── LocalStorage persistence ───────────────────────────────────────────────
+
+const STORAGE_KEY = 'rustverse_bg_task_state'
+
 interface PersistedState {
   title: string
   status: TaskStatus
@@ -84,8 +84,11 @@ const initialState: BackgroundTaskState = {
 
 const state = reactive<BackgroundTaskState>({ ...initialState })
 
-/** Callback invoked when the user taps "restore" — brings back the owner dialog. */
-let onRestore: (() => void) | null = null
+/** Callback invoked to hide the owner dialog when minimizing. */
+let onHideDialog: (() => void) | null = null
+
+/** Callback invoked to show the owner dialog when restoring. */
+let onShowDialog: (() => void) | null = null
 
 /** Reset timer — auto-sets status to idle after completion/failure display. */
 let resetTimer: ReturnType<typeof setTimeout> | null = null
@@ -253,17 +256,25 @@ export function useBackgroundTask() {
 
   // ── Minimize / restore ──
 
-  /** Minimize to background overlay. Caller should hide its dialog. */
-  function minimize(callback: () => void) {
+  /**
+   * Minimize to background overlay.
+   * @param onHide - called to hide the owner dialog
+   * @param onShow - called to restore the owner dialog (e.g., re-show ProgressDialog)
+   */
+  function minimize(onHide: () => void, onShow: () => void) {
     state.minimized = true
-    onRestore = callback
+    onHideDialog = onHide
+    onShowDialog = onShow
+    // Trigger the hide immediately
+    onHide()
   }
 
   /** Restore the owner dialog from the overlay. */
   function restore() {
     state.minimized = false
-    onRestore?.()
-    onRestore = null
+    onShowDialog?.()
+    onHideDialog = null
+    onShowDialog = null
   }
 
   // ── Cancel ──

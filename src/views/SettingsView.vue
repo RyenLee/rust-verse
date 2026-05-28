@@ -80,9 +80,9 @@ const themeOptions = computed(() => [
 ])
 
 const priorityOptions = computed(() => [
-  { value: 'high', label: t('notifications.priority.high', { ns: 'notifications' }) },
-  { value: 'medium', label: t('notifications.priority.medium', { ns: 'notifications' }) },
-  { value: 'low', label: t('notifications.priority.low', { ns: 'notifications' }) },
+  { value: 'high', label: t('notifications.priority.high') },
+  { value: 'medium', label: t('notifications.priority.medium') },
+  { value: 'low', label: t('notifications.priority.low') },
 ])
 
 const cleanupOptions = computed(() => [
@@ -131,11 +131,13 @@ function validate(): string | null {
     return `Invalid theme "${s.theme}"`
   }
   if (s.proxy_type === 'manual') {
+    // Allow empty host/port during mode switch; only validate range when values are present
     if (s.proxy_port !== 0 && (s.proxy_port < 1 || s.proxy_port > 65535)) {
       return t('settings.validationPortRange')
     }
-    if (s.proxy_host.trim() === '' && s.proxy_port !== 0) {
-      return t('settings.validationHostRequired')
+    // Host is only required when port is non-zero (meaningful manual config)
+    if (s.proxy_host.trim() !== '' && s.proxy_port === 0) {
+      return t('settings.validationPortRequired')
     }
   }
   return null

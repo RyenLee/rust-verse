@@ -5,7 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.7] - 2026-05-25
+## [1.3.9] - 2026-05-28
+
+### Added
+
+- **Notification auto-cleanup periodic task** — Backend periodically cleans expired read notifications every 5 minutes based on `auto_cleanup_minutes` setting; also performs cleanup on app startup; emits `notification:cleanup` event to trigger frontend refresh
+- **Sidebar & Welcome logo replaced** — Both expanded and collapsed sidebar states, as well as the Welcome page, now use the actual app icon (`/icon.png`) instead of iconify icons
+
+### Changed
+
+- **Help panel restructured** — Rewritten with 11+ feature module sections based on requirements.md; added project URL (`https://github.com/RyenLee/rust-verse`) and homepage URL (`https://ryenlee.github.io/rust-verse/`); moved "项目主页" link from AppUpdateView to Help panel
+- **Help i18n rewritten** — Comprehensive i18n keys for all feature sections in zh-CN and en locales
+- **AppUpdateView i18n** — Network Diagnostic section internationalized with `t()` calls
+
+### Fixed
+
+- Fixed `notifyNotificationChange is not a function` runtime error (Vite HMR stale module cache)
+- Fixed `isDark` not defined on TopBar instance (missing from `useAppStore()` destructuring)
+- Fixed redb BTree cursor invalidation in `delete_read_before` — split into read-only transaction (collect IDs) + write-only transaction (delete), preventing skipped entries during iteration
+- Fixed background task overlay minimize/restore flow — `minimize()` callback split into `onHide`/`onShow` for proper window state management
+- Fixed notification auto-cleanup not working — added periodic background cleanup task and startup cleanup
+- Fixed page layout inconsistencies — unified search bar and data list alignment across all menu pages (MirrorView as standard); fixed left/right padding inconsistencies; aligned EnvVars search bar width with data list
+
+## [1.3.8] - 2026-05-27
+
+### Changed
+
+- **Domain-Driven Design (DDD) refactoring** — Complete backend architecture overhaul from monolithic command structure to layered DDD architecture:
+  - `domain/` — Entity models, repository traits, error types, settings, parsing logic, notification system
+  - `infrastructure/` — redb database layer, command execution, installer, JSON store, logger, notifier, system env detection, app config with defaults
+  - `interfaces/` — Tauri command handlers for toolchain, component, target, override, update, plugin, mirror, env var, env check, locale, persist, notification
+  - `application/` — Application services for env check, env var management, locale detection, persist/state management, rustup integration
+  - Centralized config management with typed `AppConfig` and sensible defaults
+- Updated `tauri.conf.json` capability permissions and plugin configurations for new architecture
+
+### Added
+
+- **Notification Center** — New notification system with real-time push, mark-as-read, mark-all-read, and configurable auto-cleanup
+  - `NotificationCenter.vue` page with dynamic list height, toolbar filters, and real-time listener
+  - `useBackgroundTask` composable for managing background tasks with minimize/restore support
+  - `BackgroundTaskOverlay.vue` component for in-app task progress display
+  - `useDataRefresh` composable with `notificationVersion` and `notifSettingsVersion` reactive signals for cross-component sync
+- **Settings page** — Dedicated settings page with notification preferences, auto-cleanup configuration, and theme toggle
+- **TopBar notification badge** — Unread count synced across components via `onNotificationChange`/`onNotifSettingsChange`
+- **History version navigation** — `HistoryVersionView.vue` for browsing stable/beta/nightly release history with date range and search filters
+- **DatePicker/DateRangePicker components** with `useCalendar` composable for shared calendar logic
+- **HelpPanel component** with feature documentation modules
 
 ### Added
 
@@ -226,6 +271,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo plugins management
 - Dashboard with system status
 
+[1.3.9]: https://github.com/RyenLee/rust-verse/compare/v1.3.8...v1.3.9
+[1.3.8]: https://github.com/RyenLee/rust-verse/compare/v1.3.7...v1.3.8
 [1.3.7]: https://github.com/RyenLee/rust-verse/compare/v1.3.6...v1.3.7
 [1.3.6]: https://github.com/RyenLee/rust-verse/compare/v1.3.5...v1.3.6
 [1.3.5]: https://github.com/RyenLee/rust-verse/compare/v1.3.4...v1.3.5
@@ -247,7 +294,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 本文件记录了 RustVerse 项目的所有重要变更。
 
-- [最新版本 1.3.7](#137---2026-05-25) — 日期范围选择组件、useCalendar 组合式函数、跨组件工具链刷新、安装面板简化
+- [最新版本 1.3.9](#139---2026-05-28) — 通知自动清理周期任务、Logo 图标替换、帮助面板重构、页面布局统一、多项Bug修复
+- [版本 1.3.8](#138---2026-05-27) — DDD架构重构、通知中心、设置页面、历史版本浏览、DateRangePicker组件
+- [版本 1.3.7](#137---2026-05-25) — 日期范围选择组件、useCalendar 组合式函数、跨组件工具链刷新、安装面板简化
 - [版本 1.3.6](#136---2026-05-25) — 历史版本页面、自定义日期选择组件、安装面板简化、项目主页上线
 - [版本 1.3.5](#135---2026-05-25) — NSIS 卸载清理、Windows 仅保留 exe 安装包、latest.json 生成脚本修复、os error 448 友好提示
 - [版本 1.3.4](#134---2026-05-24) — App 在线更新前端 UI、工具链更新重试机制、latest.json 生成脚本、更新错误分类处理

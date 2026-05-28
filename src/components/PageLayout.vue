@@ -26,13 +26,15 @@ defineProps<{
     </header>
 
     <!-- Filters (optional) -->
-    <div v-if="$slots.filters" class="shrink-0 px-6 pt-4 pb-2">
-      <slot name="filters" />
+    <div v-if="$slots.filters" class="shrink-0 pt-4 pb-3">
+      <div class="max-w-6xl mx-auto px-6 flex flex-wrap items-center gap-3">
+        <slot name="filters" />
+      </div>
     </div>
 
     <!-- Content -->
     <div class="flex-1 overflow-y-auto scroll-container">
-      <div class="px-6 py-5 max-w-6xl mx-auto">
+      <div class="px-6 pt-4 pb-6 max-w-6xl mx-auto">
         <slot />
       </div>
     </div>

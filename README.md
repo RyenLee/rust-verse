@@ -2,6 +2,11 @@
 
 A cross-platform desktop application for visually managing Rust toolchains, components, targets, and cargo plugins. Built with Tauri 2 + Vue 3 + TypeScript + Tailwind CSS 4.
 
+## Preview
+
+![Preview](public/imgs/index-white.png)
+![Preview](public/imgs/index-black.png)
+
 ## Features
 
 - **Toolchain Management** — Install, uninstall, and switch between stable/beta/nightly toolchains with release history browser

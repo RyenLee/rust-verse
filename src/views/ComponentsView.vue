@@ -9,6 +9,7 @@ import SearchInput from '../components/SearchInput.vue'
 import SectionTitle from '../components/SectionTitle.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import ToolchainSelector from '../components/ToolchainSelector.vue'
+import { useResponsiveListHeight } from '../composables/useResponsiveListHeight'
 import { useRustup, type ComponentInfo } from '../composables/useRustup'
 import { useToolchainOptions } from '../composables/useToolchainOptions'
 
@@ -70,7 +71,7 @@ async function toggleComponent(comp: ComponentInfo) {
   } catch (e) {
     progressStatus.value = 'error'
     progressStatusText.value = t('components.progress.failed', { name: compName })
-    progressLogs.value.push(`Error: ${e}`)
+    progressLogs.value.push(`Error: ${e?.message || String(e)}`)
   }
 }
 
@@ -91,6 +92,13 @@ const availableComponents = computed(() => {
     : components.value.filter((c) => !c.installed)
   return list
 })
+
+// Responsive list height: nav(56) + pageHeader(56) + filters(60) + aboveList(60) + buffer(80)
+const { listHeight, listContainerRef } = useResponsiveListHeight({
+  filters: 60,
+  aboveList: 60,
+  buffer: 80,
+})
 </script>
 
 <template>
@@ -103,10 +111,8 @@ const availableComponents = computed(() => {
     </template>
 
     <template #filters>
-      <div class="flex gap-3 items-center">
-        <ToolchainSelector v-model="selectedToolchain" :toolchains="toolchains" @change="onToolchainChange" />
-        <SearchInput v-model="searchQuery" :placeholder="t('common.action.search')" class="flex-1" />
-      </div>
+      <ToolchainSelector v-model="selectedToolchain" :toolchains="toolchains" @change="onToolchainChange" />
+      <SearchInput v-model="searchQuery" :placeholder="t('common.action.search')" class="flex-1" />
     </template>
 
     <!-- No toolchain prompt -->
@@ -131,7 +137,11 @@ const availableComponents = computed(() => {
       <div v-else class="space-y-6">
         <div v-if="installedComponents.length > 0">
           <SectionTitle title="已安装" :count="installedComponents.length" />
-          <div class="space-y-2">
+          <div
+            ref="listContainerRef"
+            class="overflow-y-auto scroll-container space-y-2 rounded-lg"
+            :style="{ maxHeight: listHeight }"
+          >
             <ListItem
               v-for="comp in installedComponents"
               :key="comp.name"

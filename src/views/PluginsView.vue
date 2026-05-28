@@ -153,18 +153,16 @@ onMounted(async () => {
     </template>
 
     <template #filters>
-      <div class="flex items-center gap-2">
-        <div class="flex-1 max-w-md">
-          <SearchInput
-            v-model="searchQuery"
-            :placeholder="t('plugins.placeholder.search')"
-            @keyup.enter="handleSearchEnter"
-          />
-        </div>
-        <BaseButton variant="secondary" :loading="searching" :disabled="!searchQuery.trim()" @click="handleSearch">
-          {{ t('common.action.search') }}
-        </BaseButton>
+      <div class="flex-1 max-w-md">
+        <SearchInput
+          v-model="searchQuery"
+          :placeholder="t('plugins.placeholder.search')"
+          @keyup.enter="handleSearchEnter"
+        />
       </div>
+      <BaseButton variant="secondary" :loading="searching" :disabled="!searchQuery.trim()" @click="handleSearch">
+        {{ t('common.action.search') }}
+      </BaseButton>
     </template>
 
     <!-- Search results -->

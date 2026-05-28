@@ -8,6 +8,8 @@ pub mod notification;
 pub mod override_cmd;
 pub mod persist;
 pub mod plugin;
+pub mod settings;
+pub mod system;
 pub mod target;
 pub mod toolchain;
 pub mod update;

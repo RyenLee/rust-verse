@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 
 let storeInstance: any = null
 
@@ -10,45 +10,76 @@ async function getStore() {
   return storeInstance
 }
 
-const isDark = ref(true)
+const isDark = ref(false)
+const themeMode = ref<'auto' | 'dark' | 'light'>('light')
 
-async function initTheme() {
-  try {
-    const store = await getStore()
-    const stored = await store.get<string>('theme')
-    if (stored === 'light') {
-      isDark.value = false
-      document.documentElement.classList.remove('dark')
-    } else {
-      isDark.value = true
-      document.documentElement.classList.add('dark')
-    }
-  } catch {
-    // Fallback to localStorage if store is unavailable
-    const stored = localStorage.getItem('theme')
-    if (stored === 'light') {
-      isDark.value = false
-      document.documentElement.classList.remove('dark')
-    } else {
-      isDark.value = true
-      document.documentElement.classList.add('dark')
-    }
-  }
-}
-
-async function toggleTheme() {
-  isDark.value = !isDark.value
-  if (isDark.value) {
+/** Check the OS prefers-color-scheme media query and update isDark accordingly. */
+function applySystemTheme() {
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  isDark.value = prefersDark
+  if (prefersDark) {
     document.documentElement.classList.add('dark')
   } else {
     document.documentElement.classList.remove('dark')
   }
+}
+
+/** Apply the given theme mode to the DOM. */
+function applyTheme(mode: 'auto' | 'dark' | 'light') {
+  if (mode === 'auto') {
+    applySystemTheme()
+  } else if (mode === 'dark') {
+    isDark.value = true
+    document.documentElement.classList.add('dark')
+  } else {
+    isDark.value = false
+    document.documentElement.classList.remove('dark')
+  }
+}
+
+async function initTheme() {
   try {
     const store = await getStore()
-    await store.set('theme', isDark.value ? 'dark' : 'light')
+    const stored = await store.get<'auto' | 'dark' | 'light'>('theme')
+    if (stored && ['auto', 'dark', 'light'].includes(stored)) {
+      themeMode.value = stored
+    } else {
+      themeMode.value = 'auto'
+    }
   } catch {
-    localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+    const stored = localStorage.getItem('theme') as 'auto' | 'dark' | 'light' | null
+    if (stored && ['auto', 'dark', 'light'].includes(stored)) {
+      themeMode.value = stored
+    } else {
+      themeMode.value = 'auto'
+    }
   }
+
+  // Apply the resolved theme mode to the DOM
+  applyTheme(themeMode.value)
+
+  // When in auto mode, listen for OS theme changes
+  if (themeMode.value === 'auto') {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applySystemTheme)
+  }
+}
+
+async function setTheme(mode: 'auto' | 'dark' | 'light') {
+  themeMode.value = mode
+  applyTheme(mode)
+  try {
+    const store = await getStore()
+    await store.set('theme', mode)
+  } catch {
+    localStorage.setItem('theme', mode)
+  }
+}
+
+async function toggleTheme() {
+  // Toggle between dark and light based on current visual state
+  // When in auto mode, we want to explicitly set to the opposite of current visual state
+  const nextMode = isDark.value ? 'light' : 'dark'
+  await setTheme(nextMode)
 }
 
 // --- Window size/position persistence ---
@@ -115,7 +146,9 @@ function setupWindowBoundsListener() {
 export function useAppStore() {
   return {
     isDark,
+    themeMode,
     initTheme,
+    setTheme,
     toggleTheme,
     restoreWindowBounds,
     setupWindowBoundsListener,

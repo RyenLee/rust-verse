@@ -1,7 +1,7 @@
 export default {
   dashboard: '仪表盘',
   envVars: '环境变量',
-  mirrors: '镜像源',
+  mirrors: 'Crates 镜像源',
   toolchains: '工具链',
   historyVersions: '历史版本',
   components: '组件',
@@ -17,5 +17,7 @@ export default {
     extend: '扩展',
     system: '系统',
   },
+  settings: '设置',
+  notifications: '通知中心',
   appUpdate: '软件更新',
 }

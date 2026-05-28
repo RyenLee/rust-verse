@@ -79,6 +79,7 @@ pub trait PluginRepository: Send + Sync {
 /// 通知仓库。
 pub trait NotificationRepository: Send + Sync {
     /// 确保通知表存在。
+    #[allow(dead_code)]
     fn notification_ensure_table(&self) -> Result<(), RepositoryError>;
 
     /// 插入通知，返回生成的 ID。

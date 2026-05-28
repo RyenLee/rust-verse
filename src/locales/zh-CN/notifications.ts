@@ -34,6 +34,9 @@ export default {
     markAllRead: '全部已读',
     delete: '删除',
     deleteAll: '删除全部',
+    deleteReadBefore: '清理已读',
+    deleteReadBeforeTip: '清理所有已读通知',
+    deleteAllConfirm: '确定要删除全部 {count} 条通知吗？此操作无法撤销。',
   },
 
   time: {

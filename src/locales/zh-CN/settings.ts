@@ -61,6 +61,7 @@ export default {
   // Validation
   validationPortRange: '端口号必须在 1 到 65535 之间。',
   validationHostRequired: '手动代理需要填写服务器地址。',
+  validationPortRequired: '填写了服务器地址但未填写端口号。',
   saveError: '保存失败：{error}',
   loading: '正在加载设置...',
 }

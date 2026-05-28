@@ -145,7 +145,7 @@ async function installRelease(release: { version: string; date: string; channel:
     notifyToolchainChange()
   } catch (e) {
     installStatus.value = 'error'
-    installLogs.value.push(`Error: ${e}`)
+    installLogs.value.push(`Error: ${e?.message || String(e)}`)
   } finally {
     installing.value = false
   }
@@ -226,29 +226,27 @@ watch(searchQuery, () => {
     </template>
 
     <template #filters>
-      <div class="flex items-center gap-2.5 flex-wrap">
-        <!-- Channel tabs -->
-        <div class="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 gap-0.5 shrink-0">
-          <button
-            v-for="opt in channelOptions"
-            :key="opt.value"
-            :class="[
-              'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-              selectedChannel === opt.value
-                ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200',
-            ]"
-            @click="selectedChannel = opt.value"
-          >
-            <iconify-icon :icon="opt.icon" width="14" class="mr-1"></iconify-icon>
-            {{ opt.label }}
-          </button>
-        </div>
-        <!-- Date range -->
-        <DateRangePicker v-model="dateRange" :placeholder="t('histver.filter.dateRange')" class="w-64 shrink-0" />
-        <!-- Search -->
-        <SearchInput v-model="searchQuery" :placeholder="t('histver.action.searchPlaceholder')" class="flex-1 min-w-0" />
+      <!-- Channel tabs -->
+      <div class="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 gap-0.5 shrink-0">
+        <button
+          v-for="opt in channelOptions"
+          :key="opt.value"
+          :class="[
+            'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+            selectedChannel === opt.value
+              ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200',
+          ]"
+          @click="selectedChannel = opt.value"
+        >
+          <iconify-icon :icon="opt.icon" width="14" class="mr-1"></iconify-icon>
+          {{ opt.label }}
+        </button>
       </div>
+      <!-- Date range -->
+      <DateRangePicker v-model="dateRange" :placeholder="t('histver.filter.dateRange')" class="w-64 shrink-0" />
+      <!-- Search -->
+      <SearchInput v-model="searchQuery" :placeholder="t('histver.action.searchPlaceholder')" class="flex-1 min-w-0" />
     </template>
 
     <!-- Sync error -->

@@ -34,6 +34,9 @@ export default {
     markAllRead: 'Mark all read',
     delete: 'Delete',
     deleteAll: 'Delete all',
+    deleteReadBefore: 'Clean read',
+    deleteReadBeforeTip: 'Clean all read notifications',
+    deleteAllConfirm: 'Are you sure you want to delete all {count} notifications? This action cannot be undone.',
   },
 
   time: {

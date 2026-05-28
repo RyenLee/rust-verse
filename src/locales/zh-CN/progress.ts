@@ -7,4 +7,9 @@ export default {
     waiting: '等待输出...',
     inProgress: '操作进行中...',
   },
+  task: {
+    cancel: '取消',
+    minimize: '后台运行',
+    showDetails: '查看详情',
+  },
 }

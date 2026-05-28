@@ -69,6 +69,10 @@ impl Default for UserSettings {
 
 impl UserSettings {
     /// Validate all field values, returning the first error found.
+    ///
+    /// Note: `manual` proxy with empty host/port is allowed — it means the user
+    /// has switched to manual mode but hasn't entered the address yet.  The
+    /// proxy resolver will fall back to `Direct` until valid values are set.
     pub fn validate(&self) -> Result<(), String> {
         if !VALID_PROXY_TYPES.contains(&self.proxy_type.as_str()) {
             return Err(format!(
@@ -85,12 +89,9 @@ impl UserSettings {
             ));
         }
         if self.proxy_type == "manual" {
-            if self.proxy_port == 0 {
-                return Err("Proxy port is set to 0, which disables the proxy. Specify a port 1–65535.".to_string());
-            }
-            if self.proxy_host.trim().is_empty() {
-                return Err("Proxy host is required when using manual proxy".to_string());
-            }
+            // Allow empty host/port during mode switch; incomplete configs
+            // are handled at runtime by the proxy resolver (falls back to Direct).
+            // Port is u16 so range is implicitly valid (0–65535).
         }
         self.notifications.validate()?;
         Ok(())

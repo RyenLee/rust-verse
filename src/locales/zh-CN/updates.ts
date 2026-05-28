@@ -43,4 +43,14 @@ export default {
     installComplete: '安装完成，请重启应用以应用更新。',
     downloadFailed: '下载失败',
   },
+  networkDiag: {
+    title: '网络诊断',
+    run: '运行诊断',
+    running: '运行中...',
+    elapsed: '耗时: {ms}ms',
+    body: '响应体: {body}',
+    dns: 'DNS',
+    tcp: 'TCP',
+    http: 'HTTP',
+  },
 }

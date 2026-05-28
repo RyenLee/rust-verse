@@ -17,6 +17,8 @@ import spline from './splash'
 import install from './install'
 import welcome from './welcome'
 import about from './about'
+import settings from './settings'
+import notifications from './notifications'
 
 export default {
   app,
@@ -38,4 +40,6 @@ export default {
   install,
   welcome,
   about,
+  settings,
+  notifications,
 }

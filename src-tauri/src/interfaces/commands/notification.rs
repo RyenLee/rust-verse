@@ -92,3 +92,14 @@ pub fn notify_unread_count(
 ) -> Result<u64, String> {
     (&*state.store).notification_unread_count().map_err(|e| e.to_string())
 }
+
+/// Delete all read notifications older than `before_ms` (Unix timestamp in milliseconds).
+#[tauri::command]
+pub fn notification_delete_read_before(
+    state: tauri::State<'_, AppState>,
+    before_ms: i64,
+) -> Result<u64, String> {
+    (&*state.store)
+        .notification_delete_read_before(before_ms)
+        .map_err(|e| e.to_string())
+}

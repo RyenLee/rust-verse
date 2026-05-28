@@ -68,7 +68,7 @@ async function updateAll() {
     await checkUpdates()
   } catch (e) {
     updateStatus.value = 'error'
-    updateLogs.value.push(`Error: ${e}`)
+    updateLogs.value.push(`Error: ${e?.message || String(e)}`)
   } finally {
     updating.value = false
   }
@@ -87,7 +87,7 @@ async function updateRustup() {
     await checkUpdates()
   } catch (e) {
     updateStatus.value = 'error'
-    updateLogs.value.push(`Error: ${e}`)
+    updateLogs.value.push(`Error: ${e?.message || String(e)}`)
   } finally {
     updatingRustup.value = false
   }

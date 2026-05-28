@@ -43,5 +43,6 @@ export default {
     success: '{channel} installed successfully',
     failed: 'Installation failed',
     installing: 'Installing...',
+    cancelled: 'Installation cancelled',
   },
 }

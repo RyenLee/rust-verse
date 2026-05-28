@@ -43,5 +43,6 @@ export default {
     success: '{channel} 安装成功',
     failed: '安装失败',
     installing: '安装中...',
+    cancelled: '安装已取消',
   },
 }

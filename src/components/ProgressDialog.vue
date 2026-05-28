@@ -21,6 +21,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   close: []
+  cancel: []
+  minimize: []
 }>()
 
 const logContainer = ref<HTMLElement | null>(null)
@@ -135,21 +137,39 @@ const statusConfig = computed(() => ({
           </div>
 
           <!-- Footer -->
-          <div class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end shrink-0">
-            <button
-              v-if="status === 'running'"
-              disabled
-              class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 dark:text-gray-500 cursor-not-allowed"
-            >
-              {{ t('progress.status.inProgress') }}
-            </button>
-            <button
-              v-else
-              class="px-4 py-2 rounded-lg text-sm font-medium bg-sky-600 hover:bg-sky-500 text-white transition-colors"
-              @click="emit('close')"
-            >
-              {{ t('common.action.close') }}
-            </button>
+          <div class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-between shrink-0">
+            <div class="flex gap-2">
+              <button
+                v-if="status === 'running'"
+                class="px-4 py-2 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                @click="emit('cancel')"
+              >
+                {{ t('progress.task.cancel') }}
+              </button>
+              <button
+                v-if="status === 'running'"
+                class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                @click="emit('minimize')"
+              >
+                {{ t('progress.task.minimize') }}
+              </button>
+            </div>
+            <div>
+              <button
+                v-if="status === 'running'"
+                disabled
+                class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 dark:text-gray-500 cursor-not-allowed"
+              >
+                {{ t('progress.status.inProgress') }}
+              </button>
+              <button
+                v-else
+                class="px-4 py-2 rounded-lg text-sm font-medium bg-sky-600 hover:bg-sky-500 text-white transition-colors"
+                @click="emit('close')"
+              >
+                {{ t('common.action.close') }}
+              </button>
+            </div>
           </div>
         </div>
       </div>

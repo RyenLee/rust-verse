@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::domain::repository::DataStore;
 use crate::infrastructure::logger;
-use crate::settings::UserSettings;
+use crate::domain::settings::UserSettings;
 
 // ── Global instance ──
 
@@ -35,7 +35,7 @@ pub fn init_proxy_resolver(db: redb::Database) {
     // This bridges the old API; we construct a temporary `RedbDataStore`
     // on top of the raw Database handle.
     let store: Arc<dyn DataStore> =
-        Arc::new(crate::infrastructure::db::RedbDataStore::from_db(db));
+        Arc::new(crate::infrastructure::db::RedbDataStore::from_db(Arc::new(db)));
     PROXY_RESOLVER
         .set(ProxyResolver {
             cache: Mutex::new(CachedEntry::Empty),
@@ -45,6 +45,7 @@ pub fn init_proxy_resolver(db: redb::Database) {
 }
 
 /// Initialize the global proxy resolver from a `DataStore` (preferred).
+#[allow(dead_code)]
 pub fn init_proxy_resolver_with_store(store: Arc<dyn DataStore>) {
     PROXY_RESOLVER
         .set(ProxyResolver {
@@ -70,6 +71,7 @@ pub fn get_proxy_config() -> ProxyConfig {
 /// Invalidate the proxy cache so the next `get_proxy_config()` call
 /// re-reads from the database.  Call this after the user saves new
 /// settings in the Settings page.
+#[allow(dead_code)]
 pub fn invalidate_cache() {
     if let Some(resolver) = PROXY_RESOLVER.get() {
         let mut guard = resolver.cache.lock().unwrap_or_else(|e| e.into_inner());
