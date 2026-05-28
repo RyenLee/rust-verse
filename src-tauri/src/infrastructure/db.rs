@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use redb::{Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition, WriteTransaction};
+use redb::{
+    Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition,
+    WriteTransaction,
+};
 
 use crate::domain::config_keys::keys;
 use crate::infrastructure::config::EnvVarEntryConfig;
@@ -107,6 +110,19 @@ pub fn delete_simple(db: &Database, key: &str) -> Result<bool, redb::Error> {
     };
     write_tx.commit()?;
     Ok(removed)
+}
+
+/// Write multiple string values to the `config_simple` table in a single transaction.
+pub fn set_simple_batch(db: &Database, entries: &[(&str, &str)]) -> Result<(), redb::Error> {
+    let write_tx = db.begin_write()?;
+    {
+        let mut table = write_tx.open_table(SIMPLE)?;
+        for (key, value) in entries {
+            table.insert(*key, *value)?;
+        }
+    }
+    write_tx.commit()?;
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -489,11 +505,31 @@ pub fn migrate_from_toml(db: &Database, toml_path: &Path) -> Result<bool, String
         toml::from_str(&content).map_err(|e| format!("failed to parse config.toml: {e}"))?;
 
     let defaults = crate::infrastructure::config::AppConfig::default();
-    if app_config == defaults {
-        return Ok(false); // nothing to migrate
-    }
+    let is_default = app_config == defaults;
 
     let write_tx = db.begin_write().map_err(|e| format!("db write tx: {e}"))?;
+
+    // Always write app metadata from config.toml to ensure database stays in sync
+    {
+        let mut table = write_tx
+            .open_table(SIMPLE)
+            .map_err(|e| format!("open SIMPLE: {e}"))?;
+
+        table
+            .insert(keys::APP_NAME, app_config.app.name.as_str())
+            .map_err(|e| format!("insert app.name: {e}"))?;
+        table
+            .insert(keys::APP_VERSION, app_config.app.version.as_str())
+            .map_err(|e| format!("insert app.version: {e}"))?;
+        table
+            .insert(keys::APP_DESCRIPTION, app_config.app.description.as_str())
+            .map_err(|e| format!("insert app.description: {e}"))?;
+    }
+
+    if is_default {
+        write_tx.commit().map_err(|e| format!("commit: {e}"))?;
+        return Ok(false); // nothing else to migrate
+    }
 
     // Simple string fields
     {
@@ -511,16 +547,6 @@ pub fn migrate_from_toml(db: &Database, toml_path: &Path) -> Result<bool, String
             };
         }
 
-        // Always write app metadata from config.toml to ensure database stays in sync
-        table
-            .insert(keys::APP_NAME, app_config.app.name.as_str())
-            .map_err(|e| format!("insert app.name: {e}"))?;
-        table
-            .insert(keys::APP_VERSION, app_config.app.version.as_str())
-            .map_err(|e| format!("insert app.version: {e}"))?;
-        table
-            .insert(keys::APP_DESCRIPTION, app_config.app.description.as_str())
-            .map_err(|e| format!("insert app.description: {e}"))?;
         maybe_write!(
             keys::BIN_RUSTUP,
             app_config.binaries.rustup,
@@ -836,52 +862,38 @@ use crate::domain::repository::{
 
 /// Concrete redb-backed implementation of all repository traits.
 ///
-/// Uses a `MultiDbRegistry` connection pool to obtain the database handle,
-/// enabling future multi-datasource support (e.g. adding SQLite, cache stores).
 /// Created once in `lib.rs` and shared via `Arc<dyn DataStore>` throughout the application.
 #[derive(Clone)]
 pub struct RedbDataStore {
-    db_registry: Arc<crate::infrastructure::pool::MultiDbRegistry>,
+    db: Arc<redb::Database>,
 }
 
 impl RedbDataStore {
-    /// Create a store from a connection pool registry.
-    pub fn from_registry(db_registry: Arc<crate::infrastructure::pool::MultiDbRegistry>) -> Self {
-        Self { db_registry }
+    pub fn new(db: Arc<redb::Database>) -> Self {
+        Self { db }
     }
 
-    /// Create a store from an already-open database handle (legacy convenience method).
-    /// Internally creates a single-pool registry wrapping the given database.
-    pub fn from_db(db: Arc<redb::Database>) -> Self {
-        use crate::infrastructure::pool::{MultiDbRegistry, RedbPool};
-        let registry = Arc::new(MultiDbRegistry::new());
-        registry.register_config_pool(Arc::new(RedbPool::new("config", db)));
-        Self { db_registry: registry }
-    }
-
-    /// Access the underlying database handle via the pool.
     #[allow(dead_code)]
     pub fn inner_db(&self) -> Arc<redb::Database> {
-        self.db_registry.config_db().expect("config pool not registered")
-    }
-
-    /// Get the database handle for internal repository operations.
-    fn db(&self) -> Arc<redb::Database> {
-        self.db_registry.config_db().expect("config pool not registered")
+        Arc::clone(&self.db)
     }
 }
 
 impl ConfigRepository for RedbDataStore {
     fn get_config(&self, key: &str) -> Option<String> {
-        get_simple(&*self.db(), key)
+        get_simple(&*self.db, key)
     }
 
     fn set_config(&self, key: &str, value: &str) -> Result<(), RepositoryError> {
-        set_simple(&*self.db(), key, value).map_err(|e| RepositoryError::Database(e.to_string()))
+        set_simple(&*self.db, key, value).map_err(|e| RepositoryError::Database(e.to_string()))
     }
 
     fn get_config_batch(&self, keys: &[&str]) -> std::collections::HashMap<String, String> {
-        get_simple_batch(&*self.db(), keys)
+        get_simple_batch(&*self.db, keys)
+    }
+
+    fn set_config_batch(&self, entries: &[(&str, &str)]) -> Result<(), RepositoryError> {
+        set_simple_batch(&*self.db, entries).map_err(|e| RepositoryError::Database(e.to_string()))
     }
 }
 
@@ -890,7 +902,7 @@ impl EnvVarRepository for RedbDataStore {
         &self,
     ) -> std::collections::HashMap<String, std::collections::HashMap<String, EnvVarEntryConfig>>
     {
-        get_env_vars(&*self.db())
+        get_env_vars(&*self.db)
     }
 
     fn set_env_var_meta(
@@ -899,33 +911,33 @@ impl EnvVarRepository for RedbDataStore {
         name: &str,
         entry: &EnvVarEntryConfig,
     ) -> Result<(), RepositoryError> {
-        set_env_var_entry(&*self.db(), category, name, entry)
+        set_env_var_entry(&*self.db, category, name, entry)
             .map_err(|e| RepositoryError::Database(e.to_string()))
     }
 
     fn delete_env_var_meta(&self, category: &str, name: &str) -> Result<bool, RepositoryError> {
-        delete_env_var_entry(&*self.db(), category, name)
+        delete_env_var_entry(&*self.db, category, name)
             .map_err(|e| RepositoryError::Database(e.to_string()))
     }
 }
 
 impl PluginRepository for RedbDataStore {
     fn get_plugin_names(&self) -> Vec<String> {
-        get_plugin_names(&*self.db())
+        get_plugin_names(&*self.db)
     }
 
     fn set_plugin_names(&self, names: &[String]) -> Result<(), RepositoryError> {
-        set_plugin_names(&*self.db(), names).map_err(|e| RepositoryError::Database(e.to_string()))
+        set_plugin_names(&*self.db, names).map_err(|e| RepositoryError::Database(e.to_string()))
     }
 }
 
 impl SettingsRepository for RedbDataStore {
     fn get_settings(&self) -> Option<String> {
-        get_settings_json(&*self.db())
+        get_settings_json(&*self.db)
     }
 
     fn set_settings(&self, json: &str) -> Result<(), RepositoryError> {
-        set_settings_json(&*self.db(), json).map_err(|e| RepositoryError::Database(e.to_string()))
+        set_settings_json(&*self.db, json).map_err(|e| RepositoryError::Database(e.to_string()))
     }
 }
 
@@ -1005,8 +1017,7 @@ pub fn list_notifications(db: &Database) -> Result<Vec<Notification>, String> {
     for res in table.iter().map_err(|e| e.to_string())? {
         let (_id, guard) = res.map_err(|e| e.to_string())?;
         let bytes = guard.value();
-        let notif: Notification =
-            serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+        let notif: Notification = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
         result.push(notif);
     }
     Ok(result)
@@ -1135,7 +1146,9 @@ fn update_notification_field(
         let mut table = write_tx
             .open_table(NOTIFICATIONS)
             .map_err(|e| e.to_string())?;
-        table.insert(id, json.as_bytes()).map_err(|e| e.to_string())?;
+        table
+            .insert(id, json.as_bytes())
+            .map_err(|e| e.to_string())?;
     }
     write_tx.commit().map_err(|e| e.to_string())?;
     Ok(())
@@ -1147,18 +1160,17 @@ fn update_notification_field(
 
 impl NotificationRepository for RedbDataStore {
     fn notification_ensure_table(&self) -> Result<(), RepositoryError> {
-        notification_ensure_table(&*self.db()).map_err(|e| RepositoryError::Database(e))
+        notification_ensure_table(&*self.db).map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_insert(&self, json: &str) -> Result<u64, RepositoryError> {
         let new: crate::domain::notification::NewNotification = serde_json::from_str(json)
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
-        insert_notification(&*self.db(), &new)
-            .map_err(|e| RepositoryError::Database(e))
+        insert_notification(&*self.db, &new).map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_list(&self) -> Result<Vec<(u64, String)>, RepositoryError> {
-        list_notifications(&*self.db())
+        list_notifications(&*self.db)
             .map(|list| {
                 list.into_iter()
                     .map(|n| {
@@ -1171,30 +1183,27 @@ impl NotificationRepository for RedbDataStore {
     }
 
     fn notification_mark_read(&self, id: u64) -> Result<(), RepositoryError> {
-        mark_read(&*self.db(), id).map_err(|e| RepositoryError::Database(e))
+        mark_read(&*self.db, id).map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_mark_unread(&self, id: u64) -> Result<(), RepositoryError> {
-        mark_unread(&*self.db(), id).map_err(|e| RepositoryError::Database(e))
+        mark_unread(&*self.db, id).map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_delete(&self, id: u64) -> Result<(), RepositoryError> {
-        delete_notification(&*self.db(), id)
-            .map_err(|e| RepositoryError::Database(e))
+        delete_notification(&*self.db, id).map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_delete_all(&self) -> Result<(), RepositoryError> {
-        delete_all_notifications(&*self.db())
-            .map_err(|e| RepositoryError::Database(e))
+        delete_all_notifications(&*self.db).map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_unread_count(&self) -> Result<u64, RepositoryError> {
-        unread_count(&*self.db()).map_err(|e| RepositoryError::Database(e))
+        unread_count(&*self.db).map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_delete_read_before(&self, cutoff_ms: i64) -> Result<u64, RepositoryError> {
-        delete_read_before(&*self.db(), cutoff_ms)
-            .map_err(|e| RepositoryError::Database(e))
+        delete_read_before(&*self.db, cutoff_ms).map_err(|e| RepositoryError::Database(e))
     }
 }
 
@@ -1337,7 +1346,7 @@ mod tests {
     fn test_binaries_config() {
         let db = test_db();
         seed_defaults_if_empty(&db).unwrap();
-        let store = RedbDataStore::from_db(Arc::new(db));
+        let store = RedbDataStore::new(Arc::new(db));
 
         let (rustup, cargo) = get_binaries_config(&store);
         assert_eq!(rustup, "rustup");
@@ -1348,7 +1357,7 @@ mod tests {
     fn test_events_config() {
         let db = test_db();
         seed_defaults_if_empty(&db).unwrap();
-        let store = RedbDataStore::from_db(Arc::new(db));
+        let store = RedbDataStore::new(Arc::new(db));
 
         let events = get_events_config(&store);
         assert_eq!(events.install_log, "install-log");
@@ -1359,7 +1368,7 @@ mod tests {
     fn test_parsing_config() {
         let db = test_db();
         seed_defaults_if_empty(&db).unwrap();
-        let store = RedbDataStore::from_db(Arc::new(db));
+        let store = RedbDataStore::new(Arc::new(db));
 
         let parsing = get_parsing_config(&store);
         assert_eq!(parsing.default_marker, "(default)");

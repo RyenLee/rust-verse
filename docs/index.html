@@ -779,14 +779,14 @@
         <div class="hero-version">
           <span class="ver-label" data-lang="zh-CN">最新版本</span>
           <span class="ver-label" data-lang="en">Latest</span>
-          <span class="ver-num">v1.3.9</span>
+          <span class="ver-num">v1.3.10</span>
           <span class="ver-sep"></span>
           <span class="ver-date">2026-05-28</span>
         </div>
         <div class="cta-row">
           <a
             class="btn btn-primary"
-            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.9"
+            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.10"
             target="_blank"
             rel="noopener"
           >
@@ -990,14 +990,44 @@
           <h2 class="section-title" data-lang="en">Release History</h2>
         </div>
         <div class="changelog-timeline">
+          <!-- v1.3.10 -->
+          <div class="release-entry">
+            <div class="release-dot"></div>
+            <div class="release-head">
+              <span class="release-ver">v1.3.10</span>
+              <span class="release-date">2026-05-28</span>
+              <span class="release-latest" data-lang="zh-CN">最新</span>
+              <span class="release-latest" data-lang="en">Latest</span>
+            </div>
+            <div class="change-group">
+              <span class="change-tag tag-fix" data-lang="zh-CN">修复</span>
+              <span class="change-tag tag-fix" data-lang="en">Fixed</span>
+              <ul>
+                <li data-lang="zh-CN">修复 Windows 下 cargo install crm 后 PATH 缓存导致 program not found — 新增 resolve_binary 多级路径查找（PATH → 注册表 → CARGO_HOME/bin → ~/.cargo/bin）</li>
+                <li data-lang="en">Fixed Windows PATH cache causing &quot;program not found&quot; after cargo install crm — added resolve_binary multi-level lookup (PATH → Registry → CARGO_HOME/bin → ~/.cargo/bin)</li>
+                <li data-lang="zh-CN">区分 BinaryNotFound 和 Command 错误类型，前端检测到未安装时自动回退到引导页</li>
+                <li data-lang="en">Distinguished BinaryNotFound from Command errors; frontend auto-falls back to guide page when binary missing</li>
+                <li data-lang="zh-CN">修复镜像列表解析测试中 mirror_type 判断错误</li>
+                <li data-lang="en">Fixed mirror_type assertion in mirror list parsing test</li>
+              </ul>
+            </div>
+            <div class="change-group">
+              <span class="change-tag tag-change" data-lang="zh-CN">改进</span>
+              <span class="change-tag tag-change" data-lang="en">Changed</span>
+              <ul>
+                <li data-lang="zh-CN">crm 安装后自动调用 refresh_process_path 刷新进程 PATH</li>
+                <li data-lang="en">Auto refresh_process_path after crm installation</li>
+                <li data-lang="zh-CN">所有 crm 操作增加 BinaryNotFound 错误处理，统一降级策略</li>
+                <li data-lang="en">Added BinaryNotFound error handling to all crm operations with unified fallback strategy</li>
+              </ul>
+            </div>
+          </div>
           <!-- v1.3.9 -->
           <div class="release-entry">
             <div class="release-dot"></div>
             <div class="release-head">
               <span class="release-ver">v1.3.9</span>
               <span class="release-date">2026-05-28</span>
-              <span class="release-latest" data-lang="zh-CN">最新</span>
-              <span class="release-latest" data-lang="en">Latest</span>
             </div>
             <div class="change-group">
               <span class="change-tag tag-feat" data-lang="zh-CN">新增</span>

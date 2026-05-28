@@ -274,6 +274,13 @@ pub fn build_app_config_from_db(repo: &dyn crate::domain::repository::DataStore)
     let events = crate::infrastructure::db::get_events_config(repo);
     let parsing = crate::infrastructure::db::get_parsing_config(repo);
     let app_meta = crate::infrastructure::db::get_app_metadata(repo);
+    let extra_batch = repo.get_config_batch(&[
+        "paths.cargo_bin_relative",
+        "locale.force_locale",
+        "locale.codes",
+        "locale.meta",
+        "timeouts.cargo_search_seconds",
+    ]);
 
     AppConfig {
         app: AppMetadataConfig {
@@ -283,26 +290,28 @@ pub fn build_app_config_from_db(repo: &dyn crate::domain::repository::DataStore)
         },
         binaries: BinariesConfig { rustup, cargo },
         paths: PathsConfig {
-            cargo_bin_relative: repo
-                .get_config("paths.cargo_bin_relative")
+            cargo_bin_relative: extra_batch
+                .get("paths.cargo_bin_relative")
+                .cloned()
                 .unwrap_or_else(defaults::cargo_bin_relative),
         },
         locale: LocaleConfig {
-            force_locale: repo
-                .get_config("locale.force_locale")
+            force_locale: extra_batch
+                .get("locale.force_locale")
+                .cloned()
                 .unwrap_or_else(defaults::force_locale),
-            codes: repo
-                .get_config("locale.codes")
-                .and_then(|s: String| serde_json::from_str::<Vec<String>>(&s).ok())
+            codes: extra_batch
+                .get("locale.codes")
+                .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
                 .unwrap_or_else(|| vec!["en".to_string()]),
-            meta: repo
-                .get_config("locale.meta")
-                .and_then(|s: String| serde_json::from_str::<HashMap<String, LocaleMeta>>(&s).ok())
+            meta: extra_batch
+                .get("locale.meta")
+                .and_then(|s| serde_json::from_str::<HashMap<String, LocaleMeta>>(s).ok())
                 .unwrap_or_default(),
         },
         timeouts: TimeoutsConfig {
-            cargo_search_seconds: repo
-                .get_config("timeouts.cargo_search_seconds")
+            cargo_search_seconds: extra_batch
+                .get("timeouts.cargo_search_seconds")
                 .and_then(|s| s.parse().ok())
                 .unwrap_or_else(defaults::cargo_search_seconds),
         },

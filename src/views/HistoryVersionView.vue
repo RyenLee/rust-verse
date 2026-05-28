@@ -17,6 +17,7 @@ import { useRustup } from '../composables/useRustup'
 import { useDataRefresh } from '../composables/useDataRefresh'
 import { useToolchainOptions } from '../composables/useToolchainOptions'
 import { useResponsiveListHeight } from '../composables/useResponsiveListHeight'
+import { useBackgroundTask } from '../composables/useBackgroundTask'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -25,6 +26,7 @@ const { installToolchain } = useRustup()
 const { notifyToolchainChange } = useDataRefresh()
 const { toolchains } = useToolchainOptions()
 const { releases, loading, syncing, syncError, sync, refresh, search } = useHistoryVersions()
+const bgTask = useBackgroundTask()
 
 const selectedChannel = ref('stable')
 const searchQuery = ref('')
@@ -127,11 +129,15 @@ async function searchReleases() {
 }
 
 async function installRelease(release: { version: string; date: string; channel: string }) {
+  if (!(await bgTask.guardStart())) {
+    return
+  }
   installing.value = true
   installLogs.value = []
   installStatus.value = 'running'
   installingRelease.value = release
   showProgress.value = true
+  bgTask.startTask(t('histver.progress.title'))
 
   try {
     if (release.channel === 'nightly') {
@@ -142,10 +148,12 @@ async function installRelease(release: { version: string; date: string; channel:
       await installToolchain('stable', release.date)
     }
     installStatus.value = 'success'
+    bgTask.finishTask('completed')
     notifyToolchainChange()
   } catch (e) {
     installStatus.value = 'error'
     installLogs.value.push(`Error: ${e?.message || String(e)}`)
+    bgTask.finishTask('failed')
   } finally {
     installing.value = false
   }
@@ -166,6 +174,19 @@ function goBackToToolchains() {
 function closeProgress() {
   showProgress.value = false
   installingRelease.value = null
+}
+
+async function cancelInstallOp() {
+  await bgTask.requestCancel()
+  installStatus.value = 'error'
+  installLogs.value.push('操作已取消')
+}
+
+function minimizeInstallOp() {
+  bgTask.minimize(
+    () => { showProgress.value = false },
+    () => { showProgress.value = true }
+  )
 }
 
 function formatDate(dateStr: string): string {
@@ -344,6 +365,8 @@ watch(searchQuery, () => {
       "
       :lines="installLogs"
       @close="closeProgress"
+      @cancel="cancelInstallOp"
+      @minimize="minimizeInstallOp"
     />
   </PageLayout>
 </template>

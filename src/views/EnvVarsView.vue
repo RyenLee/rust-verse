@@ -12,6 +12,7 @@ import { usePersist } from '../composables/usePersist'
 import { useResponsiveListHeight } from '../composables/useResponsiveListHeight'
 import { useToast } from '../composables/useToast'
 import { useDataRefresh } from '../composables/useDataRefresh'
+import { useTerminalReinit } from '../composables/useTerminalReinit'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -19,6 +20,16 @@ const { listEnvVars, setEnvVar, removeEnvVar, updateEnvVarMeta, deleteEnvVarMeta
 const { persistEnvVar, removePersistedEnvVar, listPersistedEnvVars } = usePersist()
 const { success, error } = useToast()
 const { notifyEnvVarChange } = useDataRefresh()
+const { reinitTerminal } = useTerminalReinit()
+
+// Best-effort terminal reinit — silently catches errors
+async function reinitTerminalSilent() {
+  try {
+    await reinitTerminal()
+  } catch {
+    // Terminal reinit is best-effort
+  }
+}
 
 const envVars = ref<EnvVarInfo[]>([])
 const loading = ref(true)
@@ -230,6 +241,7 @@ async function saveEditModal() {
       if (value) {
         await setEnvVar(name, value)
         await persistEnvVar(name, value)
+        reinitTerminalSilent()
       }
       // If the variable was renamed, remove the old one from system
       if (isEditing && editOriginal.name !== name) {
@@ -278,6 +290,7 @@ async function doApplyVar(v: EnvVarInfo) {
     await persistEnvVar(v.name, v.rec)
     persistedVars.value.add(v.name)
     persistedVars.value = new Set(persistedVars.value)
+    reinitTerminalSilent()
     success(t('envVars.message.applySuccess', { name: v.name, value: v.rec }))
     notifyEnvVarChange()
     await loadData()
@@ -308,6 +321,7 @@ async function doDeactivateVar(v: EnvVarInfo) {
     // 3. Update local tracking
     persistedVars.value.delete(v.name)
     persistedVars.value = new Set(persistedVars.value)
+    reinitTerminalSilent()
     success(t('envVars.message.deactivateSuccess', { name: v.name }))
     notifyEnvVarChange()
     await loadData()
@@ -542,7 +556,7 @@ onMounted(async () => {
         >
           <Transition name="dialog-panel" appear>
             <div
-              class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg border border-gray-200 dark:border-gray-700 shadow-2xl"
+              class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-xl border border-gray-200 dark:border-gray-700 shadow-2xl"
             >
               <!-- Header -->
               <div class="px-6 pt-5 pb-4 border-b border-gray-100 dark:border-gray-700/50">
@@ -580,7 +594,7 @@ onMounted(async () => {
                     class="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1"
                     >{{ t('envVars.field.description') }}</label
                   >
-                  <p class="text-sm text-gray-700 dark:text-gray-300">{{ viewVar.description }}</p>
+                  <p class="text-sm text-gray-700 dark:text-gray-300 break-words">{{ viewVar.description }}</p>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                   <div>
@@ -590,7 +604,7 @@ onMounted(async () => {
                     >
                     <code
                       v-if="viewVar.rec"
-                      class="font-mono text-sm bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 px-2 py-1 rounded"
+                      class="font-mono text-sm bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 px-2 py-1 rounded break-all inline-block max-w-full"
                     >
                       {{ viewVar.rec }}
                     </code>
@@ -603,7 +617,7 @@ onMounted(async () => {
                     >
                     <code
                       v-if="viewVar.def"
-                      class="font-mono text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-1 rounded"
+                      class="font-mono text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-1 rounded break-all inline-block max-w-full"
                     >
                       {{ viewVar.def }}
                     </code>
@@ -719,11 +733,12 @@ onMounted(async () => {
                   <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
                     {{ t('envVars.field.description') }}
                   </label>
-                  <input
+                  <textarea
                     v-model="editForm.description"
                     :placeholder="t('envVars.placeholder.description')"
-                    class="w-full h-9 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg px-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                  />
+                    rows="2"
+                    class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+                  ></textarea>
                 </div>
 
                 <!-- Set value -->

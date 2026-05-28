@@ -13,8 +13,8 @@ pub enum AppError {
     #[error("command execution failed: {0}")]
     Command(String),
 
-    #[error("command timed out after {0}s")]
-    Timeout(u64),
+    #[error("command timed out: {0}")]
+    Timeout(String),
 
     #[error("binary not found: {0}")]
     BinaryNotFound(String),
@@ -69,8 +69,8 @@ mod tests {
         let err = AppError::Command("test error".to_string());
         assert_eq!(err.to_string(), "command execution failed: test error");
 
-        let err = AppError::Timeout(30);
-        assert_eq!(err.to_string(), "command timed out after 30s");
+        let err = AppError::Timeout("command 'test' timed out after 30s: timeout has elapsed".into());
+        assert_eq!(err.to_string(), "command timed out: command 'test' timed out after 30s: timeout has elapsed");
 
         let err = AppError::BinaryNotFound("rustup".to_string());
         assert_eq!(err.to_string(), "binary not found: rustup");
@@ -93,7 +93,7 @@ mod tests {
         let json = serde_json::to_string(&err).unwrap();
         assert!(json.contains("\"kind\":\"binary_not_found\""));
 
-        let err = AppError::Timeout(60);
+        let err = AppError::Timeout("command 'test' timed out after 30s: timeout has elapsed".into());
         let json = serde_json::to_string(&err).unwrap();
         assert!(json.contains("\"kind\":\"timeout\""));
     }

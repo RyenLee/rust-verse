@@ -1,3 +1,4 @@
+use crate::domain::entity::TerminalReinitResult;
 use crate::domain::error::AppResult;
 use crate::infrastructure::system::env::binary_exists;
 use crate::infrastructure::{installer, logger};
@@ -280,4 +281,111 @@ pub fn cancel_background_task(state: tauri::State<'_, AppState>) -> AppResult<()
 pub fn is_background_task_running(state: tauri::State<'_, AppState>) -> AppResult<bool> {
     let running = *state.task_state.running.lock().unwrap();
     Ok(running)
+}
+
+/// Invalidate the in-memory config cache so the next read fetches fresh values from the database.
+/// Call this after config.toml migration or after any operation that may have modified config values.
+#[tauri::command]
+pub fn invalidate_config_cache(state: tauri::State<'_, AppState>) -> AppResult<()> {
+    state.config_cache.invalidate();
+    Ok(())
+}
+
+/// Reinitialize the terminal execution environment.
+///
+/// This should be called after any configuration change that affects subprocess
+/// execution: environment variable changes, proxy settings updates, or crate
+/// mirror source switching.
+///
+/// The command performs these steps in order:
+/// 1. Cancel any running background task to prevent stale env inheritance
+/// 2. Invalidate and refresh the proxy configuration cache
+/// 3. Apply proxy environment variables to the current process
+/// 4. Refresh PATH and Rust-related environment variables from the system
+#[tauri::command]
+pub fn reinit_terminal(state: tauri::State<'_, AppState>) -> AppResult<TerminalReinitResult> {
+    let log = logger::logger();
+    log.info("terminal", "Terminal reinitialization requested");
+
+    // 1. Cancel any running background task
+    let tasks_killed = {
+        let running = *state.task_state.running.lock().unwrap();
+        if running {
+            state
+                .task_state
+                .cancel_flag
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            log.info("terminal", "Cancelled running background task for reinitialization");
+            true
+        } else {
+            false
+        }
+    };
+
+    // 2. Invalidate proxy cache so next read fetches fresh settings from DB
+    crate::infrastructure::proxy::invalidate_cache();
+
+    // 3. Re-read proxy config and apply to current process
+    let proxy_config = crate::infrastructure::proxy::get_proxy_config();
+    crate::infrastructure::proxy::apply_to_current_process(&proxy_config);
+    let proxy_applied = format!("{:?}", proxy_config);
+    log.info("terminal", &format!("Proxy re-applied: {:?}", proxy_config));
+
+    // 4. Refresh PATH and Rust env vars from system (Windows Registry)
+    let env_refreshed = refresh_process_path_inner().unwrap_or_else(|e| format!("Error: {e}"));
+    log.info("terminal", &format!("Env refreshed: {}", env_refreshed));
+
+    // 5. Broadcast WM_SETTINGCHANGE so Windows-aware processes pick up env changes
+    #[cfg(target_os = "windows")]
+    {
+        unsafe extern "system" {
+            fn SendMessageTimeoutW(
+                h_wnd: isize,
+                msg: u32,
+                w_param: usize,
+                l_param: *const u16,
+                fu_flags: u32,
+                u_timeout: u32,
+                result: *mut usize,
+            ) -> isize;
+        }
+        const HWND_BROADCAST: isize = 0xffff;
+        const WM_SETTINGCHANGE: u32 = 0x001a;
+        const SMTO_ABORTIFHUNG: u32 = 0x0002;
+        let env_msg: Vec<u16> = "Environment\0".encode_utf16().collect();
+        unsafe {
+            SendMessageTimeoutW(
+                HWND_BROADCAST,
+                WM_SETTINGCHANGE,
+                0,
+                env_msg.as_ptr(),
+                SMTO_ABORTIFHUNG,
+                5000,
+                std::ptr::null_mut(),
+            );
+        }
+        log.info("terminal", "WM_SETTINGCHANGE broadcast sent");
+    }
+
+    let message = if tasks_killed {
+        format!(
+            "Terminal reinitialized. Background task was cancelled. Proxy: {}. Env: {}",
+            proxy_applied, env_refreshed
+        )
+    } else {
+        format!(
+            "Terminal reinitialized. Proxy: {}. Env: {}",
+            proxy_applied, env_refreshed
+        )
+    };
+
+    log.info("terminal", &message);
+
+    Ok(TerminalReinitResult {
+        success: true,
+        tasks_killed,
+        proxy_applied,
+        env_refreshed,
+        message,
+    })
 }

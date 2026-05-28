@@ -13,6 +13,7 @@ import SearchInput from '../components/SearchInput.vue'
 import ProgressDialog from '../components/ProgressDialog.vue'
 import { useRustup, type CargoPluginInfo, type SearchResult } from '../composables/useRustup'
 import { useResponsiveListHeight } from '../composables/useResponsiveListHeight'
+import { useBackgroundTask } from '../composables/useBackgroundTask'
 
 const { t } = useI18n()
 const {
@@ -22,6 +23,7 @@ const {
   uninstallPlugin: doUninstall,
 } = useRustup()
 
+const bgTask = useBackgroundTask()
 const plugins = ref<CargoPluginInfo[]>([])
 const loading = ref(true)
 const installing = ref(false)
@@ -98,20 +100,26 @@ function installFromSearch(crateName: string) {
 }
 
 async function installCrateByName(crateName: string) {
+  if (!(await bgTask.guardStart())) {
+    return
+  }
   installing.value = true
   installLogs.value = []
   installStatus.value = 'running'
   installTarget.value = crateName
   showProgress.value = true
+  bgTask.startTask(t('plugins.progress.title'))
   try {
     await doInstall(crateName)
     installStatus.value = 'success'
+    bgTask.finishTask('completed')
     searchQuery.value = ''
     await refresh()
   } catch (e: any) {
     installStatus.value = 'error'
     const msg = e?.message || String(e)
     installLogs.value.push(`Error: ${msg}`)
+    bgTask.finishTask('failed')
   } finally {
     installing.value = false
   }
@@ -129,6 +137,19 @@ async function uninstallPlugin(crateName: string) {
 
 function closeProgress() {
   showProgress.value = false
+}
+
+async function cancelPluginOp() {
+  await bgTask.requestCancel()
+  installStatus.value = 'error'
+  installLogs.value.push('操作已取消')
+}
+
+function minimizePluginOp() {
+  bgTask.minimize(
+    () => { showProgress.value = false },
+    () => { showProgress.value = true }
+  )
 }
 
 onMounted(async () => {
@@ -272,6 +293,8 @@ onMounted(async () => {
       "
       :lines="installLogs"
       @close="closeProgress"
+      @cancel="cancelPluginOp"
+      @minimize="minimizePluginOp"
     />
   </PageLayout>
 </template>

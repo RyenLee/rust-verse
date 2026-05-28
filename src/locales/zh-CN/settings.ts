@@ -64,4 +64,8 @@ export default {
   validationPortRequired: '填写了服务器地址但未填写端口号。',
   saveError: '保存失败：{error}',
   loading: '正在加载设置...',
+
+  terminalReinitTasksKilled: '终端已重新初始化，后台任务已取消',
+  terminalReinitSuccess: '终端已重新初始化',
+  terminalReinitFailed: '终端重新初始化失败',
 }

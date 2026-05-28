@@ -32,10 +32,8 @@ static PROXY_RESOLVER: OnceLock<ProxyResolver> = OnceLock::new();
 /// `init_proxy_resolver_with_store` for new code.
 #[allow(dead_code)]
 pub fn init_proxy_resolver(db: redb::Database) {
-    // This bridges the old API; we construct a temporary `RedbDataStore`
-    // on top of the raw Database handle.
     let store: Arc<dyn DataStore> =
-        Arc::new(crate::infrastructure::db::RedbDataStore::from_db(Arc::new(db)));
+        Arc::new(crate::infrastructure::db::RedbDataStore::new(Arc::new(db)));
     PROXY_RESOLVER
         .set(ProxyResolver {
             cache: Mutex::new(CachedEntry::Empty),
@@ -62,10 +60,16 @@ pub fn init_proxy_resolver_with_store(store: Arc<dyn DataStore>) {
 ///
 /// Always returns a valid `ProxyConfig` — errors fall back to `Direct`.
 pub fn get_proxy_config() -> ProxyConfig {
-    let resolver = PROXY_RESOLVER
-        .get()
-        .expect("ProxyResolver not initialized – call init_proxy_resolver() at startup");
-    resolver.resolve()
+    if let Some(resolver) = PROXY_RESOLVER.get() {
+        return resolver.resolve();
+    }
+    // Fallback: no resolver available (should only happen in early startup
+    // or in tests that don't call init_proxy_resolver_with_store).
+    logger::logger().info(
+        "proxy",
+        "ProxyResolver not initialized – using direct connection",
+    );
+    ProxyConfig::Direct
 }
 
 /// Invalidate the proxy cache so the next `get_proxy_config()` call
@@ -80,6 +84,61 @@ pub fn invalidate_cache() {
             "proxy",
             "cache invalidated – next terminal call will re-read from DB",
         );
+    }
+}
+
+/// Apply proxy environment variables to the **current process**.
+///
+/// Called when the user saves proxy settings, so that any process spawned
+/// from the current process inherits the correct proxy variables without
+/// needing a restart.  Also affects the WebView's network stack on some
+/// platforms.
+/// # Safety
+///
+/// `std::env::set_var` / `remove_var` are marked unsafe because they can
+/// cause data races in multithreaded programs.  Our call site is the
+/// synchronous `save_settings` command handler, which is serialized by
+/// Tauri's command queue — no concurrent env mutation occurs.
+pub fn apply_to_current_process(config: &ProxyConfig) {
+    match config {
+        ProxyConfig::Direct => {
+            unsafe {
+                std::env::remove_var("HTTP_PROXY");
+                std::env::remove_var("HTTPS_PROXY");
+                std::env::remove_var("http_proxy");
+                std::env::remove_var("https_proxy");
+                std::env::remove_var("ALL_PROXY");
+                std::env::remove_var("all_proxy");
+                std::env::remove_var("SOCKS_PROXY");
+                std::env::remove_var("socks_proxy");
+                std::env::remove_var("SOCKS5_PROXY");
+                std::env::remove_var("socks5_proxy");
+                std::env::remove_var("NO_PROXY");
+                std::env::remove_var("no_proxy");
+            }
+            logger::logger().info("proxy", "current process proxy env vars cleared (direct)");
+        }
+        ProxyConfig::System => {
+            unsafe {
+                std::env::remove_var("HTTP_PROXY");
+                std::env::remove_var("HTTPS_PROXY");
+                std::env::remove_var("http_proxy");
+                std::env::remove_var("https_proxy");
+                std::env::remove_var("ALL_PROXY");
+                std::env::remove_var("all_proxy");
+            }
+            logger::logger().info("proxy", "current process proxy env vars cleared (system mode – OS handles proxy)");
+        }
+        ProxyConfig::Manual { host, port } => {
+            let url = format!("http://{}:{}", host, port);
+            unsafe {
+                std::env::set_var("HTTP_PROXY", &url);
+                std::env::set_var("HTTPS_PROXY", &url);
+                std::env::set_var("http_proxy", &url);
+                std::env::set_var("https_proxy", &url);
+            }
+            logger::logger().info("proxy", &format!("current process proxy set to {}", url));
+        }
     }
 }
 
@@ -108,17 +167,20 @@ impl std::fmt::Debug for ProxyResolver {
 
 impl ProxyResolver {
     /// Resolve the proxy configuration: cache → DB → fallback.
+    ///
+    /// Holds the cache lock through the entire resolve (including DB read)
+    /// to eliminate a TOCTOU window where concurrent callers could trigger
+    /// duplicate DB reads.
     fn resolve(&self) -> ProxyConfig {
-        // 1. Check cache
-        {
-            let guard = self.cache.lock().unwrap_or_else(|e| e.into_inner());
-            if let CachedEntry::Resolved(ref config) = *guard {
-                logger::logger().info("proxy", &format!("cache hit → {:?}", config));
-                return config.clone();
-            }
+        let mut guard = self.cache.lock().unwrap_or_else(|e| e.into_inner());
+
+        // 1. Check cache (under lock)
+        if let CachedEntry::Resolved(ref config) = *guard {
+            logger::logger().info("proxy", &format!("cache hit → {:?}", config));
+            return config.clone();
         }
 
-        // 2. Cache miss — read from database
+        // 2. Cache miss — read from database (lock still held)
         logger::logger().info("proxy", "cache miss – reading user settings from database");
         let config = match self.store.get_settings() {
             Some(json) => match serde_json::from_str::<UserSettings>(&json) {
@@ -140,11 +202,8 @@ impl ProxyResolver {
             }
         };
 
-        // 3. Store in cache
-        {
-            let mut guard = self.cache.lock().unwrap_or_else(|e| e.into_inner());
-            *guard = CachedEntry::Resolved(config.clone());
-        }
+        // 3. Store in cache (lock still held)
+        *guard = CachedEntry::Resolved(config.clone());
 
         logger::logger().info("proxy", &format!("resolved → {:?} (cached)", config));
         config

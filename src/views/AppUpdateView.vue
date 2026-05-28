@@ -7,9 +7,11 @@ import BaseButton from '../components/BaseButton.vue'
 import PageLayout from '../components/PageLayout.vue'
 import ProgressDialog from '../components/ProgressDialog.vue'
 import { useAppUpdater } from '../composables/useAppUpdater'
+import { useBackgroundTask } from '../composables/useBackgroundTask'
 
 const { t } = useI18n()
 const store = useStore()
+const bgTask = useBackgroundTask()
 const {
   checking: appChecking,
   update: appUpdate,
@@ -58,8 +60,17 @@ async function handleCheckUpdate() {
 }
 
 async function handleDownloadAndInstall() {
+  if (!(await bgTask.guardStart())) {
+    return
+  }
   showProgress.value = true
+  bgTask.startTask(t('updates.progress.title'))
   await downloadAndInstall()
+  if (downloadPhase.value === 'success') {
+    bgTask.finishTask('completed')
+  } else if (downloadPhase.value === 'error') {
+    bgTask.finishTask('failed')
+  }
 }
 
 function closeProgress() {
@@ -67,6 +78,17 @@ function closeProgress() {
   if (downloadPhase.value === 'success' || downloadPhase.value === 'error') {
     resetAppUpdater()
   }
+}
+
+async function cancelAppUpdateOp() {
+  await bgTask.requestCancel()
+}
+
+function minimizeAppUpdateOp() {
+  bgTask.minimize(
+    () => { showProgress.value = false },
+    () => { showProgress.value = true }
+  )
 }
 
 // Network diagnostic
@@ -78,6 +100,7 @@ interface DiagResult {
   http_status: number | null
   http_body: string | null
   elapsed_ms: number
+  conclusion: string
 }
 
 const diagRunning = ref(false)
@@ -198,7 +221,7 @@ watch(downloadPhase, async phase => {
         <!-- Diagnostic output -->
         <div
           v-if="diagResult"
-          class="space-y-2 text-xs font-mono bg-gray-100 dark:bg-gray-900 rounded p-3 max-h-48 overflow-y-auto"
+          class="space-y-2 text-xs font-mono bg-gray-100 dark:bg-gray-900 rounded p-3 max-h-64 overflow-y-auto"
         >
           <p class="text-gray-600 dark:text-gray-400">{{ t('updates.networkDiag.elapsed', { ms: diagResult.elapsed_ms }) }}</p>
           <p
@@ -222,6 +245,23 @@ watch(downloadPhase, async phase => {
           >
             HTTP: {{ diagResult.http }}
           </p>
+
+          <!-- Conclusion with actionable suggestions -->
+          <div
+            class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700"
+          >
+            <p
+              class="text-sm leading-relaxed whitespace-normal font-sans"
+              :class="diagResult.success ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'"
+            >
+              <iconify-icon
+                :icon="diagResult.success ? 'mdi:check-circle-outline' : 'mdi:alert-outline'"
+                width="16"
+                class="inline-block align-text-bottom mr-1"
+              ></iconify-icon>
+              {{ diagResult.conclusion }}
+            </p>
+          </div>
         </div>
         <p v-if="diagError" class="text-sm text-red-600 dark:text-red-400">{{ diagError }}</p>
       </div>
@@ -249,6 +289,8 @@ watch(downloadPhase, async phase => {
       "
       :lines="progressLines"
       @close="closeProgress"
+      @cancel="cancelAppUpdateOp"
+      @minimize="minimizeAppUpdateOp"
     />
   </PageLayout>
 </template>

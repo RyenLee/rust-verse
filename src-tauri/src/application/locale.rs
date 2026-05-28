@@ -198,13 +198,14 @@ pub fn get_locales_from_config_or_db(
     }
     if let Some(state) = app.try_state::<crate::state::AppState>() {
         let store = &*state.store;
-        let codes: Vec<String> = store
-            .get_config(keys::LOCALE_CODES)
-            .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+        let batch = store.get_config_batch(&[keys::LOCALE_CODES, keys::LOCALE_META]);
+        let codes: Vec<String> = batch
+            .get(keys::LOCALE_CODES)
+            .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
             .unwrap_or_default();
         let meta: std::collections::HashMap<String, crate::infrastructure::config::LocaleMeta> =
-            store.get_config(keys::LOCALE_META)
-                .and_then(|s| serde_json::from_str::<HashMap<String, crate::infrastructure::config::LocaleMeta>>(&s).ok())
+            batch.get(keys::LOCALE_META)
+                .and_then(|s| serde_json::from_str::<HashMap<String, crate::infrastructure::config::LocaleMeta>>(s).ok())
                 .unwrap_or_default();
         let locales: Vec<LocaleInfo> = codes
             .into_iter()

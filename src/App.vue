@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import Toast from './components/Toast.vue'
 import ProgressDialog from './components/ProgressDialog.vue'
 import BackgroundTaskOverlay from './components/BackgroundTaskOverlay.vue'
+import { useBackgroundTask } from './composables/useBackgroundTask'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import SplashScreen from './components/SplashScreen.vue'
 import TopBar from './components/TopBar.vue'
@@ -44,6 +45,7 @@ const router = useRouter()
 
 // Sidebar collapsed state (persisted)
 const sidebarCollapsed = ref(false)
+const bgTask = useBackgroundTask()
 try {
   const saved = localStorage.getItem('sidebar-collapsed')
   if (saved !== null) sidebarCollapsed.value = saved === 'true'
@@ -229,11 +231,15 @@ function advanceSplash(stepIndex: number) {
 }
 
 async function handleUninstallRustup() {
+  if (!(await bgTask.guardStart())) {
+    return
+  }
   uninstalling.value = true
   showUninstallProgress.value = true
   uninstallProgressStatus.value = 'running'
   uninstallProgressLines.value = [t('app.uninstallStepChecking')]
   uninstallProgressStatusText.value = ''
+  bgTask.startTask(t('app.uninstallRustup'))
 
   try {
     uninstallProgressLines.value.push(t('app.uninstallStepRemoving'))
@@ -251,6 +257,7 @@ async function handleUninstallRustup() {
     uninstallProgressLines.value.push(t('app.uninstallStepDone'))
     uninstallProgressStatus.value = 'success'
     uninstallProgressStatusText.value = t('app.uninstallSuccess')
+    bgTask.finishTask('completed')
 
     setTimeout(async () => {
       showUninstallProgress.value = false
@@ -269,6 +276,7 @@ async function handleUninstallRustup() {
     })
 
     uninstallProgressStatus.value = 'error'
+    bgTask.finishTask('failed')
     if (msg.includes('rustup is not installed')) {
       uninstallProgressStatusText.value = t('app.uninstallNotInstalled')
     } else if (
@@ -296,6 +304,19 @@ function confirmUninstall() {
 
 function closeUninstallProgress() {
   showUninstallProgress.value = false
+}
+
+async function cancelUninstallOp() {
+  await bgTask.requestCancel()
+  uninstallProgressStatus.value = 'error'
+  uninstallProgressLines.value.push('操作已取消')
+}
+
+function minimizeUninstallOp() {
+  bgTask.minimize(
+    () => { showUninstallProgress.value = false },
+    () => { showUninstallProgress.value = true }
+  )
 }
 
 // Expose uninstall trigger for child views (e.g. DashboardView)
@@ -587,6 +608,8 @@ onBeforeUnmount(() => {
     :status-text="uninstallProgressStatusText"
     :lines="uninstallProgressLines"
     @close="closeUninstallProgress"
+    @cancel="cancelUninstallOp"
+    @minimize="minimizeUninstallOp"
   />
 </template>
 

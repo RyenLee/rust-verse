@@ -4,11 +4,15 @@ import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { useAppStore } from '../composables/useAppStore'
 import { useDataRefresh } from '../composables/useDataRefresh'
+import { useTerminalReinit } from '../composables/useTerminalReinit'
+import { useToast } from '../composables/useToast'
 import PageLayout from '../components/PageLayout.vue'
 
 const { t } = useI18n()
 const { isDark, themeMode, setTheme } = useAppStore()
 const { notifyNotifSettingsChange } = useDataRefresh()
+const { reinitTerminal } = useTerminalReinit()
+const { success: toastSuccess, error: toastError } = useToast()
 
 interface NotificationsConfig {
   enabled: boolean
@@ -171,6 +175,16 @@ async function commitSetting(key: SettingKey) {
     await invoke('save_settings', { settings: settings.value })
     // Success — data is on disk (verified by backend re-read)
     actionState[key] = 'saved'
+
+    // Reinitialize the terminal environment to pick up proxy changes
+    try {
+      const result = await reinitTerminal()
+      if (result.tasks_killed) {
+        toastSuccess(t('settings.terminalReinitTasksKilled'))
+      }
+    } catch {
+      // Terminal reinit is best-effort; don't block the settings save flow
+    }
     savedTimers[key] = setTimeout(() => {
       actionState[key] = 'idle'
     }, 2500)

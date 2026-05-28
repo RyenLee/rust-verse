@@ -2,7 +2,6 @@
 
 use tauri::{AppHandle, State};
 
-use crate::domain::config_keys::keys;
 use crate::domain::error::AppResult;
 use crate::domain::mirror as mirror_svc;
 use crate::domain::notification::{Category, NotificationKey, Priority};
@@ -38,10 +37,8 @@ pub async fn install_crm(
     crate::infrastructure::system::env::validate_rust_binary(&cargo_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
     let (locale_key, log_event, finished_event) = {
-        let events = crate::infrastructure::db::get_events_config(&*state.store);
-        let locale_key = (&*state.store)
-            .get_config(keys::LOCALE_FORCE)
-            .unwrap_or_else(crate::infrastructure::config::defaults::force_locale);
+        let events = state.config_cache.get_events(&*state.store);
+        let locale_key = state.config_cache.get_locale(&*state.store);
         (
             locale_key,
             events.plugin_install_log,
@@ -199,12 +196,13 @@ mod tests {
         let result = parse_mirror_list(output);
         assert_eq!(result.len(), 4);
         assert_eq!(result[0].name, "rsproxy");
-        assert_eq!(result[0].mirror_type, "git");
+        assert_eq!(result[0].mirror_type, "other");
         assert!(!result[0].is_current);
         assert_eq!(result[1].name, "rsproxy-sparse");
         assert_eq!(result[1].mirror_type, "sparse");
         assert!(result[1].is_current);
         assert_eq!(result[2].name, "ustc");
+        assert_eq!(result[2].mirror_type, "other");
         assert_eq!(result[3].name, "tuna");
         assert_eq!(result[3].mirror_type, "git");
     }

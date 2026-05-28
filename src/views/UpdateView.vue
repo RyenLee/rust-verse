@@ -11,10 +11,12 @@ import StatusBadge from '../components/StatusBadge.vue'
 import ProgressDialog from '../components/ProgressDialog.vue'
 import { useRustup, type UpdateInfo } from '../composables/useRustup'
 import { useDataRefresh } from '../composables/useDataRefresh'
+import { useBackgroundTask } from '../composables/useBackgroundTask'
 
 const { t } = useI18n()
 const { checkUpdate: doCheck, updateAll: doUpdateAll, updateRustup: doUpdateRustup } = useRustup()
 const { notifyToolchainChange } = useDataRefresh()
+const bgTask = useBackgroundTask()
 
 const updates = ref<UpdateInfo[]>([])
 const loading = ref(true)
@@ -56,38 +58,50 @@ async function checkUpdates() {
 }
 
 async function updateAll() {
+  if (!(await bgTask.guardStart())) {
+    return
+  }
   updating.value = true
   updateLogs.value = []
   updateStatus.value = 'running'
   updateMode.value = 'all'
   showProgress.value = true
+  bgTask.startTask(t('updates.progress.updatingAllTitle'))
   try {
     await doUpdateAll()
     updateStatus.value = 'success'
+    bgTask.finishTask('completed')
     notifyToolchainChange()
     await checkUpdates()
   } catch (e) {
     updateStatus.value = 'error'
     updateLogs.value.push(`Error: ${e?.message || String(e)}`)
+    bgTask.finishTask('failed')
   } finally {
     updating.value = false
   }
 }
 
 async function updateRustup() {
+  if (!(await bgTask.guardStart())) {
+    return
+  }
   updatingRustup.value = true
   updateLogs.value = []
   updateStatus.value = 'running'
   updateMode.value = 'rustup'
   showProgress.value = true
+  bgTask.startTask(t('updates.progress.updatingRustupTitle'))
   try {
     await doUpdateRustup()
     updateStatus.value = 'success'
+    bgTask.finishTask('completed')
     notifyToolchainChange()
     await checkUpdates()
   } catch (e) {
     updateStatus.value = 'error'
     updateLogs.value.push(`Error: ${e?.message || String(e)}`)
+    bgTask.finishTask('failed')
   } finally {
     updatingRustup.value = false
   }
@@ -95,6 +109,19 @@ async function updateRustup() {
 
 function closeProgress() {
   showProgress.value = false
+}
+
+async function cancelUpdateOp() {
+  await bgTask.requestCancel()
+  updateStatus.value = 'error'
+  updateLogs.value.push('操作已取消')
+}
+
+function minimizeUpdateOp() {
+  bgTask.minimize(
+    () => { showProgress.value = false },
+    () => { showProgress.value = true }
+  )
 }
 
 onMounted(async () => {
@@ -186,6 +213,8 @@ onMounted(async () => {
       "
       :lines="updateLogs"
       @close="closeProgress"
+      @cancel="cancelUpdateOp"
+      @minimize="minimizeUpdateOp"
     />
   </PageLayout>
 </template>

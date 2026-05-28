@@ -41,6 +41,9 @@ pub trait ConfigRepository: Send + Sync {
 
     /// 批量读取配置值（一次事务）。
     fn get_config_batch(&self, keys: &[&str]) -> HashMap<String, String>;
+
+    /// 批量写入配置值（一次事务）。
+    fn set_config_batch(&self, entries: &[(&str, &str)]) -> Result<(), RepositoryError>;
 }
 
 // ── EnvVarRepository ─────────────────────────────────────────────────────

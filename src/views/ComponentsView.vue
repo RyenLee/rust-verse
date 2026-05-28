@@ -12,10 +12,12 @@ import ToolchainSelector from '../components/ToolchainSelector.vue'
 import { useResponsiveListHeight } from '../composables/useResponsiveListHeight'
 import { useRustup, type ComponentInfo } from '../composables/useRustup'
 import { useToolchainOptions } from '../composables/useToolchainOptions'
+import { useBackgroundTask } from '../composables/useBackgroundTask'
 
 const { t } = useI18n()
 const { listComponents, addComponent, removeComponent } = useRustup()
 const { toolchains } = useToolchainOptions()
+const bgTask = useBackgroundTask()
 
 const selectedToolchain = ref('')
 const components = ref<ComponentInfo[]>([])
@@ -48,6 +50,9 @@ function onToolchainChange() {
 }
 
 async function toggleComponent(comp: ComponentInfo) {
+  if (!(await bgTask.guardStart())) {
+    return
+  }
   const isInstall = !comp.installed
   const action = isInstall ? t('components.action.installing') : t('components.action.removing')
   const compName = comp.name
@@ -57,6 +62,7 @@ async function toggleComponent(comp: ComponentInfo) {
   progressStatus.value = 'running'
   progressLogs.value = [t('components.progress.log', { action, name: compName, toolchain: selectedToolchain.value })]
   showProgress.value = true
+  bgTask.startTask(progressTitle.value)
 
   try {
     if (comp.installed) {
@@ -67,16 +73,31 @@ async function toggleComponent(comp: ComponentInfo) {
     progressStatus.value = 'success'
     progressStatusText.value = t('components.progress.success', { name: compName })
     progressLogs.value.push(t('common.status.done'))
+    bgTask.finishTask('completed')
     await loadComponents()
   } catch (e) {
     progressStatus.value = 'error'
     progressStatusText.value = t('components.progress.failed', { name: compName })
     progressLogs.value.push(`Error: ${e?.message || String(e)}`)
+    bgTask.finishTask('failed')
   }
 }
 
 function closeProgress() {
   showProgress.value = false
+}
+
+async function cancelComponentOp() {
+  await bgTask.requestCancel()
+  progressStatus.value = 'error'
+  progressLogs.value.push('操作已取消')
+}
+
+function minimizeComponentOp() {
+  bgTask.minimize(
+    () => { showProgress.value = false },
+    () => { showProgress.value = true }
+  )
 }
 
 const installedComponents = computed(() => {
@@ -194,6 +215,8 @@ const { listHeight, listContainerRef } = useResponsiveListHeight({
       :status-text="progressStatusText"
       :lines="progressLogs"
       @close="closeProgress"
+      @cancel="cancelComponentOp"
+      @minimize="minimizeComponentOp"
     />
   </PageLayout>
 </template>

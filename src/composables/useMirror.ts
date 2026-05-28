@@ -26,7 +26,13 @@ export function useMirror() {
   }
 
   async function install(): Promise<void> {
-    return invoke('install_crm', { cargoPath: CARGO })
+    await invoke('install_crm', { cargoPath: CARGO })
+    // Refresh PATH after installing crm
+    try {
+      await invoke('refresh_process_path')
+    } catch {
+      // Best-effort refresh
+    }
   }
 
   async function list(): Promise<MirrorInfo[]> {

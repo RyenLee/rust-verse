@@ -64,4 +64,8 @@ export default {
   validationPortRequired: 'Host address specified but port is missing.',
   saveError: 'Failed to save: {error}',
   loading: 'Loading settings...',
+
+  terminalReinitTasksKilled: 'Terminal reinitialized, background task was cancelled',
+  terminalReinitSuccess: 'Terminal reinitialized',
+  terminalReinitFailed: 'Terminal reinitialization failed',
 }

@@ -82,6 +82,7 @@ pub struct RedbPool {
     db: Arc<Database>,
 }
 
+#[allow(dead_code)]
 impl RedbPool {
     pub fn new(_name: &str, db: Arc<Database>) -> Self {
         Self { db }
@@ -94,7 +95,10 @@ impl RedbPool {
 
 impl DbPool for RedbPool {
     fn get_connection(&self) -> Option<Arc<dyn DbConnection>> {
-        Some(Arc::new(RedbConnection::new("config", Arc::clone(&self.db))))
+        Some(Arc::new(RedbConnection::new(
+            "config",
+            Arc::clone(&self.db),
+        )))
     }
 }
 
@@ -113,6 +117,7 @@ pub struct MultiDbRegistry {
     config_pool: RwLock<Option<Arc<RedbPool>>>,
 }
 
+#[allow(dead_code)]
 impl MultiDbRegistry {
     pub fn new() -> Self {
         Self {

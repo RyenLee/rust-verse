@@ -142,6 +142,7 @@ pub struct NetworkDiagResult {
     pub http_status: Option<u16>,
     pub http_body: Option<String>,
     pub elapsed_ms: u64,
+    pub conclusion: String,
 }
 
 // ── Environment Check ──
@@ -160,4 +161,17 @@ pub struct EnvCheck {
 pub struct VersionInfo {
     pub rustup_version: Option<String>,
     pub cargo_version: Option<String>,
+}
+
+// ── Terminal Reinitialization ──
+
+/// Result of a terminal reinitialization operation.
+/// Returned to the frontend so it can display feedback.
+#[derive(Debug, Clone, Serialize)]
+pub struct TerminalReinitResult {
+    pub success: bool,
+    pub tasks_killed: bool,
+    pub proxy_applied: String,
+    pub env_refreshed: String,
+    pub message: String,
 }

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.10] - 2026-05-28
+
+### Fixed
+
+- **Windows PATH cache causing "program not found"** — `tokio::process::Command::new("crm")` on Windows uses the process PATH snapshot at launch, which doesn't include directories added by `cargo install crm` after the app started. Added `resolve_binary()` that performs multi-level lookup: current PATH → Windows Registry PATH → `CARGO_HOME/bin` → `~/.cargo/bin`, then passes the resolved absolute path to `Command::new`
+- **Distinguished `BinaryNotFound` from `Command` errors** — All `run_command*` variants now return `AppError::BinaryNotFound` when the binary cannot be found, instead of a generic `AppError::Command`. Frontend can detect this and auto-fallback to the installation guide page
+- **Mirror list parsing test** — Fixed `test_parse_mirror_list` assertion: URLs without `.git` suffix are now correctly classified as `"other"` instead of `"git"`
+
+### Changed
+
+- **Auto `refresh_process_path` after crm install** — `useMirror.install()` now calls `invoke('refresh_process_path')` after successful installation, ensuring the process PATH is updated
+- **Unified `BinaryNotFound` error handling in frontend** — All crm operations (`handleSwitch`, `handleBest`, `handleDefault`, `handleTestAll`, `handleTestOne`) now detect `BinaryNotFound` errors and auto-navigate to the guide page instead of showing a generic error toast
+
 ## [1.3.9] - 2026-05-28
 
 ### Added
@@ -271,6 +284,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo plugins management
 - Dashboard with system status
 
+[1.3.10]: https://github.com/RyenLee/rust-verse/compare/v1.3.9...v1.3.10
 [1.3.9]: https://github.com/RyenLee/rust-verse/compare/v1.3.8...v1.3.9
 [1.3.8]: https://github.com/RyenLee/rust-verse/compare/v1.3.7...v1.3.8
 [1.3.7]: https://github.com/RyenLee/rust-verse/compare/v1.3.6...v1.3.7
@@ -294,7 +308,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 本文件记录了 RustVerse 项目的所有重要变更。
 
-- [最新版本 1.3.9](#139---2026-05-28) — 通知自动清理周期任务、Logo 图标替换、帮助面板重构、页面布局统一、多项Bug修复
+- [最新版本 1.3.10](#1310---2026-05-28) — Windows PATH缓存修复、BinaryNotFound错误区分、镜像管理降级策略
 - [版本 1.3.8](#138---2026-05-27) — DDD架构重构、通知中心、设置页面、历史版本浏览、DateRangePicker组件
 - [版本 1.3.7](#137---2026-05-25) — 日期范围选择组件、useCalendar 组合式函数、跨组件工具链刷新、安装面板简化
 - [版本 1.3.6](#136---2026-05-25) — 历史版本页面、自定义日期选择组件、安装面板简化、项目主页上线

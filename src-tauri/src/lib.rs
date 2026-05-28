@@ -39,8 +39,9 @@ use interfaces::commands::plugin::{
 };
 use interfaces::commands::settings::{get_config, get_settings, save_settings};
 use interfaces::commands::system::{
-    cancel_background_task, frontend_log, get_log_dir, install_rustup, is_background_task_running,
-    refresh_process_path, uninstall_rustup,
+    cancel_background_task, frontend_log, get_log_dir, install_rustup,
+    invalidate_config_cache, is_background_task_running, refresh_process_path, reinit_terminal,
+    uninstall_rustup,
 };
 use interfaces::commands::target::{add_target, list_targets, remove_target};
 use interfaces::commands::toolchain::{
@@ -57,11 +58,9 @@ use tauri::{
 macro_rules! dual_log {
     ($log:expr, $level:expr, $module:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
         let msg = format!($fmt $(, $arg)*);
-        eprintln!("[{}] {}", $module, msg);
         $log.info($module, &msg);
     }};
     ($log:expr, $level:expr, $module:expr, $fmt:expr) => {{
-        eprintln!("[{}] {}", $module, $fmt);
         $log.info($module, $fmt);
     }};
 }
@@ -115,9 +114,9 @@ fn migrate_db_to_data_dir() {
 
     std::fs::create_dir_all(&data_dir).ok();
     match std::fs::rename(&old_path, &new_path) {
-        Ok(()) => eprintln!("Migrated database: {:?} -> {:?}", old_path, new_path),
+        Ok(()) => logger::logger().info("startup", &format!("Migrated database: {:?} -> {:?}", old_path, new_path)),
         Err(e) => {
-            eprintln!("Warning: failed to move database to data/ dir: {e}; will use old location")
+            logger::logger().warn("startup", &format!("Warning: failed to move database to data/ dir: {e}; will use old location"))
         }
     }
 }
@@ -138,11 +137,13 @@ fn try_migrate_from_toml(db: &redb::Database) {
     match migrate_from_toml(db, &toml_path) {
         Ok(true) => {
             let migrated = exe_dir.join("config.toml.migrated");
+            // Remove old .migrated file if it exists (from a previous update)
+            let _ = std::fs::remove_file(&migrated);
             let _ = std::fs::rename(&toml_path, &migrated);
-            eprintln!("Migrated config.toml -> config.redb, renamed to config.toml.migrated");
+            logger::logger().info("startup", "Migrated config.toml -> config.redb, renamed to config.toml.migrated");
         }
-        Ok(false) => eprintln!("config.toml exists but matches defaults, skipping migration"),
-        Err(e) => eprintln!("Warning: config.toml migration failed: {e}"),
+        Ok(false) => logger::logger().info("startup", "config.toml exists but matches defaults, skipping migration"),
+        Err(e) => logger::logger().warn("startup", &format!("Warning: config.toml migration failed: {e}")),
     }
 }
 
@@ -171,27 +172,27 @@ fn run_notification_cleanup(
 
     match store.notification_delete_read_before(cutoff_ms) {
         Ok(deleted) if deleted > 0 => {
-            eprintln!(
-                "[cleanup] Auto-deleted {deleted} expired read notifications (threshold: {minutes} min)"
-            );
+            logger::logger().info("cleanup", &format!(
+                "Auto-deleted {deleted} expired read notifications (threshold: {minutes} min)"
+            ));
             // Notify frontend to refresh notification list
             let _ = app.emit("notification:cleanup", deleted);
         }
         Ok(_) => {} // No expired notifications
         Err(e) => {
-            eprintln!("[cleanup] Failed to auto-delete expired notifications: {e}");
+            logger::logger().error("cleanup", &format!("Failed to auto-delete expired notifications: {e}"));
         }
     }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    eprintln!("=== RustVerse v{} startup ===", env!("CARGO_PKG_VERSION"));
-
     let log = logger::logger();
-    eprintln!("[startup] Logger initialized at {:?}", log.log_dir());
+    log.info("startup", &format!("=== RustVerse v{} startup ===", env!("CARGO_PKG_VERSION")));
 
-    eprintln!("[startup] Running DB migration check...");
+    log.info("startup", &format!("Logger initialized at {:?}", log.log_dir()));
+
+    log.info("startup", "Running DB migration check...");
     migrate_db_to_data_dir();
 
     let db_path = get_db_path();
@@ -213,6 +214,10 @@ pub fn run() {
 
     let app_state = AppState::new(db);
 
+    // Cache is fresh on startup, no need to invalidate.
+    // The `invalidate_config_cache` Tauri command allows the frontend
+    // to invalidate the cache after config-modifying operations.
+
     // Initialize the proxy resolver so that any subprocess execution
     // (run_command, run_command_with_cancel, etc.) can resolve proxy
     // settings from user preferences without panicking.
@@ -231,11 +236,10 @@ pub fn run() {
     dual_log!(log, "INFO", "startup", "Log directory: {:?}", log.log_dir());
 
     let log_for_setup = log;
-    eprintln!("[startup] Building Tauri application...");
+    log.info("startup", "Building Tauri application...");
 
     tauri::Builder::default()
         .setup(move |app| {
-            eprintln!("[setup] Tauri setup started");
             log_for_setup.info("setup", "Tauri setup started");
 
             let main_window =
@@ -249,11 +253,9 @@ pub fn run() {
 
             match main_window {
                 Ok(_) => {
-                    eprintln!("[setup] Main window created successfully");
                     log_for_setup.info("setup", "Main window created successfully")
                 }
                 Err(e) => {
-                    eprintln!("[setup] ERROR: Failed to create main window: {e}");
                     log_for_setup.error("setup", &format!("Failed to create main window: {e}"))
                 }
             }
@@ -320,7 +322,6 @@ pub fn run() {
                 // let window = tauri::Manager::get_webview_window(app, "main").unwrap();
                 // window.open_devtools();
             }
-            eprintln!("[setup] Tauri setup completed");
             log_for_setup.info("setup", "Tauri setup completed");
 
             // ── Start periodic notification auto-cleanup task ──
@@ -353,6 +354,8 @@ pub fn run() {
             install_rustup,
             cancel_background_task,
             is_background_task_running,
+            invalidate_config_cache,
+            reinit_terminal,
             get_versions,
             get_config,
             list_toolchains,

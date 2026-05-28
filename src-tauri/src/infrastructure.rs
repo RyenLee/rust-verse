@@ -4,8 +4,10 @@
 //! redb database, system environment, CLI execution, logging, proxy, installer.
 
 pub mod config;
+pub mod config_cache;
 pub mod db;
 pub mod exec;
+pub mod http_client;
 pub mod installer;
 #[cfg(feature = "db-json")]
 pub mod json_store;

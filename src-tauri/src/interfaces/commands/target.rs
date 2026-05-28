@@ -29,7 +29,7 @@ pub async fn list_targets(
         30,
     )
     .await?;
-    let db_parsing = crate::infrastructure::db::get_parsing_config(&*state.store);
+    let db_parsing = state.config_cache.get_parsing(&*state.store);
     Ok(parsing::parse_target_list(
         &output,
         &db_parsing.installed_marker,
@@ -66,10 +66,8 @@ pub async fn add_target(
     let cancel_flag = state.task_state.cancel_flag.clone();
 
     let (locale_key, log_event, finished_event) = {
-        let events = crate::infrastructure::db::get_events_config(&*state.store);
-        let locale_key = (&*state.store)
-            .get_config(crate::domain::config_keys::keys::LOCALE_FORCE)
-            .unwrap_or_else(crate::infrastructure::config::defaults::force_locale);
+        let events = state.config_cache.get_events(&*state.store);
+        let locale_key = state.config_cache.get_locale(&*state.store);
         (locale_key, events.install_log, events.install_finished)
     };
 
@@ -132,10 +130,8 @@ pub async fn remove_target(
     let cancel_flag = state.task_state.cancel_flag.clone();
 
     let (locale_key, log_event, finished_event) = {
-        let events = crate::infrastructure::db::get_events_config(&*state.store);
-        let locale_key = (&*state.store)
-            .get_config(crate::domain::config_keys::keys::LOCALE_FORCE)
-            .unwrap_or_else(crate::infrastructure::config::defaults::force_locale);
+        let events = state.config_cache.get_events(&*state.store);
+        let locale_key = state.config_cache.get_locale(&*state.store);
         (locale_key, events.install_log, events.install_finished)
     };
 

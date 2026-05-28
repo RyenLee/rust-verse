@@ -18,6 +18,19 @@ pub use crate::domain::entity::{NetworkDiagResult, UpdateInfo};
 #[allow(unused_imports)]
 pub use crate::domain::parsing::{is_valid_toolchain_name, parse_check_update};
 
+fn read_retry_config(store: &dyn crate::domain::repository::DataStore) -> (u32, u64) {
+    let batch = store.get_config_batch(&[keys::RETRY_UPDATE_MAX, keys::RETRY_UPDATE_DELAY]);
+    let max_retries: u32 = batch
+        .get(keys::RETRY_UPDATE_MAX)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(2);
+    let retry_delay_ms: u64 = batch
+        .get(keys::RETRY_UPDATE_DELAY)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3000);
+    (max_retries, retry_delay_ms)
+}
+
 /// Check for available updates with a configurable timeout.
 #[tauri::command]
 pub async fn check_update(
@@ -28,19 +41,14 @@ pub async fn check_update(
     logger::logger().log_request("check_update", &format!("rustup_path={:?}", rustup_path));
     crate::infrastructure::system::env::validate_rust_binary(&rustup_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
-    let timeout = (&*state.store)
-        .get_config(keys::TIMEOUT_RUSTUP_CHECK)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(30);
-    // rustup check returns exit code 100 when updates are available (normal behavior)
-    // https://github.com/rust-lang/rustup/issues/3057
+    let timeout = state.config_cache.get_timeout_rustup_check(&*state.store);
     let output = exec::run_command_with_timeout_allow_codes(&rustup_path, &["check"], timeout, &[100]).await?;
     logger::logger().debug(
         "update",
         &format!("[check_update] raw rustup check output:\n{output}"),
     );
 
-    let db_parsing = crate::infrastructure::db::get_parsing_config(&*state.store);
+    let db_parsing = state.config_cache.get_parsing(&*state.store);
     let updates = parsing::parse_check_update(
         &output,
         &db_parsing.status_separator,
@@ -78,18 +86,9 @@ pub async fn update_all(
     crate::infrastructure::system::env::validate_rust_binary(&rustup_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
     let (locale_key, log_event, finished_event, max_retries, retry_delay_ms) = {
-        let events = crate::infrastructure::db::get_events_config(&*state.store);
-        let locale_key = (&*state.store)
-            .get_config(keys::LOCALE_FORCE)
-            .unwrap_or_else(crate::infrastructure::config::defaults::force_locale);
-        let max_retries: u32 = (&*state.store)
-            .get_config(keys::RETRY_UPDATE_MAX)
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(2);
-        let retry_delay_ms: u64 = (&*state.store)
-            .get_config(keys::RETRY_UPDATE_DELAY)
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(3000);
+        let events = state.config_cache.get_events(&*state.store);
+        let locale_key = state.config_cache.get_locale(&*state.store);
+        let (max_retries, retry_delay_ms) = read_retry_config(&*state.store);
         (
             locale_key,
             events.update_log,
@@ -168,18 +167,9 @@ pub async fn update_rustup(
     crate::infrastructure::system::env::validate_rust_binary(&rustup_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
     let (locale_key, log_event, finished_event, max_retries, retry_delay_ms) = {
-        let events = crate::infrastructure::db::get_events_config(&*state.store);
-        let locale_key = (&*state.store)
-            .get_config(keys::LOCALE_FORCE)
-            .unwrap_or_else(crate::infrastructure::config::defaults::force_locale);
-        let max_retries: u32 = (&*state.store)
-            .get_config(keys::RETRY_UPDATE_MAX)
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(2);
-        let retry_delay_ms: u64 = (&*state.store)
-            .get_config(keys::RETRY_UPDATE_DELAY)
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(3000);
+        let events = state.config_cache.get_events(&*state.store);
+        let locale_key = state.config_cache.get_locale(&*state.store);
+        let (max_retries, retry_delay_ms) = read_retry_config(&*state.store);
         (
             locale_key,
             events.update_log,
@@ -252,15 +242,16 @@ pub async fn update_rustup(
 #[tauri::command]
 pub async fn diag_network(app: AppHandle) -> AppResult<NetworkDiagResult> {
     let start = std::time::Instant::now();
+    let diag_timeout = std::time::Duration::from_secs(10);
     let client = reqwest::Client::builder()
         .no_proxy()
         .danger_accept_invalid_certs(true)
         .danger_accept_invalid_hostnames(true)
-        .timeout(std::time::Duration::from_secs(15))
+        .timeout(diag_timeout)
         .build()
         .map_err(|e| crate::domain::error::AppError::Command(e.to_string()))?;
 
-    // 1. DNS test
+    // 1. DNS test — GitHub
     let dns = match tokio::net::lookup_host("github.com:443").await {
         Ok(addrs) => {
             let list: Vec<String> = addrs.map(|a| a.to_string()).collect();
@@ -273,13 +264,14 @@ pub async fn diag_network(app: AppHandle) -> AppResult<NetworkDiagResult> {
         Err(e) => format!("FAIL: {e}"),
     };
 
-    // 2. TCP test
-    let tcp = match tokio::net::TcpStream::connect("github.com:443").await {
-        Ok(_) => "OK: TCP connection succeeded".to_string(),
-        Err(e) => format!("FAIL: {e}"),
+    // 2. TCP test — GitHub (with explicit timeout)
+    let tcp = match tokio::time::timeout(diag_timeout, tokio::net::TcpStream::connect("github.com:443")).await {
+        Ok(Ok(_)) => "OK: TCP connection succeeded".to_string(),
+        Ok(Err(e)) => format!("FAIL: {e}"),
+        Err(_) => "FAIL: connection timed out (10s)".to_string(),
     };
 
-    // 3. HTTP test
+    // 3. HTTP test — GitHub update server
     let url = "https://github.com/RyenLee/rust-verse/releases/latest/download/latest.json";
     let (http, http_status, http_body) = match client.get(url).send().await {
         Ok(resp) => {
@@ -303,9 +295,38 @@ pub async fn diag_network(app: AppHandle) -> AppResult<NetworkDiagResult> {
     };
 
     let elapsed_ms = start.elapsed().as_millis() as u64;
-    let success = http_status.is_some();
+    let github_reachable = http_status.is_some();
 
-    if !success {
+    // 4. Generate conclusion with actionable advice
+    let dns_ok = dns.starts_with("OK");
+    let tcp_ok = tcp.starts_with("OK");
+    let http_ok = http.starts_with("OK");
+
+    let conclusion = if http_ok {
+        "All tests passed — the update server is reachable.".to_string()
+    } else if dns_ok && !tcp_ok {
+        format!(
+            "DNS resolved successfully but TCP connection to GitHub was blocked. \
+This typically means your network restricts access to GitHub (common in mainland China). \
+Suggestions: (1) Use a proxy/VPN to access GitHub; \
+(2) Configure proxy in Settings → Proxy; \
+(3) If you have a local mirror or corporate network, ensure GitHub IPs are whitelisted."
+        )
+    } else if !dns_ok {
+        format!(
+            "DNS resolution failed — your network cannot resolve github.com. \
+Please check your DNS settings or try using a public DNS server (e.g., 114.114.114.114 or 8.8.8.8)."
+        )
+    } else if dns_ok && tcp_ok && !http_ok {
+        format!(
+            "TCP connected but HTTPS request failed. This may indicate a TLS/SSL issue or \
+an HTTP-level proxy blocking the connection. Check your system proxy settings and firewall rules."
+        )
+    } else {
+        "Network diagnostic completed. See individual test results above for details.".to_string()
+    };
+
+    if !github_reachable {
         notifier::notify(
             &app,
             Category::Operation,
@@ -317,13 +338,14 @@ pub async fn diag_network(app: AppHandle) -> AppResult<NetworkDiagResult> {
     }
 
     Ok(NetworkDiagResult {
-        success,
+        success: github_reachable,
         dns,
         tcp,
         http,
         http_status,
         http_body,
         elapsed_ms,
+        conclusion,
     })
 }
 

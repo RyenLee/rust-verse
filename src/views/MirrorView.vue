@@ -14,6 +14,8 @@ import StatusBadge from '../components/StatusBadge.vue'
 import { useMirror, type MirrorInfo, type MirrorLatency } from '../composables/useMirror'
 import { useResponsiveListHeight } from '../composables/useResponsiveListHeight'
 import { useToast } from '../composables/useToast'
+import { useBackgroundTask } from '../composables/useBackgroundTask'
+import { useTerminalReinit } from '../composables/useTerminalReinit'
 
 const route = useRoute()
 
@@ -30,6 +32,16 @@ const {
   test: doTest,
 } = useMirror()
 const { success, error } = useToast()
+const bgTask = useBackgroundTask()
+const { reinitTerminal } = useTerminalReinit()
+
+async function reinitTerminalSilent() {
+  try {
+    await reinitTerminal()
+  } catch {
+    // Terminal reinit is best-effort
+  }
+}
 
 // Page state: 'loading' | 'guide' | 'main'
 const pageState = ref<'loading' | 'guide' | 'main'>('loading')
@@ -72,7 +84,7 @@ async function loadData() {
   loading.value = true
   try {
     const [listResult, currentResult, versionResult] = await Promise.all([
-      doList(),
+      doList().catch(() => []),
       doCurrent().catch(() => ''),
       doVersion().catch(() => ''),
     ])
@@ -102,13 +114,18 @@ async function initPage() {
 }
 
 async function handleEnable() {
+  if (!(await bgTask.guardStart())) {
+    return
+  }
   installing.value = true
   installLogs.value = []
   installStatus.value = 'running'
   showProgress.value = true
+  bgTask.startTask(t('mirror.guide.title'))
   try {
     await doInstall()
     installStatus.value = 'success'
+    bgTask.finishTask('completed')
     success(t('mirror.message.installSuccess'))
     pageState.value = 'main'
     await loadData()
@@ -116,6 +133,7 @@ async function handleEnable() {
     installStatus.value = 'error'
     const msg = e?.message || String(e)
     installLogs.value.push(`Error: ${msg}`)
+    bgTask.finishTask('failed')
     error(t('mirror.message.installFailed', { error: msg }))
   } finally {
     installing.value = false
@@ -127,9 +145,15 @@ async function handleSwitch(name: string) {
     await doUse(name)
     currentMirror.value = name
     mirrors.value.forEach(m => (m.is_current = m.name === name))
+    reinitTerminalSilent()
     success(t('mirror.message.switchSuccess', { name }))
   } catch (e: any) {
-    error(t('mirror.message.switchFailed', { error: e?.message || String(e) }))
+    if (isBinaryNotFoundError(e)) {
+      pageState.value = 'guide'
+      error('crm 未安装，请先点击引导页安装')
+    } else {
+      error(t('mirror.message.switchFailed', { error: e?.message || String(e) }))
+    }
   }
 }
 
@@ -138,9 +162,15 @@ async function handleBest(mode: string) {
   try {
     await doBest(mode || undefined)
     await loadData()
+    reinitTerminalSilent()
     success(t('mirror.message.bestSuccess'))
   } catch (e: any) {
-    error(t('mirror.message.bestFailed', { error: e?.message || String(e) }))
+    if (isBinaryNotFoundError(e)) {
+      pageState.value = 'guide'
+      error('crm 未安装，请先点击引导页安装')
+    } else {
+      error(t('mirror.message.bestFailed', { error: e?.message || String(e) }))
+    }
   } finally {
     bestLoading.value = ''
   }
@@ -153,9 +183,15 @@ async function handleDefault() {
     currentMirror.value = ''
     mirrors.value.forEach(m => (m.is_current = false))
     await loadData()
+    reinitTerminalSilent()
     success(t('mirror.message.defaultSuccess'))
   } catch (e: any) {
-    error(t('mirror.message.defaultFailed', { error: e?.message || String(e) }))
+    if (isBinaryNotFoundError(e)) {
+      pageState.value = 'guide'
+      error('crm 未安装，请先点击引导页安装')
+    } else {
+      error(t('mirror.message.defaultFailed', { error: e?.message || String(e) }))
+    }
   } finally {
     bestLoading.value = ''
   }
@@ -167,7 +203,12 @@ async function handleTestAll() {
     const result = await doTest()
     applyLatencyResults(result.latencies)
   } catch (e: any) {
-    error(t('mirror.message.testFailed', { error: e?.message || String(e) }))
+    if (isBinaryNotFoundError(e)) {
+      pageState.value = 'guide'
+      error('crm 未安装，请先点击引导页安装')
+    } else {
+      error(t('mirror.message.testFailed', { error: e?.message || String(e) }))
+    }
   } finally {
     testingAll.value = false
   }
@@ -179,7 +220,12 @@ async function handleTestOne(name: string) {
     const result = await doTest(name)
     applyLatencyResults(result.latencies)
   } catch (e: any) {
-    error(t('mirror.message.testFailed', { error: e?.message || String(e) }))
+    if (isBinaryNotFoundError(e)) {
+      pageState.value = 'guide'
+      error('crm 未安装，请先点击引导页安装')
+    } else {
+      error(t('mirror.message.testFailed', { error: e?.message || String(e) }))
+    }
   } finally {
     testingMirror.value = ''
   }
@@ -199,8 +245,31 @@ function getDownloadMs(name: string): number | null {
   return latencyMap.value[name]?.download_ms ?? null
 }
 
+function isBinaryNotFoundError(e: any): boolean {
+  const msg = e?.message || ''
+  const kind = e?.kind || ''
+  return kind === 'binary_not_found' || msg.includes('not found') || msg.includes('program not found')
+}
+
 function closeProgress() {
   showProgress.value = false
+}
+
+async function cancelMirrorOp() {
+  await bgTask.requestCancel()
+  installStatus.value = 'error'
+  installLogs.value.push('操作已取消')
+}
+
+function minimizeMirrorOp() {
+  bgTask.minimize(
+    () => {
+      showProgress.value = false
+    },
+    () => {
+      showProgress.value = true
+    }
+  )
 }
 
 onMounted(async () => {
@@ -470,6 +539,8 @@ watch(
       "
       :lines="installLogs"
       @close="closeProgress"
+      @cancel="cancelMirrorOp"
+      @minimize="minimizeMirrorOp"
     />
   </div>
 </template>

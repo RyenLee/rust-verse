@@ -1,5 +1,5 @@
 use std::fs::{self, File, OpenOptions};
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
@@ -94,7 +94,7 @@ fn should_log(level: LogLevel) -> bool {
 /// (renamed to `.1`, `.2`, etc.) and a new file is created.
 pub struct FileLogger {
     log_dir: PathBuf,
-    file: Mutex<File>,
+    file: Mutex<BufWriter<File>>,
 }
 
 impl FileLogger {
@@ -112,22 +112,23 @@ impl FileLogger {
             }
         }
 
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_path)
-            .unwrap_or_else(|e| {
-                // Note: Cannot use logger here since we're in the logger init path.
-                // This eprintln! is a last resort fallback when log file cannot be created.
-                let msg = format!("Failed to open log file {:?}: {e}", log_path);
-                let _ = std::io::stderr().write_all(msg.as_bytes());
-                let fallback = std::env::temp_dir().join("rustverse.log");
-                OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(&fallback)
-                    .expect("cannot open any log file")
-            });
+        let file = BufWriter::with_capacity(
+            64 * 1024,
+            OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&log_path)
+                .unwrap_or_else(|e| {
+                    let msg = format!("Failed to open log file {:?}: {e}", log_path);
+                    let _ = std::io::stderr().write_all(msg.as_bytes());
+                    let fallback = std::env::temp_dir().join("rustverse.log");
+                    OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&fallback)
+                        .expect("cannot open any log file")
+                }),
+        );
 
         Self {
             log_dir,
@@ -149,20 +150,22 @@ impl FileLogger {
 
         if let Ok(mut file) = self.file.lock() {
             let _ = file.write_all(line.as_bytes());
-            let _ = file.flush();
 
-            // Check if rotation is needed
-            if let Ok(metadata) = file.metadata() {
+            if level >= LogLevel::Error {
+                let _ = file.flush();
+            }
+
+            if let Ok(metadata) = file.get_ref().metadata() {
                 if metadata.len() > MAX_LOG_SIZE {
-                    drop(file); // release lock before rotation
+                    let _ = file.flush();
+                    drop(file);
                     rotate_logs(&self.log_dir);
-                    // Re-open the file after rotation
                     if let Ok(mut guard) = self.file.lock() {
                         let log_path = self.log_dir.join("rustverse.log");
                         if let Ok(new_file) =
                             OpenOptions::new().create(true).append(true).open(&log_path)
                         {
-                            *guard = new_file;
+                            *guard = BufWriter::with_capacity(64 * 1024, new_file);
                         }
                     }
                 }

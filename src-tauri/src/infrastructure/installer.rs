@@ -26,8 +26,7 @@ fn install_log(app: &AppHandle, msg: impl AsRef<str>) {
 /// Maximum download retry attempts.
 const MAX_RETRIES: u32 = 3;
 
-/// Download timeout in seconds.
-const DOWNLOAD_TIMEOUT_SECS: u64 = 300;
+
 
 // ── Platform-specific installer metadata ──────────────────────────────────
 
@@ -122,10 +121,7 @@ fn get_cached_installer_path() -> AppResult<PathBuf> {
 async fn download_installer(app: &AppHandle, url: &str, dest: &Path) -> AppResult<()> {
     install_log(app, format!("Downloading installer from {}...", url));
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
-        .build()
-        .map_err(|e| AppError::Network(format!("failed to create HTTP client: {e}")))?;
+    let client = crate::infrastructure::http_client::http_client();
 
     let response = client
         .get(url)

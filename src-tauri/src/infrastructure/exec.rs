@@ -23,11 +23,9 @@ const RUSTUP_MIRROR_VARS: &[&str] = &["RUSTUP_DIST_SERVER", "RUSTUP_UPDATE_ROOT"
 /// after the user set those variables.
 fn inject_rustup_mirror_env(cmd: &mut Command) {
     for &var_name in RUSTUP_MIRROR_VARS {
-        // If already set in the current process env, the child will inherit it.
         if std::env::var(var_name).is_ok() {
             continue;
         }
-        // Otherwise, try to read from the Windows Registry.
         #[cfg(target_os = "windows")]
         {
             let value = crate::infrastructure::system::env::read_user_env_var(var_name)
@@ -38,10 +36,52 @@ fn inject_rustup_mirror_env(cmd: &mut Command) {
         }
         #[cfg(not(target_os = "windows"))]
         {
-            // On non-Windows platforms, process env is the only source.
             let _ = var_name;
         }
     }
+}
+
+/// Resolve a binary name to an absolute path.
+///
+/// Delegates to `find_binary` which searches:
+/// 1. Current process PATH (`which::which`)
+/// 2. System-level PATH from Windows Registry
+/// 3. `CARGO_HOME/bin`
+/// 4. `~/.cargo/bin`
+///
+/// Falls back to the original name if all lookups fail, so `Command::new`
+/// can produce a clear error message.
+fn resolve_binary(bin: &str) -> std::path::PathBuf {
+    if std::path::Path::new(bin).is_absolute() || bin.contains(std::path::MAIN_SEPARATOR) {
+        return std::path::PathBuf::from(bin);
+    }
+
+    match crate::infrastructure::system::env::find_binary(bin) {
+        Ok(path) => path,
+        Err(_) => std::path::PathBuf::from(bin),
+    }
+}
+
+/// Build a `tokio::process::Command` from a resolved absolute path.
+///
+/// Use this when the binary path has already been resolved by `resolve_binary`.
+/// Does NOT call `resolve_binary` again.
+fn init_command_from_path(path: &std::path::Path, args: &[&str], locale: &str) -> Command {
+    let mut cmd = Command::new(path);
+    cmd.args(args)
+        .env("LC_ALL", locale)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+
+    let proxy_config = crate::infrastructure::proxy::get_proxy_config();
+    crate::infrastructure::proxy::apply_proxy_env(&mut cmd, &proxy_config);
+    inject_rustup_mirror_env(&mut cmd);
+
+    cmd
 }
 
 /// Execute a command with `LC_ALL=C` and capture its combined output.
@@ -51,23 +91,8 @@ fn inject_rustup_mirror_env(cmd: &mut Command) {
 ///
 /// If the command does not complete within `timeout_secs`, `AppError::Timeout` is returned.
 pub async fn run_command(bin: &str, args: &[&str], timeout_secs: u64) -> AppResult<String> {
-    let mut cmd = Command::new(bin);
-    cmd.args(args)
-        .env("LC_ALL", "C")
-        .env("CARGO_HTTP_MULTIPLEXING", "false")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
-
-    // Apply proxy settings from the resolver (cached DB read).
-    let proxy_config = crate::infrastructure::proxy::get_proxy_config();
-    crate::infrastructure::proxy::apply_proxy_env(&mut cmd, &proxy_config);
-
-    // Inject RUSTUP_DIST_SERVER / RUSTUP_UPDATE_ROOT from registry if set.
-    inject_rustup_mirror_env(&mut cmd);
+    let resolved = resolve_binary(bin);
+    let mut cmd = init_command_from_path(&resolved, args, "C");
 
     let result =
         tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), cmd.output()).await;
@@ -86,9 +111,16 @@ pub async fn run_command(bin: &str, args: &[&str], timeout_secs: u64) -> AppResu
         }
         Ok(Err(e)) => {
             let raw = e.to_string();
-            // os error 448 on Windows: "Cannot traverse this path because it contains an untrusted mount point."
-            // This is typically caused by Windows Controlled Folder Access or Windows Defender Application Guard.
-            if raw.contains("os error 448") || raw.contains("448") {
+            // Detect "program not found" errors — likely means the binary
+            // was not in PATH at process startup and resolve_binary fallback failed.
+            if raw.contains("program not found")
+                || raw.contains("cannot find the file specified")
+                || raw.contains("No such file or directory")
+            {
+                Err(AppError::BinaryNotFound(format!(
+                    "'{bin}' not found in PATH or ~/.cargo/bin. Please install it first."
+                )))
+            } else if raw.contains("os error 448") || raw.contains("448") {
                 Err(AppError::Command(format!(
                     "failed to execute '{bin}': Windows security blocked execution (os error 448 - untrusted mount point). \
                     This is usually caused by Windows Controlled Folder Access. Try adding the Rust toolchain \
@@ -101,7 +133,9 @@ pub async fn run_command(bin: &str, args: &[&str], timeout_secs: u64) -> AppResu
                 )))
             }
         }
-        Err(_) => Err(AppError::Timeout(timeout_secs)),
+        Err(elapsed) => Err(AppError::Timeout(format!(
+            "command '{bin}' timed out after {timeout_secs}s: {elapsed}"
+        ))),
     }
 }
 
@@ -128,20 +162,8 @@ pub async fn run_command_with_timeout_allow_codes(
     timeout_secs: u64,
     allowed_codes: &[i32],
 ) -> AppResult<String> {
-    let mut cmd = Command::new(bin);
-    cmd.args(args)
-        .env("LC_ALL", "C")
-        .env("CARGO_HTTP_MULTIPLEXING", "false")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
-
-    let proxy_config = crate::infrastructure::proxy::get_proxy_config();
-    crate::infrastructure::proxy::apply_proxy_env(&mut cmd, &proxy_config);
-    inject_rustup_mirror_env(&mut cmd);
+    let resolved = resolve_binary(bin);
+    let mut cmd = init_command_from_path(&resolved, args, "C");
 
     let result =
         tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), cmd.output()).await;
@@ -160,7 +182,14 @@ pub async fn run_command_with_timeout_allow_codes(
         }
         Ok(Err(e)) => {
             let raw = e.to_string();
-            if raw.contains("os error 448") || raw.contains("448") {
+            if raw.contains("program not found")
+                || raw.contains("cannot find the file specified")
+                || raw.contains("No such file or directory")
+            {
+                Err(AppError::BinaryNotFound(format!(
+                    "'{bin}' not found in PATH or ~/.cargo/bin. Please install it first."
+                )))
+            } else if raw.contains("os error 448") || raw.contains("448") {
                 Err(AppError::Command(format!(
                     "failed to execute '{bin}': Windows security blocked execution (os error 448 - untrusted mount point). \
                     This is usually caused by Windows Controlled Folder Access. Try adding the Rust toolchain \
@@ -173,7 +202,9 @@ pub async fn run_command_with_timeout_allow_codes(
                 )))
             }
         }
-        Err(_) => Err(AppError::Timeout(timeout_secs)),
+        Err(elapsed) => Err(AppError::Timeout(format!(
+            "command '{bin}' timed out after {timeout_secs}s: {elapsed}"
+        ))),
     }
 }
 
@@ -212,28 +243,22 @@ pub async fn run_command_with_cancel(
     timeout_secs: u64,
     cancel_flag: Arc<AtomicBool>,
 ) -> AppResult<()> {
-    let mut child_cmd = Command::new(command);
-    child_cmd
-        .args(args)
-        .env("LC_ALL", locale_key)
-        .env("CARGO_HTTP_MULTIPLEXING", "false")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        child_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
+    let resolved = resolve_binary(command);
+    let mut child_cmd = init_command_from_path(&resolved, args, locale_key);
 
-    // Apply proxy settings.
-    let proxy_config = crate::infrastructure::proxy::get_proxy_config();
-    crate::infrastructure::proxy::apply_proxy_env(&mut child_cmd, &proxy_config);
-
-    // Inject RUSTUP_DIST_SERVER / RUSTUP_UPDATE_ROOT from registry if set.
-    inject_rustup_mirror_env(&mut child_cmd);
-
-    let mut child = child_cmd
-        .spawn()
-        .map_err(|e| AppError::Command(format!("failed to spawn '{command}': {e}")))?;
+    let mut child = child_cmd.spawn().map_err(|e| {
+        let raw = e.to_string();
+        if raw.contains("program not found")
+            || raw.contains("cannot find the file specified")
+            || raw.contains("No such file or directory")
+        {
+            AppError::BinaryNotFound(format!(
+                "'{command}' not found in PATH or ~/.cargo/bin. Please install it first."
+            ))
+        } else {
+            AppError::Command(format!("failed to spawn '{command}': {e}"))
+        }
+    })?;
 
     if let Some(stderr) = child.stderr.take() {
         spawn_line_reader(app.clone(), stderr, log_event.to_string());
@@ -290,7 +315,9 @@ pub async fn run_command_with_cancel(
         _ = timeout_fut => {
             let _ = child.kill().await;
             let _ = app.emit(finished_event, ());
-            Err(AppError::Timeout(timeout_secs))
+            Err(AppError::Timeout(format!(
+                "command '{command}' timed out after {timeout_secs}s"
+            )))
         }
     }
 }
@@ -306,24 +333,9 @@ pub async fn run_command_with_cwd(
     cwd: &str,
     timeout_secs: u64,
 ) -> AppResult<String> {
-    let mut cmd = Command::new(bin);
-    cmd.args(args)
-        .env("LC_ALL", "C")
-        .env("CARGO_HTTP_MULTIPLEXING", "false")
-        .current_dir(cwd)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
-
-    // Apply proxy settings.
-    let proxy_config = crate::infrastructure::proxy::get_proxy_config();
-    crate::infrastructure::proxy::apply_proxy_env(&mut cmd, &proxy_config);
-
-    // Inject RUSTUP_DIST_SERVER / RUSTUP_UPDATE_ROOT from registry if set.
-    inject_rustup_mirror_env(&mut cmd);
+    let resolved = resolve_binary(bin);
+    let mut cmd = init_command_from_path(&resolved, args, "C");
+    cmd.current_dir(cwd);
 
     let result =
         tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), cmd.output()).await;
@@ -340,10 +352,24 @@ pub async fn run_command_with_cwd(
                 )))
             }
         }
-        Ok(Err(e)) => Err(AppError::Command(format!(
-            "failed to execute '{bin}' in '{cwd}': {e}"
+        Ok(Err(e)) => {
+            let raw = e.to_string();
+            if raw.contains("program not found")
+                || raw.contains("cannot find the file specified")
+                || raw.contains("No such file or directory")
+            {
+                Err(AppError::BinaryNotFound(format!(
+                    "'{bin}' not found in PATH or ~/.cargo/bin. Please install it first."
+                )))
+            } else {
+                Err(AppError::Command(format!(
+                    "failed to execute '{bin}' in '{cwd}': {e}"
+                )))
+            }
+        }
+        Err(elapsed) => Err(AppError::Timeout(format!(
+            "command '{bin}' timed out after {timeout_secs}s: {elapsed}"
         ))),
-        Err(_) => Err(AppError::Timeout(timeout_secs)),
     }
 }
 
@@ -437,8 +463,8 @@ mod tests {
         let result = run_command("nonexistent_binary_xyz_12345", &[], 30).await;
         assert!(result.is_err());
         match result.unwrap_err() {
-            AppError::Command(msg) => assert!(msg.contains("failed to execute")),
-            other => panic!("expected Command error, got: {other}"),
+            AppError::BinaryNotFound(msg) => assert!(msg.contains("not found")),
+            other => panic!("expected BinaryNotFound error, got: {other}"),
         }
     }
 

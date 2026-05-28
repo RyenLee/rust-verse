@@ -12,10 +12,12 @@ import ToolchainSelector from '../components/ToolchainSelector.vue'
 import { useResponsiveListHeight } from '../composables/useResponsiveListHeight'
 import { useRustup, type TargetInfo } from '../composables/useRustup'
 import { useToolchainOptions } from '../composables/useToolchainOptions'
+import { useBackgroundTask } from '../composables/useBackgroundTask'
 
 const { t } = useI18n()
 const { listTargets, addTarget, removeTarget } = useRustup()
 const { toolchains } = useToolchainOptions()
+const bgTask = useBackgroundTask()
 
 const selectedToolchain = ref('')
 const targets = ref<TargetInfo[]>([])
@@ -48,6 +50,9 @@ function onToolchainChange() {
 }
 
 async function toggleTarget(target: TargetInfo) {
+  if (!(await bgTask.guardStart())) {
+    return
+  }
   const isInstall = !target.installed
   const action = isInstall ? t('targets.action.installing') : t('targets.action.removing')
   const targetName = target.name
@@ -57,6 +62,7 @@ async function toggleTarget(target: TargetInfo) {
   progressStatus.value = 'running'
   progressLogs.value = [t('targets.progress.log', { action, name: targetName, toolchain: selectedToolchain.value })]
   showProgress.value = true
+  bgTask.startTask(progressTitle.value)
 
   try {
     if (target.installed) {
@@ -67,16 +73,31 @@ async function toggleTarget(target: TargetInfo) {
     progressStatus.value = 'success'
     progressStatusText.value = t('targets.progress.success', { name: targetName })
     progressLogs.value.push(t('common.status.done'))
+    bgTask.finishTask('completed')
     await loadTargets()
   } catch (e) {
     progressStatus.value = 'error'
     progressStatusText.value = t('targets.progress.failed', { name: targetName })
     progressLogs.value.push(`Error: ${e?.message || String(e)}`)
+    bgTask.finishTask('failed')
   }
 }
 
 function closeProgress() {
   showProgress.value = false
+}
+
+async function cancelTargetOp() {
+  await bgTask.requestCancel()
+  progressStatus.value = 'error'
+  progressLogs.value.push('操作已取消')
+}
+
+function minimizeTargetOp() {
+  bgTask.minimize(
+    () => { showProgress.value = false },
+    () => { showProgress.value = true }
+  )
 }
 
 const installedTargets = computed(() => {
@@ -194,6 +215,8 @@ const { listHeight, listContainerRef } = useResponsiveListHeight({
       :status-text="progressStatusText"
       :lines="progressLogs"
       @close="closeProgress"
+      @cancel="cancelTargetOp"
+      @minimize="minimizeTargetOp"
     />
   </PageLayout>
 </template>

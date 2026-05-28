@@ -26,7 +26,7 @@ pub async fn list_cargo_plugins(
     crate::infrastructure::system::env::validate_rust_binary(&cargo_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
     let output = exec::run_command(&cargo_path, &["install", "--list"], 30).await?;
-    let db_parsing = crate::infrastructure::db::get_parsing_config(&*state.store);
+    let db_parsing = state.config_cache.get_parsing(&*state.store);
     let official_names = (&*state.store).get_plugin_names();
     Ok(parsing::parse_cargo_plugin_list(
         &output,
@@ -50,10 +50,8 @@ pub async fn install_plugin(
     crate::infrastructure::system::env::validate_rust_binary(&cargo_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
     let (locale_key, log_event, finished_event) = {
-        let events = crate::infrastructure::db::get_events_config(&*state.store);
-        let locale_key = (&*state.store)
-            .get_config(keys::LOCALE_FORCE)
-            .unwrap_or_else(crate::infrastructure::config::defaults::force_locale);
+        let events = state.config_cache.get_events(&*state.store);
+        let locale_key = state.config_cache.get_locale(&*state.store);
         (
             locale_key,
             events.plugin_install_log,

@@ -4,7 +4,6 @@
 
 use tauri::{AppHandle, State};
 
-use crate::domain::config_keys::keys;
 use crate::domain::error::AppResult;
 use crate::domain::notification::{Category, NotificationKey, Priority};
 use crate::domain::parsing;
@@ -31,7 +30,7 @@ pub async fn list_toolchains(
     logger::logger().log_request("list_toolchains", &format!("rustup_path={:?}", rustup_path));
     crate::infrastructure::system::env::validate_rust_binary(&rustup_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
-    let parsing = crate::infrastructure::db::get_parsing_config(&*state.store);
+    let parsing = state.config_cache.get_parsing(&*state.store);
 
     let output = exec::run_command(&rustup_path, &["toolchain", "list"], 30).await?;
     let mut toolchains =
@@ -73,10 +72,8 @@ pub async fn install_toolchain(
     crate::infrastructure::system::env::validate_rust_binary(&rustup_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
     let (locale_key, log_event, finished_event) = {
-        let events = crate::infrastructure::db::get_events_config(&*state.store);
-        let locale_key = (&*state.store)
-            .get_config(keys::LOCALE_FORCE)
-            .unwrap_or_else(crate::infrastructure::config::defaults::force_locale);
+        let events = state.config_cache.get_events(&*state.store);
+        let locale_key = state.config_cache.get_locale(&*state.store);
         (locale_key, events.install_log, events.install_finished)
     };
 

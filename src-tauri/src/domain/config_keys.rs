@@ -1,7 +1,7 @@
 //! 集中化的配置键常量 —— 所有配置 key 的 single source of truth。
 //!
 //! 使用方式：
-//! ```rust
+//! ```ignore
 //! use crate::domain::config_keys::keys;
 //! let v = store.get_config(keys::BIN_RUSTUP);
 //! ```
