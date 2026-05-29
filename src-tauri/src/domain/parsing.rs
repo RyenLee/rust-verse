@@ -202,13 +202,25 @@ pub fn toolchain_name_has_date(name: &str) -> bool {
 /// Examples:
 /// - (`stable-2026-03-26-x86_64-pc-windows-msvc`, `1.95.0`) → `stable-1.95.0-x86_64-pc-windows-msvc`
 /// - (`nightly-2025-01-15-aarch64-apple-darwin`, `1.89.0`) → `nightly-1.89.0-aarch64-apple-darwin`
+/// - (`stable-x86_64-pc-windows-msvc`, `1.95.0`) → `stable-1.95.0-x86_64-pc-windows-msvc`
+/// - (`1.95.0-x86_64-pc-windows-msvc`, `1.95.0`) → `1.95.0-x86_64-pc-windows-msvc` (unchanged)
 pub fn build_display_name(name: &str, version: &str) -> String {
     let parts: Vec<&str> = name.split('-').collect();
     if parts.len() >= 4 && toolchain_name_has_date(name) {
-        // Replace parts[1..4] (YYYY-MM-DD) with the version
+        // {channel}-{YYYY}-{MM}-{DD}-{target-triple} → {channel}-{version}-{target-triple}
         let mut display_parts: Vec<&str> = vec![parts[0]];
         display_parts.push(version);
         display_parts.extend_from_slice(&parts[4..]);
+        display_parts.join("-")
+    } else if parts.len() >= 2
+        && matches!(parts[0], "stable" | "beta" | "nightly")
+        && !toolchain_name_has_date(name)
+    {
+        // {channel}-{target-triple} (default install, e.g. stable-x86_64-pc-windows-msvc)
+        // → {channel}-{version}-{target-triple}
+        let mut display_parts: Vec<&str> = vec![parts[0]];
+        display_parts.push(version);
+        display_parts.extend_from_slice(&parts[1..]);
         display_parts.join("-")
     } else {
         name.to_string()
@@ -305,4 +317,45 @@ pub fn parse_check_update(
         updates.push(UpdateInfo { toolchain, up_to_date, new_version, current_version });
     }
     updates
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_display_name_date_format() {
+        let result = build_display_name(
+            "stable-2026-03-26-x86_64-pc-windows-msvc",
+            "1.95.0",
+        );
+        assert_eq!(result, "stable-1.95.0-x86_64-pc-windows-msvc");
+    }
+
+    #[test]
+    fn test_build_display_name_channel_only() {
+        let result = build_display_name("stable-x86_64-pc-windows-msvc", "1.95.0");
+        assert_eq!(result, "stable-1.95.0-x86_64-pc-windows-msvc");
+    }
+
+    #[test]
+    fn test_build_display_name_nightly_no_date() {
+        let result = build_display_name(
+            "nightly-x86_64-pc-windows-msvc",
+            "1.96.0",
+        );
+        assert_eq!(result, "nightly-1.96.0-x86_64-pc-windows-msvc");
+    }
+
+    #[test]
+    fn test_build_display_name_version_format_unchanged() {
+        let result = build_display_name("1.95.0-x86_64-pc-windows-msvc", "1.95.0");
+        assert_eq!(result, "1.95.0-x86_64-pc-windows-msvc");
+    }
+
+    #[test]
+    fn test_build_display_name_beta_channel_only() {
+        let result = build_display_name("beta-x86_64-pc-windows-msvc", "1.96.0");
+        assert_eq!(result, "beta-1.96.0-x86_64-pc-windows-msvc");
+    }
 }

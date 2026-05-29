@@ -89,21 +89,35 @@ const groupedReleases = computed(() => {
 
 // Check if a version is already installed
 const installedVersions = computed(() => {
-  const versions = new Set<string>()
+  const versionSet = new Set<string>()
+  const dateSet = new Set<string>()
   for (const tc of toolchains.value) {
-    const match = tc.name.match(/^(\d+\.\d+\.\d+)/)
-    if (match) versions.add(match[1])
+    const displayMatch = tc.display_name.match(
+      /^(?:stable|beta|nightly)?-?(\d+\.\d+\.\d+(?:-[a-z]+\.\d+)?)/
+    )
+    if (displayMatch) versionSet.add(displayMatch[1])
+    const versionMatch = tc.name.match(/^(\d+\.\d+\.\d+(?:-[a-z]+\.\d+)?)/)
+    if (versionMatch) versionSet.add(versionMatch[1])
     const nightlyMatch = tc.name.match(/^nightly-(\d{4}-\d{2}-\d{2})/)
-    if (nightlyMatch) versions.add(nightlyMatch[1])
+    if (nightlyMatch) dateSet.add(nightlyMatch[1])
+    const dateMatch = tc.name.match(/^(?:stable|beta)-(\d{4}-\d{2}-\d{2})/)
+    if (dateMatch) dateSet.add(dateMatch[1])
   }
-  return versions
+  return { versionSet, dateSet }
 })
 
 function isInstalled(release: { version: string; date: string; channel: string }): boolean {
-  if (release.channel === 'nightly') {
-    return installedVersions.value.has(release.date)
+  const cleanVer = release.version.split(' ')[0]
+  if (installedVersions.value.versionSet.has(cleanVer)) {
+    return true
   }
-  return installedVersions.value.has(release.version)
+  if (installedVersions.value.versionSet.has(release.version)) {
+    return true
+  }
+  if (installedVersions.value.dateSet.has(release.date)) {
+    return true
+  }
+  return false
 }
 
 async function syncReleases() {
@@ -141,11 +155,9 @@ async function installRelease(release: { version: string; date: string; channel:
 
   try {
     if (release.channel === 'nightly') {
-      await installToolchain('nightly', release.date)
-    } else if (release.channel === 'beta') {
-      await installToolchain('beta', release.date)
+      await installToolchain('nightly', undefined, release.date)
     } else {
-      await installToolchain('stable', release.date)
+      await installToolchain(release.channel, release.version, release.date)
     }
     installStatus.value = 'success'
     bgTask.finishTask('completed')

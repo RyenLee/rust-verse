@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 
 export interface ToolchainInfo {
   name: string
+  display_name: string
   channel: string
   is_default: boolean
   is_active: boolean
@@ -77,8 +78,13 @@ export function useRustup() {
     return invoke<ToolchainInfo[]>('list_toolchains', { rustupPath: RUSTUP })
   }
 
-  async function installToolchain(channel: string, date?: string) {
-    return invoke('install_toolchain', { rustupPath: RUSTUP, channel, date: date || null })
+  async function installToolchain(channel: string, version?: string, date?: string) {
+    return invoke('install_toolchain', {
+      rustupPath: RUSTUP,
+      channel,
+      version: version || null,
+      date: date || null,
+    })
   }
 
   async function uninstallToolchain(name: string) {

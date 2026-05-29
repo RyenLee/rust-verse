@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.11] - 2026-05-29
+
+### Fixed
+
+- **Beta channel version parsing** — Fixed `install_toolchain` command accepting beta version strings with git hash and date (e.g., `1.97.0-beta.1 (96f70397e 2026-05-26)`). Added version string cleaning to extract the pure version number before the first whitespace
+
+### Changed
+
+- **Version number installation support** — Toolchain installation now supports specifying version numbers directly (e.g., `1.96.0`) instead of only channel+date+platform format; the system automatically resolves to the latest available version for that channel
+
 ## [1.3.10] - 2026-05-28
 
 ### Fixed

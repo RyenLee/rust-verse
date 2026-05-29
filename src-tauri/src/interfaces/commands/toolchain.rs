@@ -37,8 +37,12 @@ pub async fn list_toolchains(
         parsing::parse_toolchain_list(&output, &parsing.default_marker, &parsing.active_marker)?;
 
     // Resolve version numbers for date-based toolchain names
+    // Also resolves version for default channel toolchains (e.g. stable-x86_64-pc-windows-msvc)
     for tc in &mut toolchains {
-        if parsing::toolchain_name_has_date(&tc.name) {
+        let needs_version = parsing::toolchain_name_has_date(&tc.name)
+            || (matches!(tc.channel.as_str(), "stable" | "beta" | "nightly")
+                && !tc.display_name.contains('.'));
+        if needs_version {
             if let Ok(ver_output) =
                 exec::run_command(&rustup_path, &["run", &tc.name, "rustc", "--version"], 15).await
             {
@@ -53,20 +57,23 @@ pub async fn list_toolchains(
 }
 
 /// Install a toolchain with streaming output.
+///
+/// For stable/beta channels, `version` is preferred (e.g. `1.95.0`).
+/// For nightly, `date` is used (e.g. `2026-03-26`).
 #[tauri::command]
 pub async fn install_toolchain(
     app: AppHandle,
     state: State<'_, AppState>,
     rustup_path: String,
     channel: String,
+    version: Option<String>,
     date: Option<String>,
 ) -> AppResult<()> {
     logger::logger().info(
         "toolchain",
         &format!(
-            "install_toolchain requested: {} {}",
-            channel,
-            date.as_deref().unwrap_or("")
+            "install_toolchain requested: {} (version={:?}, date={:?})",
+            channel, version, date
         ),
     );
     crate::infrastructure::system::env::validate_rust_binary(&rustup_path)
@@ -77,7 +84,15 @@ pub async fn install_toolchain(
         (locale_key, events.install_log, events.install_finished)
     };
 
-    let toolchain_name = if let Some(ref d) = date {
+    let toolchain_name = if channel == "nightly" {
+        if let Some(ref d) = date {
+            format!("{channel}-{d}")
+        } else {
+            channel.clone()
+        }
+    } else if let Some(ref v) = version {
+        v.split_whitespace().next().unwrap_or(v).to_string()
+    } else if let Some(ref d) = date {
         format!("{channel}-{d}")
     } else {
         channel.clone()

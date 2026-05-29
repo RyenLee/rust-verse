@@ -333,7 +333,7 @@ an HTTP-level proxy blocking the connection. Check your system proxy settings an
             Priority::High,
             NotificationKey::NetworkDiagFailed,
             &[],
-            Some("/updates"),
+            Some("/about"),
         );
     }
 

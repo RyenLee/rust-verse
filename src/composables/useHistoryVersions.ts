@@ -74,8 +74,8 @@ export function useHistoryVersions() {
     return countHistReleases(channel)
   }
 
-  async function installFromHistory(channel: string, date: string) {
-    return installToolchain(channel, date)
+  async function installFromHistory(channel: string, version: string, date: string) {
+    return installToolchain(channel, version, date)
   }
 
   return {

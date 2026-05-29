@@ -69,9 +69,10 @@ fn resolve_binary(bin: &str) -> std::path::PathBuf {
 fn init_command_from_path(path: &std::path::Path, args: &[&str], locale: &str) -> Command {
     let mut cmd = Command::new(path);
     cmd.args(args)
-        .env("LC_ALL", locale)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stderr(Stdio::piped())
+        .env("LC_ALL", locale);
     #[cfg(windows)]
     {
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
