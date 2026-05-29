@@ -2,6 +2,7 @@
 //!
 //! No framework dependencies, no I/O, no side effects.
 
+use crate::domain::constants::channel;
 use crate::domain::entity::{
     CargoPluginInfo, CrmTestResult, ComponentInfo, MirrorInfo, MirrorLatency, OverrideInfo,
     SearchResult, TargetInfo, ToolchainInfo, UpdateInfo,
@@ -190,7 +191,6 @@ pub fn toolchain_name_has_date(name: &str) -> bool {
     if parts.len() < 4 {
         return false;
     }
-    // Check if parts[1] looks like YYYY and parts[2] looks like MM and parts[3] looks like DD
     let year = parts[1].parse::<u32>().unwrap_or(0);
     let month = parts[2].parse::<u32>().unwrap_or(0);
     let day = parts[3].parse::<u32>().unwrap_or(0);
@@ -207,17 +207,14 @@ pub fn toolchain_name_has_date(name: &str) -> bool {
 pub fn build_display_name(name: &str, version: &str) -> String {
     let parts: Vec<&str> = name.split('-').collect();
     if parts.len() >= 4 && toolchain_name_has_date(name) {
-        // {channel}-{YYYY}-{MM}-{DD}-{target-triple} → {channel}-{version}-{target-triple}
         let mut display_parts: Vec<&str> = vec![parts[0]];
         display_parts.push(version);
         display_parts.extend_from_slice(&parts[4..]);
         display_parts.join("-")
     } else if parts.len() >= 2
-        && matches!(parts[0], "stable" | "beta" | "nightly")
+        && matches!(parts[0], channel::STABLE | channel::BETA | channel::NIGHTLY)
         && !toolchain_name_has_date(name)
     {
-        // {channel}-{target-triple} (default install, e.g. stable-x86_64-pc-windows-msvc)
-        // → {channel}-{version}-{target-triple}
         let mut display_parts: Vec<&str> = vec![parts[0]];
         display_parts.push(version);
         display_parts.extend_from_slice(&parts[1..]);
@@ -233,12 +230,9 @@ pub fn build_display_name(name: &str, version: &str) -> String {
 /// Output: `1.95.0`
 pub fn parse_rustc_version(output: &str) -> Option<String> {
     let line = output.lines().next()?.trim();
-    // Format: "rustc X.Y.Z (hash date)" or "rustc X.Y.Z-beta.N (hash date)"
     let after_rustc = line.strip_prefix("rustc ")?;
     let version = after_rustc.split_whitespace().next()?;
-    // Validate it looks like a version number
     if version.split('.').any(|p| p.parse::<u32>().is_err() && !p.starts_with(|c: char| c.is_ascii_digit())) {
-        // Allow pre-release tags like "1.89.0-beta.2" — first segment must be digit
         if version.split('.').next()?.parse::<u32>().is_ok() {
             return Some(version.to_string());
         }
@@ -251,7 +245,7 @@ pub fn parse_channel_from_name(name: &str) -> String {
     let parts: Vec<&str> = name.split('-').collect();
     if parts.is_empty() { return name.to_string(); }
     match parts[0] {
-        "stable" | "beta" | "nightly" => return parts[0].to_string(),
+        channel::STABLE | channel::BETA | channel::NIGHTLY => return parts[0].to_string(),
         _ => {}
     }
     if parts[0].parse::<f64>().is_ok() { return parts[0].to_string(); }
@@ -271,8 +265,8 @@ pub fn parse_toolchain_list(output: &str, default_marker: &str, active_marker: &
         let is_active = line.contains(active_marker) && !is_default;
         let name = line.split('(').next().unwrap_or("").trim().to_string();
         if name.is_empty() { continue; }
-        let channel = parse_channel_from_name(&name);
-        toolchains.push(ToolchainInfo { name: name.clone(), display_name: name, channel, is_default, is_active });
+        let channel_name = parse_channel_from_name(&name);
+        toolchains.push(ToolchainInfo { name: name.clone(), display_name: name, channel: channel_name, is_default, is_active });
     }
     Ok(toolchains)
 }
@@ -283,10 +277,10 @@ pub fn is_valid_toolchain_name(name: &str) -> bool {
     if name == "rustup" { return true; }
     let parts: Vec<&str> = name.splitn(2, '-').collect();
     if parts.len() != 2 { return false; }
-    let channel = parts[0];
+    let ch = parts[0];
     let rest = parts[1];
-    let valid_channel = matches!(channel, "stable" | "nightly" | "beta")
-        || channel.chars().next().map_or(false, |c| c.is_ascii_digit());
+    let valid_channel = matches!(ch, channel::STABLE | channel::BETA | channel::NIGHTLY)
+        || ch.chars().next().map_or(false, |c| c.is_ascii_digit());
     let has_target_triple = rest.split('-').count() >= 3;
     valid_channel && has_target_triple
 }

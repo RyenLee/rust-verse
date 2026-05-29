@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRustup, type HistRelease } from './useRustup'
 
 /**
@@ -26,19 +26,19 @@ const syncError = ref<string | null>(null)
 
 export function useHistoryVersions() {
   const {
-    syncHistReleases,
     listHistReleases,
     searchHistReleases,
     countHistReleases,
+    syncFromManifests: invokeSyncFromManifests,
     installToolchain,
   } = useRustup()
 
-  async function sync(channel: string, full: boolean = false, days: number = 90) {
+  async function syncFromManifests() {
     syncing.value = true
     syncError.value = null
     try {
-      const count = await syncHistReleases(channel, full, days)
-      await refresh(channel)
+      const count = await invokeSyncFromManifests()
+      await refresh()
       return count
     } catch (e: unknown) {
       syncError.value = extractErrorMessage(e)
@@ -83,7 +83,7 @@ export function useHistoryVersions() {
     loading,
     syncing,
     syncError,
-    sync,
+    syncFromManifests,
     refresh,
     search,
     count,

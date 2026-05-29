@@ -3,6 +3,7 @@ pub mod env_check;
 pub mod env_var;
 pub mod histver;
 pub mod locale;
+pub mod manifest;
 pub mod mirror;
 pub mod notification;
 pub mod override_cmd;

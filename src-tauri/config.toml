@@ -1,6 +1,6 @@
 [app]
 name = "RustVerse"
-version = "1.3.11"
+version = "1.3.13"
 description = "Rust Toolchain Visual Version Manager"
 
 [binaries]
@@ -8,7 +8,20 @@ rustup = "rustup"
 cargo = "cargo"
 
 [paths]
+# Cargo command-line tool directory, where Cargo-related binaries are stored
 cargo_bin_relative = ".cargo/bin"
+# user data directory, where user data is stored
+data_dir = "$EXE_DIR/data"
+# log directory, where application logs are stored
+log_dir = "$EXE_DIR/logs"
+# Webview directory, where Webview-related data is stored
+webview_dir = "$EXE_DIR/webview"
+# Temp directory, where temporary files are stored
+temp_dir = "$EXE_DIR/temp"
+
+[database]
+db_type = "redb"
+db_name = "rustverse_db"
 
 [locale]
 codes = ["en","zh-CN"]
@@ -20,6 +33,23 @@ codes = ["en","zh-CN"]
 [locale.meta."zh-CN"]
   name = "简体中文"
   english_name = "Chinese Simplified"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

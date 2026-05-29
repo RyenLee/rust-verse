@@ -190,10 +190,6 @@ export function useRustup() {
   }
 
   // Historical versions
-  async function syncHistReleases(channel: string, full: boolean = false, days: number = 90) {
-    return invoke<number>('sync_hist_releases', { channel, full, days })
-  }
-
   async function listHistReleases(channel?: string) {
     return invoke<HistRelease[]>('list_hist_releases', { channel: channel || null })
   }
@@ -204,6 +200,10 @@ export function useRustup() {
 
   async function countHistReleases(channel?: string) {
     return invoke<number>('count_hist_releases', { channel: channel || null })
+  }
+
+  async function syncFromManifests() {
+    return invoke<number>('sync_from_manifests')
   }
 
   return {
@@ -241,9 +241,9 @@ export function useRustup() {
     uninstallRustup,
     installRustup,
     // Historical versions
-    syncHistReleases,
     listHistReleases,
     searchHistReleases,
     countHistReleases,
+    syncFromManifests,
   }
 }

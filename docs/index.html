@@ -779,14 +779,14 @@
         <div class="hero-version">
           <span class="ver-label" data-lang="zh-CN">最新版本</span>
           <span class="ver-label" data-lang="en">Latest</span>
-          <span class="ver-num">v1.3.11</span>
+          <span class="ver-num">v1.3.13</span>
           <span class="ver-sep"></span>
-          <span class="ver-date">2026-05-29</span>
+          <span class="ver-date">2026-05-30</span>
         </div>
         <div class="cta-row">
           <a
             class="btn btn-primary"
-            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.11"
+            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.13"
             target="_blank"
             rel="noopener"
           >
@@ -990,35 +990,71 @@
           <h2 class="section-title" data-lang="en">Release History</h2>
         </div>
         <div class="changelog-timeline">
-          <!-- v1.3.10 -->
+          <!-- v1.3.13 -->
+          <div class="release-entry">
+            <div class="release-dot"></div>
+            <div class="release-head">
+              <span class="release-ver">v1.3.13</span>
+              <span class="release-date">2026-05-30</span>
+              <span class="release-latest" data-lang="zh-CN">最新</span>
+              <span class="release-latest" data-lang="en">Latest</span>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-changed" data-lang="zh-CN">改进</span>
+              <span class="change-group-label label-changed" data-lang="en">Changed</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">
+                  项目代码常量抽取重构 — 把所有硬编码字符串抽取到 domain/constants.rs 模块，按类别子模块组织（channel,
+                  table_name, url, file_name, event_name, log_module, installer, tray, app, system_env, page_route,
+                  proxy_type, proxy_env_var, locale, manifest_parse, system_binary, registry_key, path_segment）
+                </li>
+                <li data-lang="en">
+                  Constant extraction refactoring — All hardcoded strings moved to domain/constants.rs module, organized
+                  by category submodules (channel, table_name, url, file_name, event_name, log_module, installer, tray,
+                  app, system_env, page_route, proxy_type, proxy_env_var, locale, manifest_parse, system_binary,
+                  registry_key, path_segment)
+                </li>
+              </ul>
+            </div>
+          </div>
+          <!-- v1.3.11 -->
           <div class="release-entry">
             <div class="release-dot"></div>
             <div class="release-head">
               <span class="release-ver">v1.3.11</span>
               <span class="release-date">2026-05-29</span>
-              <span class="release-latest" data-lang="zh-CN">最新</span>
-              <span class="release-latest" data-lang="en">Latest</span>
             </div>
             <div class="change-group">
-              <span class="change-tag tag-fix" data-lang="zh-CN">修复</span>
-              <span class="change-tag tag-fix" data-lang="en">Fixed</span>
-              <ul>
-                <li data-lang="zh-CN">修复 Windows 下 cargo install crm 后 PATH 缓存导致 program not found — 新增 resolve_binary 多级路径查找（PATH → 注册表 → CARGO_HOME/bin → ~/.cargo/bin）</li>
-                <li data-lang="en">Fixed Windows PATH cache causing &quot;program not found&quot; after cargo install crm — added resolve_binary multi-level lookup (PATH → Registry → CARGO_HOME/bin → ~/.cargo/bin)</li>
+              <span class="change-group-label label-fixed" data-lang="zh-CN">修复</span>
+              <span class="change-group-label label-fixed" data-lang="en">Fixed</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">
+                  修复 Windows 下 cargo install crm 后 PATH 缓存导致 program not found — 新增 resolve_binary
+                  多级路径查找（PATH → 注册表 → CARGO_HOME/bin → ~/.cargo/bin）
+                </li>
+                <li data-lang="en">
+                  Fixed Windows PATH cache causing &quot;program not found&quot; after cargo install crm — added
+                  resolve_binary multi-level lookup (PATH → Registry → CARGO_HOME/bin → ~/.cargo/bin)
+                </li>
                 <li data-lang="zh-CN">区分 BinaryNotFound 和 Command 错误类型，前端检测到未安装时自动回退到引导页</li>
-                <li data-lang="en">Distinguished BinaryNotFound from Command errors; frontend auto-falls back to guide page when binary missing</li>
+                <li data-lang="en">
+                  Distinguished BinaryNotFound from Command errors; frontend auto-falls back to guide page when binary
+                  missing
+                </li>
                 <li data-lang="zh-CN">修复镜像列表解析测试中 mirror_type 判断错误</li>
                 <li data-lang="en">Fixed mirror_type assertion in mirror list parsing test</li>
               </ul>
             </div>
             <div class="change-group">
-              <span class="change-tag tag-change" data-lang="zh-CN">改进</span>
-              <span class="change-tag tag-change" data-lang="en">Changed</span>
-              <ul>
+              <span class="change-group-label label-changed" data-lang="zh-CN">改进</span>
+              <span class="change-group-label label-changed" data-lang="en">Changed</span>
+              <ul class="change-list">
                 <li data-lang="zh-CN">crm 安装后自动调用 refresh_process_path 刷新进程 PATH</li>
                 <li data-lang="en">Auto refresh_process_path after crm installation</li>
                 <li data-lang="zh-CN">所有 crm 操作增加 BinaryNotFound 错误处理，统一降级策略</li>
-                <li data-lang="en">Added BinaryNotFound error handling to all crm operations with unified fallback strategy</li>
+                <li data-lang="en">
+                  Added BinaryNotFound error handling to all crm operations with unified fallback strategy
+                </li>
               </ul>
             </div>
           </div>
@@ -1034,7 +1070,10 @@
               <span class="change-tag tag-feat" data-lang="en">Added</span>
               <ul>
                 <li data-lang="zh-CN">通知自动清理周期任务 — 后端每5分钟按设置清理过期已读通知，启动时立即执行一次</li>
-                <li data-lang="en">Notification auto-cleanup periodic task — backend cleans expired read notifications every 5 min per settings, also on startup</li>
+                <li data-lang="en">
+                  Notification auto-cleanup periodic task — backend cleans expired read notifications every 5 min per
+                  settings, also on startup
+                </li>
                 <li data-lang="zh-CN">侧边栏和欢迎页 Logo 替换为实际应用图标（/icon.png）</li>
                 <li data-lang="en">Sidebar &amp; Welcome logo replaced with actual app icon (/icon.png)</li>
               </ul>
@@ -1044,7 +1083,10 @@
               <span class="change-tag tag-change" data-lang="en">Changed</span>
               <ul>
                 <li data-lang="zh-CN">帮助面板重构 — 基于 requirements.md 划分为11+功能模块，添加项目地址和主页链接</li>
-                <li data-lang="en">Help panel restructured — 11+ feature sections based on requirements.md, added project URL &amp; homepage links</li>
+                <li data-lang="en">
+                  Help panel restructured — 11+ feature sections based on requirements.md, added project URL &amp;
+                  homepage links
+                </li>
                 <li data-lang="zh-CN">帮助面板和软件更新网络诊断国际化</li>
                 <li data-lang="en">Help panel &amp; AppUpdate network diagnostic internationalized</li>
               </ul>
@@ -1054,7 +1096,9 @@
               <span class="change-tag tag-fix" data-lang="en">Fixed</span>
               <ul>
                 <li data-lang="zh-CN">修复通知自动清理过期不生效问题（新增后台周期清理任务）</li>
-                <li data-lang="en">Fixed notification auto-cleanup not working (added periodic background cleanup task)</li>
+                <li data-lang="en">
+                  Fixed notification auto-cleanup not working (added periodic background cleanup task)
+                </li>
                 <li data-lang="zh-CN">修复 redb BTree 游标失效导致清理不完整</li>
                 <li data-lang="en">Fixed redb BTree cursor invalidation causing incomplete cleanup</li>
                 <li data-lang="zh-CN">修复后台任务窗口最小化/恢复流程异常</li>
@@ -1077,8 +1121,12 @@
               <span class="change-tag tag-change" data-lang="zh-CN">重构</span>
               <span class="change-tag tag-change" data-lang="en">Refactor</span>
               <ul>
-                <li data-lang="zh-CN">DDD架构重构 — 后端按领域驱动设计分层为 domain/infrastructure/interfaces/application</li>
-                <li data-lang="en">DDD architecture refactoring — backend split into domain/infrastructure/interfaces/application layers</li>
+                <li data-lang="zh-CN">
+                  DDD架构重构 — 后端按领域驱动设计分层为 domain/infrastructure/interfaces/application
+                </li>
+                <li data-lang="en">
+                  DDD architecture refactoring — backend split into domain/infrastructure/interfaces/application layers
+                </li>
               </ul>
             </div>
             <div class="change-group">
@@ -1086,7 +1134,9 @@
               <span class="change-tag tag-feat" data-lang="en">Added</span>
               <ul>
                 <li data-lang="zh-CN">通知中心 — 实时推送、标记已读/全部已读、可配置自动清理</li>
-                <li data-lang="en">Notification Center — real-time push, mark read/mark all read, configurable auto-cleanup</li>
+                <li data-lang="en">
+                  Notification Center — real-time push, mark read/mark all read, configurable auto-cleanup
+                </li>
                 <li data-lang="zh-CN">设置页面 — 通知偏好、自动清理配置、主题切换</li>
                 <li data-lang="en">Settings page — notification preferences, auto-cleanup config, theme toggle</li>
                 <li data-lang="zh-CN">TopBar通知徽章、BackgroundTaskOverlay、DateRangePicker等组件</li>

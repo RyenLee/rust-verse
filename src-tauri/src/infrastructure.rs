@@ -3,6 +3,7 @@
 //! Implements domain repository traits with real infrastructure:
 //! redb database, system environment, CLI execution, logging, proxy, installer.
 
+pub mod app_paths;
 pub mod config;
 pub mod config_cache;
 pub mod db;

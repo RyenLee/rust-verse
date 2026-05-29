@@ -1,8 +1,10 @@
+use crate::domain::constants::{event_name, log_module, system_binary, system_env};
 use crate::domain::entity::TerminalReinitResult;
 use crate::domain::error::AppResult;
 use crate::infrastructure::system::env::binary_exists;
 use crate::infrastructure::{installer, logger};
 use crate::state::AppState;
+use tauri::Emitter;
 
 /// Internal logic for refreshing process PATH and Rust-related env vars.
 pub fn refresh_process_path_inner() -> AppResult<String> {
@@ -14,25 +16,25 @@ pub fn refresh_process_path_inner() -> AppResult<String> {
         use crate::infrastructure::system::env::{read_system_env_var, read_user_env_var};
 
         let mut new_path_parts: Vec<String> = Vec::new();
-        if let Some(system_path) = read_system_env_var("Path") {
+        if let Some(system_path) = read_system_env_var(system_env::PATH) {
             new_path_parts.push(system_path);
         }
-        if let Some(user_path) = read_user_env_var("Path") {
+        if let Some(user_path) = read_user_env_var(system_env::PATH) {
             new_path_parts.push(user_path);
         }
 
         if !new_path_parts.is_empty() {
             let new_path = new_path_parts.join(";");
-            let old_path = std::env::var("PATH").unwrap_or_default();
+            let old_path = std::env::var(system_env::PATH).unwrap_or_default();
             if new_path != old_path {
                 unsafe {
-                    std::env::set_var("PATH", &new_path);
+                    std::env::set_var(system_env::PATH, &new_path);
                 }
                 added.push(format!("PATH updated ({} chars)", new_path.len()));
             }
         }
 
-        for var_name in &["CARGO_HOME", "RUSTUP_HOME"] {
+        for var_name in &[system_env::CARGO_HOME, system_env::RUSTUP_HOME] {
             let current = std::env::var(var_name).ok();
             let from_system = read_system_env_var(var_name);
             let from_user = read_user_env_var(var_name);
@@ -89,7 +91,7 @@ async fn try_elevated_uninstall(rustup: &str) -> Result<(), String> {
     std::fs::write(&script_path, &script_content)
         .map_err(|e| format!("failed to write script: {e}"))?;
 
-    let output = tokio::process::Command::new("powershell.exe")
+    let output = tokio::process::Command::new(system_binary::POWERSHELL)
         .args([
             "-NoProfile",
             "-ExecutionPolicy",
@@ -214,7 +216,7 @@ async fn install_rustup_unix(app: tauri::AppHandle) -> AppResult<()> {
 #[tauri::command]
 pub async fn install_rustup(app: tauri::AppHandle) -> AppResult<()> {
     let log = logger::logger();
-    log.info("install", "Install rustup requested");
+    log.info(log_module::INSTALL, "Install rustup requested");
 
     let _ = refresh_process_path_inner();
 
@@ -223,7 +225,7 @@ pub async fn install_rustup(app: tauri::AppHandle) -> AppResult<()> {
 
     if rustup_ok && cargo_ok {
         log.info(
-            "install",
+            log_module::INSTALL,
             "rustup and cargo are already installed, aborting",
         );
         return Err(crate::domain::error::AppError::Command(
@@ -231,14 +233,14 @@ pub async fn install_rustup(app: tauri::AppHandle) -> AppResult<()> {
         ));
     }
 
-    log.info("install", "Starting rustup installation...");
+    log.info(log_module::INSTALL, "Starting rustup installation...");
 
     #[cfg(target_os = "windows")]
     {
         let result = install_rustup_windows(app).await;
         match &result {
-            Ok(()) => log.info("install", "Rustup installation completed successfully"),
-            Err(e) => log.error("install", &format!("Rustup installation failed: {e}")),
+            Ok(()) => log.info(log_module::INSTALL, "Rustup installation completed successfully"),
+            Err(e) => log.error(log_module::INSTALL, &format!("Rustup installation failed: {e}")),
         }
         result
     }
@@ -247,8 +249,8 @@ pub async fn install_rustup(app: tauri::AppHandle) -> AppResult<()> {
     {
         let result = install_rustup_unix(app).await;
         match &result {
-            Ok(()) => log.info("install", "Rustup installation completed successfully"),
-            Err(e) => log.error("install", &format!("Rustup installation failed: {e}")),
+            Ok(()) => log.info(log_module::INSTALL, "Rustup installation completed successfully"),
+            Err(e) => log.error(log_module::INSTALL, &format!("Rustup installation failed: {e}")),
         }
         result
     }
@@ -305,7 +307,7 @@ pub fn invalidate_config_cache(state: tauri::State<'_, AppState>) -> AppResult<(
 #[tauri::command]
 pub fn reinit_terminal(state: tauri::State<'_, AppState>) -> AppResult<TerminalReinitResult> {
     let log = logger::logger();
-    log.info("terminal", "Terminal reinitialization requested");
+    log.info(log_module::TERMINAL, "Terminal reinitialization requested");
 
     // 1. Cancel any running background task
     let tasks_killed = {
@@ -315,7 +317,7 @@ pub fn reinit_terminal(state: tauri::State<'_, AppState>) -> AppResult<TerminalR
                 .task_state
                 .cancel_flag
                 .store(true, std::sync::atomic::Ordering::SeqCst);
-            log.info("terminal", "Cancelled running background task for reinitialization");
+            log.info(log_module::TERMINAL, "Cancelled running background task for reinitialization");
             true
         } else {
             false
@@ -329,11 +331,11 @@ pub fn reinit_terminal(state: tauri::State<'_, AppState>) -> AppResult<TerminalR
     let proxy_config = crate::infrastructure::proxy::get_proxy_config();
     crate::infrastructure::proxy::apply_to_current_process(&proxy_config);
     let proxy_applied = format!("{:?}", proxy_config);
-    log.info("terminal", &format!("Proxy re-applied: {:?}", proxy_config));
+    log.info(log_module::TERMINAL, &format!("Proxy re-applied: {:?}", proxy_config));
 
     // 4. Refresh PATH and Rust env vars from system (Windows Registry)
     let env_refreshed = refresh_process_path_inner().unwrap_or_else(|e| format!("Error: {e}"));
-    log.info("terminal", &format!("Env refreshed: {}", env_refreshed));
+    log.info(log_module::TERMINAL, &format!("Env refreshed: {}", env_refreshed));
 
     // 5. Broadcast WM_SETTINGCHANGE so Windows-aware processes pick up env changes
     #[cfg(target_os = "windows")]
@@ -364,7 +366,7 @@ pub fn reinit_terminal(state: tauri::State<'_, AppState>) -> AppResult<TerminalR
                 std::ptr::null_mut(),
             );
         }
-        log.info("terminal", "WM_SETTINGCHANGE broadcast sent");
+        log.info(log_module::TERMINAL, "WM_SETTINGCHANGE broadcast sent");
     }
 
     let message = if tasks_killed {
@@ -379,7 +381,7 @@ pub fn reinit_terminal(state: tauri::State<'_, AppState>) -> AppResult<TerminalR
         )
     };
 
-    log.info("terminal", &message);
+    log.info(log_module::TERMINAL, &message);
 
     Ok(TerminalReinitResult {
         success: true,
@@ -388,4 +390,21 @@ pub fn reinit_terminal(state: tauri::State<'_, AppState>) -> AppResult<TerminalR
         env_refreshed,
         message,
     })
+}
+
+/// Restart the application to apply updates.
+/// Emits an event to the frontend, then exits the process after a brief delay.
+#[tauri::command]
+pub async fn restart_application(app: tauri::AppHandle) -> AppResult<()> {
+    let log = logger::logger();
+    log.info(log_module::UPDATE, "Application restart requested");
+
+    app.emit(event_name::APP_RESTARTING, ()).ok();
+
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+    log.info(log_module::UPDATE, "Exiting application for restart");
+    app.exit(0);
+
+    Ok(())
 }

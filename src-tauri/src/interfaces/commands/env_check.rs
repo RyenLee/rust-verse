@@ -1,6 +1,7 @@
 //! Environment check commands — thin forwarding layer.
 
 use crate::application::env_check as env_check_svc;
+use crate::domain::constants::page_route;
 use crate::domain::notification::{Category, NotificationKey, Priority};
 use crate::infrastructure::db;
 use crate::infrastructure::exec::run_command;
@@ -52,7 +53,7 @@ pub async fn check_env(
                 ("rustup", if rustup_installed { "OK" } else { "NOT FOUND" }),
                 ("cargo", if cargo_installed { "OK" } else { "NOT FOUND" }),
             ],
-            Some("/"),
+            Some(page_route::ROOT),
         );
     }
 

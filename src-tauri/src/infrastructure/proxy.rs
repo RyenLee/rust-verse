@@ -17,6 +17,7 @@
 
 use std::sync::{Arc, Mutex, OnceLock};
 
+use crate::domain::constants::{log_module, proxy_env_var, proxy_type};
 use crate::domain::repository::DataStore;
 use crate::infrastructure::logger;
 use crate::domain::settings::UserSettings;
@@ -66,7 +67,7 @@ pub fn get_proxy_config() -> ProxyConfig {
     // Fallback: no resolver available (should only happen in early startup
     // or in tests that don't call init_proxy_resolver_with_store).
     logger::logger().info(
-        "proxy",
+        log_module::PROXY,
         "ProxyResolver not initialized – using direct connection",
     );
     ProxyConfig::Direct
@@ -81,7 +82,7 @@ pub fn invalidate_cache() {
         let mut guard = resolver.cache.lock().unwrap_or_else(|e| e.into_inner());
         *guard = CachedEntry::Empty;
         logger::logger().info(
-            "proxy",
+            log_module::PROXY,
             "cache invalidated – next terminal call will re-read from DB",
         );
     }
@@ -103,41 +104,41 @@ pub fn apply_to_current_process(config: &ProxyConfig) {
     match config {
         ProxyConfig::Direct => {
             unsafe {
-                std::env::remove_var("HTTP_PROXY");
-                std::env::remove_var("HTTPS_PROXY");
-                std::env::remove_var("http_proxy");
-                std::env::remove_var("https_proxy");
-                std::env::remove_var("ALL_PROXY");
-                std::env::remove_var("all_proxy");
-                std::env::remove_var("SOCKS_PROXY");
-                std::env::remove_var("socks_proxy");
-                std::env::remove_var("SOCKS5_PROXY");
-                std::env::remove_var("socks5_proxy");
-                std::env::remove_var("NO_PROXY");
-                std::env::remove_var("no_proxy");
+                std::env::remove_var(proxy_env_var::HTTP_PROXY);
+                std::env::remove_var(proxy_env_var::HTTPS_PROXY);
+                std::env::remove_var(proxy_env_var::HTTP_PROXY_LOWER);
+                std::env::remove_var(proxy_env_var::HTTPS_PROXY_LOWER);
+                std::env::remove_var(proxy_env_var::ALL_PROXY);
+                std::env::remove_var(proxy_env_var::ALL_PROXY_LOWER);
+                std::env::remove_var(proxy_env_var::SOCKS_PROXY);
+                std::env::remove_var(proxy_env_var::SOCKS_PROXY_LOWER);
+                std::env::remove_var(proxy_env_var::SOCKS5_PROXY);
+                std::env::remove_var(proxy_env_var::SOCKS5_PROXY_LOWER);
+                std::env::remove_var(proxy_env_var::NO_PROXY);
+                std::env::remove_var(proxy_env_var::NO_PROXY_LOWER);
             }
-            logger::logger().info("proxy", "current process proxy env vars cleared (direct)");
+            logger::logger().info(log_module::PROXY, "current process proxy env vars cleared (direct)");
         }
         ProxyConfig::System => {
             unsafe {
-                std::env::remove_var("HTTP_PROXY");
-                std::env::remove_var("HTTPS_PROXY");
-                std::env::remove_var("http_proxy");
-                std::env::remove_var("https_proxy");
-                std::env::remove_var("ALL_PROXY");
-                std::env::remove_var("all_proxy");
+                std::env::remove_var(proxy_env_var::HTTP_PROXY);
+                std::env::remove_var(proxy_env_var::HTTPS_PROXY);
+                std::env::remove_var(proxy_env_var::HTTP_PROXY_LOWER);
+                std::env::remove_var(proxy_env_var::HTTPS_PROXY_LOWER);
+                std::env::remove_var(proxy_env_var::ALL_PROXY);
+                std::env::remove_var(proxy_env_var::ALL_PROXY_LOWER);
             }
-            logger::logger().info("proxy", "current process proxy env vars cleared (system mode – OS handles proxy)");
+            logger::logger().info(log_module::PROXY, "current process proxy env vars cleared (system mode – OS handles proxy)");
         }
         ProxyConfig::Manual { host, port } => {
             let url = format!("http://{}:{}", host, port);
             unsafe {
-                std::env::set_var("HTTP_PROXY", &url);
-                std::env::set_var("HTTPS_PROXY", &url);
-                std::env::set_var("http_proxy", &url);
-                std::env::set_var("https_proxy", &url);
+                std::env::set_var(proxy_env_var::HTTP_PROXY, &url);
+                std::env::set_var(proxy_env_var::HTTPS_PROXY, &url);
+                std::env::set_var(proxy_env_var::HTTP_PROXY_LOWER, &url);
+                std::env::set_var(proxy_env_var::HTTPS_PROXY_LOWER, &url);
             }
-            logger::logger().info("proxy", &format!("current process proxy set to {}", url));
+            logger::logger().info(log_module::PROXY, &format!("current process proxy set to {}", url));
         }
     }
 }
@@ -176,18 +177,18 @@ impl ProxyResolver {
 
         // 1. Check cache (under lock)
         if let CachedEntry::Resolved(ref config) = *guard {
-            logger::logger().info("proxy", &format!("cache hit → {:?}", config));
+            logger::logger().info(log_module::PROXY, &format!("cache hit → {:?}", config));
             return config.clone();
         }
 
         // 2. Cache miss — read from database (lock still held)
-        logger::logger().info("proxy", "cache miss – reading user settings from database");
+        logger::logger().info(log_module::PROXY, "cache miss – reading user settings from database");
         let config = match self.store.get_settings() {
             Some(json) => match serde_json::from_str::<UserSettings>(&json) {
                 Ok(settings) => Self::parse_settings(&settings),
                 Err(e) => {
                     logger::logger().error(
-                        "proxy",
+                        log_module::PROXY,
                         &format!("failed to parse settings JSON: {e} – falling back to direct"),
                     );
                     ProxyConfig::Direct
@@ -195,7 +196,7 @@ impl ProxyResolver {
             },
             None => {
                 logger::logger().info(
-                    "proxy",
+                    log_module::PROXY,
                     "no settings found in database – using defaults (direct)",
                 );
                 ProxyConfig::Direct
@@ -205,7 +206,7 @@ impl ProxyResolver {
         // 3. Store in cache (lock still held)
         *guard = CachedEntry::Resolved(config.clone());
 
-        logger::logger().info("proxy", &format!("resolved → {:?} (cached)", config));
+        logger::logger().info(log_module::PROXY, &format!("resolved → {:?} (cached)", config));
         config
     }
 }
@@ -216,24 +217,24 @@ impl ProxyResolver {
     /// Convert `UserSettings` into a concrete `ProxyConfig`.
     fn parse_settings(s: &UserSettings) -> ProxyConfig {
         match s.proxy_type.as_str() {
-            "none" => {
-                logger::logger().info("proxy", "proxy_type=none → direct connection");
+            proxy_type::NONE => {
+                logger::logger().info(log_module::PROXY, "proxy_type=none → direct connection");
                 ProxyConfig::Direct
             }
-            "system" => {
+            proxy_type::SYSTEM => {
                 logger::logger().info(
-                    "proxy",
+                    log_module::PROXY,
                     "proxy_type=system → pass-through (OS handles proxy)",
                 );
                 ProxyConfig::System
             }
-            "manual" => {
+            proxy_type::MANUAL => {
                 let host = s.proxy_host.trim().to_string();
                 let port = s.proxy_port;
 
                 if host.is_empty() || port == 0 {
                     logger::logger().warn(
-                        "proxy",
+                        log_module::PROXY,
                         &format!(
                             "proxy_type=manual but host='{host}' / port={port} are incomplete – falling back to direct"
                         ),
@@ -245,12 +246,12 @@ impl ProxyResolver {
                     host: host.clone(),
                     port,
                 };
-                logger::logger().info("proxy", &format!("proxy_type=manual → {}:{}", host, port));
+                logger::logger().info(log_module::PROXY, &format!("proxy_type=manual → {}:{}", host, port));
                 config
             }
             other => {
                 logger::logger().warn(
-                    "proxy",
+                    log_module::PROXY,
                     &format!("unknown proxy_type='{other}' – falling back to direct"),
                 );
                 ProxyConfig::Direct
@@ -285,7 +286,7 @@ pub fn apply_proxy_env(cmd: &mut tokio::process::Command, config: &ProxyConfig) 
     match config {
         ProxyConfig::Direct => {
             logger::logger().info(
-                "proxy",
+                log_module::PROXY,
                 "applying Direct mode - clearing all proxy environment variables",
             );
             // Ensure NO proxy env vars leak through - clear ALL known proxy-related variables
@@ -294,50 +295,50 @@ pub fn apply_proxy_env(cmd: &mut tokio::process::Command, config: &ProxyConfig) 
             // - SOCKS proxy vars
             // - NO_PROXY exclusion list (can interfere with direct connections)
             // - ALL_PROXY catch-all variable
-            cmd.env_remove("HTTP_PROXY")
-                .env_remove("HTTPS_PROXY")
-                .env_remove("http_proxy")
-                .env_remove("https_proxy")
-                .env_remove("ALL_PROXY")
-                .env_remove("all_proxy")
-                .env_remove("SOCKS_PROXY")
-                .env_remove("socks_proxy")
-                .env_remove("SOCKS5_PROXY")
-                .env_remove("socks5_proxy")
-                .env_remove("NO_PROXY")
-                .env_remove("no_proxy");
-            logger::logger().info("proxy", "cleared all proxy env vars (direct connection)");
+            cmd.env_remove(proxy_env_var::HTTP_PROXY)
+                .env_remove(proxy_env_var::HTTPS_PROXY)
+                .env_remove(proxy_env_var::HTTP_PROXY_LOWER)
+                .env_remove(proxy_env_var::HTTPS_PROXY_LOWER)
+                .env_remove(proxy_env_var::ALL_PROXY)
+                .env_remove(proxy_env_var::ALL_PROXY_LOWER)
+                .env_remove(proxy_env_var::SOCKS_PROXY)
+                .env_remove(proxy_env_var::SOCKS_PROXY_LOWER)
+                .env_remove(proxy_env_var::SOCKS5_PROXY)
+                .env_remove(proxy_env_var::SOCKS5_PROXY_LOWER)
+                .env_remove(proxy_env_var::NO_PROXY)
+                .env_remove(proxy_env_var::NO_PROXY_LOWER);
+            logger::logger().info(log_module::PROXY, "cleared all proxy env vars (direct connection)");
         }
         ProxyConfig::System => {
             logger::logger().info(
-                "proxy",
+                log_module::PROXY,
                 "applying System mode - passing through OS proxy settings",
             );
             // System mode: don't touch proxy env vars, let the OS handle it
             // But still clear any explicitly set vars that might override system settings
-            cmd.env_remove("HTTP_PROXY")
-                .env_remove("HTTPS_PROXY")
-                .env_remove("http_proxy")
-                .env_remove("https_proxy")
-                .env_remove("ALL_PROXY")
-                .env_remove("all_proxy");
+            cmd.env_remove(proxy_env_var::HTTP_PROXY)
+                .env_remove(proxy_env_var::HTTPS_PROXY)
+                .env_remove(proxy_env_var::HTTP_PROXY_LOWER)
+                .env_remove(proxy_env_var::HTTPS_PROXY_LOWER)
+                .env_remove(proxy_env_var::ALL_PROXY)
+                .env_remove(proxy_env_var::ALL_PROXY_LOWER);
             logger::logger().info(
-                "proxy",
+                log_module::PROXY,
                 "cleared user-set proxy env vars, OS proxy will be used",
             );
         }
         ProxyConfig::Manual { host, port } => {
             let url = format!("http://{}:{}", host, port);
             logger::logger().info(
-                "proxy",
+                log_module::PROXY,
                 &format!("applying Manual mode - setting proxy to {}", url),
             );
-            cmd.env("HTTP_PROXY", &url)
-                .env("HTTPS_PROXY", &url)
-                .env("http_proxy", &url)
-                .env("https_proxy", &url);
+            cmd.env(proxy_env_var::HTTP_PROXY, &url)
+                .env(proxy_env_var::HTTPS_PROXY, &url)
+                .env(proxy_env_var::HTTP_PROXY_LOWER, &url)
+                .env(proxy_env_var::HTTPS_PROXY_LOWER, &url);
             logger::logger().info(
-                "proxy",
+                log_module::PROXY,
                 &format!(
                     "applied proxy env vars: HTTP_PROXY={} HTTPS_PROXY={}",
                     url, url
@@ -354,7 +355,7 @@ mod tests {
     #[test]
     fn test_parse_direct() {
         let s = UserSettings {
-            proxy_type: "none".into(),
+            proxy_type: proxy_type::NONE.into(),
             ..Default::default()
         };
         let config = ProxyResolver::parse_settings(&s);
@@ -364,7 +365,7 @@ mod tests {
     #[test]
     fn test_parse_system() {
         let s = UserSettings {
-            proxy_type: "system".into(),
+            proxy_type: proxy_type::SYSTEM.into(),
             ..Default::default()
         };
         let config = ProxyResolver::parse_settings(&s);
@@ -374,7 +375,7 @@ mod tests {
     #[test]
     fn test_parse_manual_valid() {
         let s = UserSettings {
-            proxy_type: "manual".into(),
+            proxy_type: proxy_type::MANUAL.into(),
             proxy_host: "127.0.0.1".into(),
             proxy_port: 7890,
             ..Default::default()
@@ -392,7 +393,7 @@ mod tests {
     #[test]
     fn test_parse_manual_empty_host_falls_back_to_direct() {
         let s = UserSettings {
-            proxy_type: "manual".into(),
+            proxy_type: proxy_type::MANUAL.into(),
             proxy_host: "".into(),
             proxy_port: 8080,
             ..Default::default()
@@ -404,7 +405,7 @@ mod tests {
     #[test]
     fn test_parse_manual_zero_port_falls_back_to_direct() {
         let s = UserSettings {
-            proxy_type: "manual".into(),
+            proxy_type: proxy_type::MANUAL.into(),
             proxy_host: "proxy.example.com".into(),
             proxy_port: 0,
             ..Default::default()

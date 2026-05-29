@@ -5,6 +5,7 @@ use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
+use crate::domain::constants::{locale, log_module};
 use crate::domain::error::{AppError, AppResult};
 
 /// Rust-related environment variables that affect download sources.
@@ -72,7 +73,7 @@ fn init_command_from_path(path: &std::path::Path, args: &[&str], locale: &str) -
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .env("LC_ALL", locale);
+        .env(locale::LC_ALL, locale);
     #[cfg(windows)]
     {
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
@@ -93,7 +94,7 @@ fn init_command_from_path(path: &std::path::Path, args: &[&str], locale: &str) -
 /// If the command does not complete within `timeout_secs`, `AppError::Timeout` is returned.
 pub async fn run_command(bin: &str, args: &[&str], timeout_secs: u64) -> AppResult<String> {
     let resolved = resolve_binary(bin);
-    let mut cmd = init_command_from_path(&resolved, args, "C");
+    let mut cmd = init_command_from_path(&resolved, args, locale::LC_C);
 
     let result =
         tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), cmd.output()).await;
@@ -164,7 +165,7 @@ pub async fn run_command_with_timeout_allow_codes(
     allowed_codes: &[i32],
 ) -> AppResult<String> {
     let resolved = resolve_binary(bin);
-    let mut cmd = init_command_from_path(&resolved, args, "C");
+    let mut cmd = init_command_from_path(&resolved, args, locale::LC_C);
 
     let result =
         tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), cmd.output()).await;
@@ -222,7 +223,7 @@ fn spawn_line_reader(
         while let Ok(Some(line)) = lines.next_line().await {
             let _ = app.emit(&event_name, &line);
             crate::infrastructure::logger::logger()
-                .info("stream", &format!("[{}] {}", event_name, line));
+                .info(log_module::STREAM, &format!("[{}] {}", event_name, line));
         }
     });
 }
@@ -335,7 +336,7 @@ pub async fn run_command_with_cwd(
     timeout_secs: u64,
 ) -> AppResult<String> {
     let resolved = resolve_binary(bin);
-    let mut cmd = init_command_from_path(&resolved, args, "C");
+    let mut cmd = init_command_from_path(&resolved, args, locale::LC_C);
     cmd.current_dir(cwd);
 
     let result =

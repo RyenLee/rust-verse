@@ -26,6 +26,8 @@ const {
 } = useAppUpdater()
 
 const showProgress = ref(false)
+const showRestartButton = ref(false)
+const restarting = ref(false)
 
 const progressLines = computed(() => {
   const lines: string[] = []
@@ -84,10 +86,24 @@ async function cancelAppUpdateOp() {
   await bgTask.requestCancel()
 }
 
+async function handleRestart() {
+  restarting.value = true
+  try {
+    await invoke('restart_application')
+  } catch (e) {
+    console.error('[AppUpdate] Restart failed:', e)
+    restarting.value = false
+  }
+}
+
 function minimizeAppUpdateOp() {
   bgTask.minimize(
-    () => { showProgress.value = false },
-    () => { showProgress.value = true }
+    () => {
+      showProgress.value = false
+    },
+    () => {
+      showProgress.value = true
+    }
   )
 }
 
@@ -123,11 +139,14 @@ async function runDiag() {
 watch(downloadPhase, async phase => {
   if (phase === 'downloading' || phase === 'installing') {
     showProgress.value = true
+    showRestartButton.value = false
   }
   if (phase === 'success') {
-    // Reload app metadata so the version display reflects the newly installed version.
-    // The MSI installer has already updated the config; refresh from backend.
+    showRestartButton.value = true
     await store.loadAppMeta()
+  }
+  if (phase === 'error') {
+    showRestartButton.value = false
   }
 })
 </script>
@@ -223,7 +242,9 @@ watch(downloadPhase, async phase => {
           v-if="diagResult"
           class="space-y-2 text-xs font-mono bg-gray-100 dark:bg-gray-900 rounded p-3 max-h-64 overflow-y-auto"
         >
-          <p class="text-gray-600 dark:text-gray-400">{{ t('updates.networkDiag.elapsed', { ms: diagResult.elapsed_ms }) }}</p>
+          <p class="text-gray-600 dark:text-gray-400">
+            {{ t('updates.networkDiag.elapsed', { ms: diagResult.elapsed_ms }) }}
+          </p>
           <p
             :class="
               diagResult.dns.startsWith('OK') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
@@ -247,9 +268,7 @@ watch(downloadPhase, async phase => {
           </p>
 
           <!-- Conclusion with actionable suggestions -->
-          <div
-            class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700"
-          >
+          <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
             <p
               class="text-sm leading-relaxed whitespace-normal font-sans"
               :class="diagResult.success ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'"
@@ -292,5 +311,19 @@ watch(downloadPhase, async phase => {
       @cancel="cancelAppUpdateOp"
       @minimize="minimizeAppUpdateOp"
     />
+
+    <!-- Restart button overlay when update is ready -->
+    <div v-if="showRestartButton" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+      <div
+        class="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3 shadow-lg"
+      >
+        <p class="text-sm text-green-700 dark:text-green-300 mb-2">
+          {{ t('updates.status.appUpdateReady') }}
+        </p>
+        <BaseButton variant="primary" :loading="restarting" @click="handleRestart">
+          {{ t('updates.action.restartNow') || 'Restart Now' }}
+        </BaseButton>
+      </div>
+    </div>
   </PageLayout>
 </template>

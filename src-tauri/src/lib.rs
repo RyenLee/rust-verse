@@ -4,8 +4,8 @@ mod infrastructure;
 mod interfaces;
 mod state;
 
-use std::path::PathBuf;
-
+use crate::domain::constants::{app as app_const, event_name, file_name, log_module, tray};
+use crate::infrastructure::app_paths;
 use crate::infrastructure::db::{migrate_from_toml, open_or_create};
 use crate::infrastructure::logger;
 use interfaces::commands::component::{add_component, list_components, remove_component};
@@ -15,10 +15,13 @@ use interfaces::commands::env_var::{
     update_env_var_meta,
 };
 use interfaces::commands::histver::{
-    count_hist_releases, list_hist_releases, search_hist_releases, sync_hist_releases,
+    count_hist_releases, list_hist_releases, search_hist_releases,
 };
 use interfaces::commands::locale::{
     LocaleScanState, get_locale, list_available_locales, set_locale,
+};
+use interfaces::commands::manifest::{
+    download_manifests, startup_sync_manifests, sync_from_manifests,
 };
 use interfaces::commands::mirror::{
     check_crm_installed, crm_best, crm_current, crm_default, crm_list, crm_test, crm_use,
@@ -39,8 +42,8 @@ use interfaces::commands::plugin::{
 };
 use interfaces::commands::settings::{get_config, get_settings, save_settings};
 use interfaces::commands::system::{
-    cancel_background_task, frontend_log, get_log_dir, install_rustup,
-    invalidate_config_cache, is_background_task_running, refresh_process_path, reinit_terminal,
+    cancel_background_task, frontend_log, get_log_dir, install_rustup, invalidate_config_cache,
+    is_background_task_running, refresh_process_path, reinit_terminal, restart_application,
     uninstall_rustup,
 };
 use interfaces::commands::target::{add_target, list_targets, remove_target};
@@ -52,7 +55,7 @@ use state::AppState;
 use tauri::{
     Emitter, Manager, WebviewUrl, WebviewWindowBuilder,
     menu::{Menu, MenuItem},
-    tray::TrayIconBuilder,
+    tray::{TrayIconBuilder},
 };
 
 macro_rules! dual_log {
@@ -65,98 +68,72 @@ macro_rules! dual_log {
     }};
 }
 
-/// Get the WebView2 user data directory path.
-fn get_webview_data_dir() -> PathBuf {
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(parent) = exe_path.parent() {
-            let dir = parent.join("webview");
-            std::fs::create_dir_all(&dir).ok();
-            return dir;
-        }
-    }
-    let dir = PathBuf::from("webview");
-    std::fs::create_dir_all(&dir).ok();
-    dir
-}
-
-/// Determine the database file path.
-fn get_db_path() -> PathBuf {
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(parent) = exe_path.parent() {
-            let data_dir = parent.join("data");
-            std::fs::create_dir_all(&data_dir).ok();
-            return data_dir.join("config.redb");
-        }
-    }
-    let data_dir = PathBuf::from("data");
-    std::fs::create_dir_all(&data_dir).ok();
-    data_dir.join("config.redb")
-}
-
 fn migrate_db_to_data_dir() {
-    let Ok(exe_path) = std::env::current_exe() else {
-        return;
-    };
-    let Some(exe_dir) = exe_path.parent() else {
-        return;
-    };
+    let paths = app_paths::app_paths();
+    let exe_dir = paths.exe_dir();
+    let db_file = format!("{}.{}", paths.db_name(), paths.db_type());
 
-    let old_path = exe_dir.join("config.redb");
+    let old_path = exe_dir.join(&db_file);
     if !old_path.exists() {
         return;
     }
 
-    let data_dir = exe_dir.join("data");
-    let new_path = data_dir.join("config.redb");
+    let data_dir = paths.data_dir();
+    let new_path = data_dir.join(&db_file);
     if new_path.exists() {
         return;
     }
 
-    std::fs::create_dir_all(&data_dir).ok();
+    std::fs::create_dir_all(data_dir).ok();
     match std::fs::rename(&old_path, &new_path) {
-        Ok(()) => logger::logger().info("startup", &format!("Migrated database: {:?} -> {:?}", old_path, new_path)),
-        Err(e) => {
-            logger::logger().warn("startup", &format!("Warning: failed to move database to data/ dir: {e}; will use old location"))
-        }
+        Ok(()) => logger::logger().info(
+            log_module::STARTUP,
+            &format!("Migrated database: {:?} -> {:?}", old_path, new_path),
+        ),
+        Err(e) => logger::logger().warn(
+            log_module::STARTUP,
+            &format!("Warning: failed to move database to data/ dir: {e}; will use old location"),
+        ),
     }
 }
 
 fn try_migrate_from_toml(db: &redb::Database) {
-    let Ok(exe_path) = std::env::current_exe() else {
-        return;
-    };
-    let Some(exe_dir) = exe_path.parent() else {
-        return;
-    };
+    let exe_dir = app_paths::app_paths().exe_dir().clone();
 
-    let toml_path = exe_dir.join("config.toml");
+    let toml_path = exe_dir.join(file_name::CONFIG_TOML);
     if !toml_path.exists() {
         return;
     }
 
     match migrate_from_toml(db, &toml_path) {
         Ok(true) => {
-            let migrated = exe_dir.join("config.toml.migrated");
-            // Remove old .migrated file if it exists (from a previous update)
+            let migrated = exe_dir.join(file_name::CONFIG_TOML_MIGRATED);
             let _ = std::fs::remove_file(&migrated);
             let _ = std::fs::rename(&toml_path, &migrated);
-            logger::logger().info("startup", "Migrated config.toml -> config.redb, renamed to config.toml.migrated");
+            logger::logger().info(
+                log_module::STARTUP,
+                &format!(
+                    "Migrated config.toml -> {}.{}",
+                    app_paths::app_paths().db_name(),
+                    app_paths::app_paths().db_type()
+                ),
+            );
         }
-        Ok(false) => logger::logger().info("startup", "config.toml exists but matches defaults, skipping migration"),
-        Err(e) => logger::logger().warn("startup", &format!("Warning: config.toml migration failed: {e}")),
+        Ok(false) => logger::logger().info(
+            log_module::STARTUP,
+            "config.toml exists but matches defaults, skipping migration",
+        ),
+        Err(e) => logger::logger().warn(
+            log_module::STARTUP,
+            &format!("Warning: config.toml migration failed: {e}"),
+        ),
     }
 }
 
-/// Run notification auto-cleanup based on user settings.
-///
-/// Reads `auto_cleanup_minutes` from persisted settings. If > 0, deletes all
-/// read notifications older than the configured threshold and emits a
-/// `notification:cleanup` event so the frontend can refresh.
 fn run_notification_cleanup(
     store: &dyn crate::domain::repository::DataStore,
     app: &tauri::AppHandle,
 ) {
-    // Read settings to get auto_cleanup_minutes
     let minutes = match store.get_settings() {
         Some(json) => serde_json::from_str::<crate::domain::settings::UserSettings>(&json)
             .map(|s| s.notifications.auto_cleanup_minutes)
@@ -165,86 +142,105 @@ fn run_notification_cleanup(
     };
 
     if minutes == 0 {
-        return; // Auto-cleanup disabled
+        return;
     }
 
     let cutoff_ms = crate::domain::base::time::chrono_now_ms() - (minutes as i64) * 60 * 1000;
 
     match store.notification_delete_read_before(cutoff_ms) {
         Ok(deleted) if deleted > 0 => {
-            logger::logger().info("cleanup", &format!(
-                "Auto-deleted {deleted} expired read notifications (threshold: {minutes} min)"
-            ));
-            // Notify frontend to refresh notification list
-            let _ = app.emit("notification:cleanup", deleted);
+            logger::logger().info(
+                log_module::CLEANUP,
+                &format!(
+                    "Auto-deleted {deleted} expired read notifications (threshold: {minutes} min)"
+                ),
+            );
+            let _ = app.emit(event_name::NOTIFICATION_CLEANUP, deleted);
         }
-        Ok(_) => {} // No expired notifications
+        Ok(_) => {}
         Err(e) => {
-            logger::logger().error("cleanup", &format!("Failed to auto-delete expired notifications: {e}"));
+            logger::logger().error(
+                log_module::CLEANUP,
+                &format!("Failed to auto-delete expired notifications: {e}"),
+            );
         }
     }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let paths = app_paths::init_global();
+
     let log = logger::logger();
-    log.info("startup", &format!("=== RustVerse v{} startup ===", env!("CARGO_PKG_VERSION")));
+    log.info(
+        log_module::STARTUP,
+        &format!("=== RustVerse v{} startup ===", env!("CARGO_PKG_VERSION")),
+    );
 
-    log.info("startup", &format!("Logger initialized at {:?}", log.log_dir()));
+    dual_log!(log, "INFO", log_module::STARTUP, "Exe dir: {:?}", paths.exe_dir());
+    dual_log!(log, "INFO", log_module::STARTUP, "Data dir: {:?}", paths.data_dir());
+    dual_log!(log, "INFO", log_module::STARTUP, "Log dir: {:?}", paths.log_dir());
+    dual_log!(
+        log,
+        "INFO",
+        log_module::STARTUP,
+        "Webview dir: {:?}",
+        paths.webview_dir()
+    );
+    dual_log!(
+        log,
+        "INFO",
+        log_module::STARTUP,
+        "Logger initialized at {:?}",
+        log.log_dir()
+    );
 
-    log.info("startup", "Running DB migration check...");
+    log.info(log_module::STARTUP, "Running DB migration check...");
     migrate_db_to_data_dir();
 
-    let db_path = get_db_path();
-    dual_log!(log, "INFO", "startup", "Database path: {:?}", db_path);
+    let db_path = paths.db_path().clone();
+    dual_log!(log, "INFO", log_module::STARTUP, "Database path: {:?}", db_path);
     let db = open_or_create(&db_path).unwrap_or_else(|e| {
         dual_log!(
             log,
             "ERROR",
-            "startup",
+            log_module::STARTUP,
             "Failed to open database: {e}, falling back to in-memory"
         );
         redb::Database::builder()
             .create_with_backend(redb::backends::InMemoryBackend::new())
             .expect("in-memory database should always succeed")
     });
-    dual_log!(log, "INFO", "startup", "Database opened successfully");
+    dual_log!(log, "INFO", log_module::STARTUP, "Database opened successfully");
 
     try_migrate_from_toml(&db);
 
     let app_state = AppState::new(db);
 
-    // Cache is fresh on startup, no need to invalidate.
-    // The `invalidate_config_cache` Tauri command allows the frontend
-    // to invalidate the cache after config-modifying operations.
-
-    // Initialize the proxy resolver so that any subprocess execution
-    // (run_command, run_command_with_cancel, etc.) can resolve proxy
-    // settings from user preferences without panicking.
     crate::infrastructure::proxy::init_proxy_resolver_with_store(app_state.store.clone());
 
     let locale_scan_state = LocaleScanState::new();
-    let webview_data_dir = get_webview_data_dir();
+    let webview_data_dir = paths.webview_dir().clone();
 
     dual_log!(
         log,
         "INFO",
-        "startup",
+        log_module::STARTUP,
         "Webview data dir: {:?}",
         webview_data_dir
     );
-    dual_log!(log, "INFO", "startup", "Log directory: {:?}", log.log_dir());
+    dual_log!(log, "INFO", log_module::STARTUP, "Log directory: {:?}", log.log_dir());
 
     let log_for_setup = log;
-    log.info("startup", "Building Tauri application...");
+    log.info(log_module::STARTUP, "Building Tauri application...");
 
     tauri::Builder::default()
         .setup(move |app| {
-            log_for_setup.info("setup", "Tauri setup started");
+            log_for_setup.info(log_module::SETUP, "Tauri setup started");
 
             let main_window =
-                WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                    .title("RustVerse")
+                WebviewWindowBuilder::new(app, app_const::WINDOW_MAIN, WebviewUrl::App(app_const::FRONTEND_URL.into()))
+                    .title(app_const::TITLE)
                     .inner_size(1024.0, 720.0)
                     .min_inner_size(768.0, 480.0)
                     .resizable(true)
@@ -252,11 +248,9 @@ pub fn run() {
                     .build();
 
             match main_window {
-                Ok(_) => {
-                    log_for_setup.info("setup", "Main window created successfully")
-                }
+                Ok(_) => log_for_setup.info(log_module::SETUP, "Main window created successfully"),
                 Err(e) => {
-                    log_for_setup.error("setup", &format!("Failed to create main window: {e}"))
+                    log_for_setup.error(log_module::SETUP, &format!("Failed to create main window: {e}"))
                 }
             }
 
@@ -267,8 +261,8 @@ pub fn run() {
             }
 
             // ── System Tray ──
-            let quit = MenuItem::with_id(app, "quit", "退出 RustVerse", true, None::<&str>)?;
-            let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, tray::MENU_QUIT, "退出 RustVerse", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, tray::MENU_SHOW, "显示窗口", true, None::<&str>)?;
             let tray_menu = Menu::with_items(app, &[&show, &quit])?;
 
             let tray_icon = app.default_window_icon().cloned();
@@ -277,13 +271,13 @@ pub fn run() {
                 .icon(tray_icon.unwrap())
                 .menu(&tray_menu)
                 .show_menu_on_left_click(true)
-                .tooltip("RustVerse")
+                .tooltip(app_const::TITLE)
                 .on_menu_event(move |app, event| match event.id().0.as_str() {
-                    "quit" => {
+                    tray::MENU_QUIT => {
                         app.exit(0);
                     }
-                    "show" => {
-                        if let Some(window) = app.get_webview_window("main") {
+                    tray::MENU_SHOW => {
+                        if let Some(window) = app.get_webview_window(app_const::WINDOW_MAIN) {
                             let _ = window.unminimize();
                             let _ = window.show();
                             let _ = window.set_focus();
@@ -294,7 +288,7 @@ pub fn run() {
                 .build(app)?;
 
             // ── Close-to-tray handler ──
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_webview_window(app_const::WINDOW_MAIN) {
                 let app_handle = app.handle().clone();
                 let window_for_event = window.clone();
                 let _ = window.on_window_event(move |event| {
@@ -322,21 +316,25 @@ pub fn run() {
                 // let window = tauri::Manager::get_webview_window(app, "main").unwrap();
                 // window.open_devtools();
             }
-            log_for_setup.info("setup", "Tauri setup completed");
+            log_for_setup.info(log_module::SETUP, "Tauri setup completed");
 
             // ── Start periodic notification auto-cleanup task ──
             {
                 let app_handle = app.handle().clone();
                 let store = app_handle.state::<AppState>().store.clone();
                 std::thread::spawn(move || {
-                    // Initial cleanup on startup
                     run_notification_cleanup(&*store, &app_handle);
-                    // Then every 5 minutes
                     loop {
                         std::thread::sleep(std::time::Duration::from_secs(5 * 60));
                         run_notification_cleanup(&*store, &app_handle);
                     }
                 });
+            }
+
+            // ── Start background histver sync (all 3 channels) via manifests.txt ──
+            {
+                let db = app.handle().state::<AppState>().db.clone();
+                startup_sync_manifests(db);
             }
 
             Ok(())
@@ -356,6 +354,7 @@ pub fn run() {
             is_background_task_running,
             invalidate_config_cache,
             reinit_terminal,
+            restart_application,
             get_versions,
             get_config,
             list_toolchains,
@@ -376,6 +375,7 @@ pub fn run() {
             update_all,
             update_rustup,
             diag_network,
+            download_manifests,
             list_cargo_plugins,
             search_plugins,
             install_plugin,
@@ -402,7 +402,7 @@ pub fn run() {
             crm_best,
             crm_default,
             crm_test,
-            sync_hist_releases,
+            sync_from_manifests,
             list_hist_releases,
             search_hist_releases,
             count_hist_releases,
@@ -425,7 +425,6 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let state = window.state::<AppState>();
-                // Check minimize_to_tray setting
                 let should_minimize = (&*state.store)
                     .get_settings()
                     .and_then(|json| {
@@ -436,12 +435,10 @@ pub fn run() {
 
                 if should_minimize {
                     api.prevent_close();
-                    // Hide to tray — hide the window (tray icon is managed by tauri.conf.json)
-                    if let Some(w) = window.get_webview_window("main") {
+                    if let Some(w) = window.get_webview_window(app_const::WINDOW_MAIN) {
                         w.hide().ok();
                     }
                 }
-                // Otherwise allow default close behavior
             }
         })
         .run(tauri::generate_context!())

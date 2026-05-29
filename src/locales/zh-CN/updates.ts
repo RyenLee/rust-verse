@@ -9,6 +9,7 @@ export default {
     downloading: '下载中...',
     installNow: '立即安装',
     restartLater: '稍后重启',
+    restartNow: '立即重启',
   },
   status: {
     checking: '正在检查更新...',

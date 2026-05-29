@@ -1,162 +1,89 @@
-//! Historical release version commands — thin forwarding layer.
+use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
+use tauri::State;
 
-use tauri::{AppHandle, State};
-
+use crate::domain::constants::{channel, table_name};
 use crate::domain::error::AppResult;
-use crate::domain::notification::{Category, NotificationKey, Priority};
-use crate::infrastructure::notifier;
 use crate::state::AppState;
 
-// Re-export for backward compatibility
 pub use crate::domain::entity::HistRelease;
 
-/// Fetch historical releases from remote and cache locally.
-#[tauri::command]
-pub async fn sync_hist_releases(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    channel: String,
-    full: bool,
-    days: u32,
-) -> AppResult<u64> {
-    if !matches!(channel.as_str(), "stable" | "beta" | "nightly") {
-        return Err(crate::domain::error::AppError::Command(format!(
-            "Unknown channel '{}'. Must be one of: stable, beta, nightly",
-            channel
-        )));
-    }
+const TABLE_STABLE: TableDefinition<&str, &str> = TableDefinition::new(table_name::HISTVER_STABLE);
+const TABLE_BETA: TableDefinition<&str, &str> = TableDefinition::new(table_name::HISTVER_BETA);
+const TABLE_NIGHTLY: TableDefinition<&str, &str> = TableDefinition::new(table_name::HISTVER_NIGHTLY);
 
-    let db_path = histver_db_path(&state);
-    let config = rs_histver::Config::with_db_path(&db_path);
-    let hv = rs_histver::HistVer::new(config).map_err(|e| {
-        crate::domain::error::AppError::Config(format!(
-            "Failed to initialize version database ({}): {}",
-            db_path.display(),
-            e
-        ))
+fn read_releases_from_db(db: &Database, channel_filter: Option<&str>) -> AppResult<Vec<HistRelease>> {
+    let channels: Vec<&str> = if let Some(ch) = channel_filter {
+        vec![ch]
+    } else {
+        channel::ALL.to_vec()
+    };
+    let read_tx = db.begin_read().map_err(|e| {
+        crate::domain::error::AppError::Command(format!("Failed to begin read transaction: {}", e))
     })?;
-
-    let releases = hv.fetch_releases(&channel, full, days).await.map_err(|e| {
-        let hint = if e.to_string().contains("dns") || e.to_string().contains("resolve") {
-            "DNS resolution failed — check your internet connection or DNS settings."
-        } else if e.to_string().contains("timed out") || e.to_string().contains("timeout") {
-            "Request timed out — the remote server may be slow or unreachable. Try again later."
-        } else if e.to_string().contains("tls") || e.to_string().contains("certificate") {
-            "TLS/certificate error — your system clock or root certificates may be outdated."
-        } else if e.to_string().contains("connection refused") {
-            "Connection refused — the remote server may be down."
-        } else {
-            "Check your internet connection and try again."
+    let mut releases = Vec::new();
+    for ch in channels {
+        let table_def = match ch {
+            channel::STABLE => TABLE_STABLE,
+            channel::BETA => TABLE_BETA,
+            channel::NIGHTLY => TABLE_NIGHTLY,
+            _ => continue,
         };
-        crate::domain::error::AppError::Network(format!(
-            "Failed to fetch {} release data: {}. {}",
-            channel, e, hint
-        ))
-    })?;
-
-    if releases.is_empty() {
-        return Err(crate::domain::error::AppError::Network(format!(
-            "No {} release data found on the remote server. The data source may be temporarily unavailable.",
-            channel
-        )));
+        let table = match read_tx.open_table(table_def) {
+            Ok(t) => t,
+            Err(e) => {
+                if e.to_string().contains("does not exist") {
+                    continue;
+                }
+                return Err(crate::domain::error::AppError::Command(format!(
+                    "Failed to open histver table for {}: {}",
+                    ch, e
+                )));
+            }
+        };
+        for result in table.iter().map_err(|e| {
+            crate::domain::error::AppError::Command(format!("Failed to iterate releases: {}", e))
+        })? {
+            let (key, value) = result.map_err(|e| {
+                crate::domain::error::AppError::Command(format!(
+                    "Failed to read release entry: {}",
+                    e
+                ))
+            })?;
+            releases.push(HistRelease {
+                version: value.value().to_string(),
+                date: key.value().to_string(),
+                channel: ch.to_string(),
+            })
+        }
     }
-
-    let count = releases.len() as u64;
-    hv.store_releases(&releases).map_err(|e| {
-        crate::domain::error::AppError::Command(format!(
-            "Failed to save release data to local cache ({}): {}",
-            db_path.display(),
-            e
-        ))
-    })?;
-
-    let count_str = count.to_string();
-    notifier::notify(
-        &app,
-        Category::Operation,
-        Priority::Low,
-        NotificationKey::ReleaseSynced,
-        &[("count", &count_str), ("channel", &channel)],
-        Some("/history-versions"),
-    );
-
-    Ok(count)
+    releases.sort_by(|a, b| b.date.cmp(&a.date));
+    Ok(releases)
 }
 
-/// List cached historical releases.
 #[tauri::command]
 pub fn list_hist_releases(
     state: State<'_, AppState>,
     channel: Option<String>,
 ) -> AppResult<Vec<HistRelease>> {
-    let config = rs_histver::Config::with_db_path(histver_db_path(&state));
-    let hv = rs_histver::HistVer::new(config).map_err(|e| {
-        crate::domain::error::AppError::Command(format!("failed to init histver: {e}"))
-    })?;
-
-    let ch = channel.as_deref();
-    let releases = hv.list_releases(ch).map_err(|e| {
-        crate::domain::error::AppError::Command(format!("failed to list releases: {e}"))
-    })?;
-
-    Ok(releases
-        .into_iter()
-        .map(|r| HistRelease {
-            version: r.version,
-            date: r.date,
-            channel: r.channel,
-        })
-        .collect())
+    read_releases_from_db(&state.db, channel.as_deref())
 }
 
-/// Search cached historical releases by keyword.
 #[tauri::command]
 pub fn search_hist_releases(
     state: State<'_, AppState>,
     keyword: String,
     channel: Option<String>,
 ) -> AppResult<Vec<HistRelease>> {
-    let config = rs_histver::Config::with_db_path(histver_db_path(&state));
-    let hv = rs_histver::HistVer::new(config).map_err(|e| {
-        crate::domain::error::AppError::Command(format!("failed to init histver: {e}"))
-    })?;
-
-    let ch = channel.as_deref();
-    let results = hv.search_releases(&keyword, ch).map_err(|e| {
-        crate::domain::error::AppError::Command(format!("failed to search releases: {e}"))
-    })?;
-
-    Ok(results
+    let releases = read_releases_from_db(&state.db, channel.as_deref())?;
+    let lower = keyword.to_lowercase();
+    Ok(releases
         .into_iter()
-        .map(|r| HistRelease {
-            version: r.version,
-            date: r.date,
-            channel: r.channel,
-        })
+        .filter(|r| r.version.to_lowercase().contains(&lower))
         .collect())
 }
 
-/// Count cached historical releases.
 #[tauri::command]
 pub fn count_hist_releases(state: State<'_, AppState>, channel: Option<String>) -> AppResult<u64> {
-    let config = rs_histver::Config::with_db_path(histver_db_path(&state));
-    let hv = rs_histver::HistVer::new(config).map_err(|e| {
-        crate::domain::error::AppError::Command(format!("failed to init histver: {e}"))
-    })?;
-
-    let ch = channel.as_deref();
-    let releases = hv.list_releases(ch).map_err(|e| {
-        crate::domain::error::AppError::Command(format!("failed to count releases: {e}"))
-    })?;
+    let releases = read_releases_from_db(&state.db, channel.as_deref())?;
     Ok(releases.len() as u64)
-}
-
-/// Compute the histver database path, colocated with the app config database.
-fn histver_db_path(_state: &AppState) -> std::path::PathBuf {
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(parent) = exe_path.parent() {
-            return parent.join("data").join("rs-histver.redb");
-        }
-    }
-    std::path::PathBuf::from("data/rs-histver.redb")
 }

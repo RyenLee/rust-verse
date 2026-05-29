@@ -210,14 +210,9 @@ impl FileLogger {
     }
 }
 
-/// Get the log directory: `<exe_dir>/logs/`.
+/// Get the log directory from the centralized AppPaths module.
 fn get_log_dir() -> PathBuf {
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(parent) = exe_path.parent() {
-            return parent.join("logs");
-        }
-    }
-    PathBuf::from("logs")
+    crate::infrastructure::app_paths::app_paths().log_dir().clone()
 }
 
 /// Rotate log files: `rustverse.log` → `rustverse.log.1`, etc.

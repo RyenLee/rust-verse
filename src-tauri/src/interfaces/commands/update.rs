@@ -5,6 +5,7 @@ use std::error::Error;
 use tauri::{AppHandle, State};
 
 use crate::domain::config_keys::keys;
+use crate::domain::constants::page_route;
 use crate::domain::error::AppResult;
 use crate::domain::notification::{Category, NotificationKey, Priority};
 use crate::domain::parsing;
@@ -69,7 +70,7 @@ pub async fn check_update(
             Priority::High,
             NotificationKey::ToolchainUpdatesAvailable,
             &[("count", &count_str), ("names", &names_str)],
-            Some("/updates"),
+            Some(page_route::UPDATES),
         );
     }
 
@@ -139,7 +140,7 @@ pub async fn update_all(
                 Priority::High,
                 NotificationKey::ToolchainsUpdated,
                 &[],
-                Some("/updates"),
+                Some(page_route::UPDATES),
             );
             Ok(())
         }
@@ -150,7 +151,7 @@ pub async fn update_all(
                 Priority::High,
                 NotificationKey::ToolchainUpdateFailed,
                 &[("error", &format!("{e}"))],
-                Some("/updates"),
+                Some(page_route::UPDATES),
             );
             Err(e)
         }
@@ -220,7 +221,7 @@ pub async fn update_rustup(
                 Priority::High,
                 NotificationKey::RustupUpdated,
                 &[],
-                Some("/updates"),
+                Some(page_route::UPDATES),
             );
             Ok(())
         }
@@ -231,7 +232,7 @@ pub async fn update_rustup(
                 Priority::High,
                 NotificationKey::RustupUpdateFailed,
                 &[("error", &format!("{e}"))],
-                Some("/updates"),
+                Some(page_route::UPDATES),
             );
             Err(e)
         }

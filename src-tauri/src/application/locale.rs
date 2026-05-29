@@ -251,12 +251,9 @@ pub fn get_locales_from_config_or_db(
     }]
 }
 
-/// Get locale config path in the app data directory.
-pub fn locale_config_path(app: &tauri::AppHandle) -> Option<PathBuf> {
-    app.path()
-        .app_data_dir()
-        .ok()
-        .map(|dir| dir.join("locale.json"))
+/// Get locale config path from the centralized AppPaths module.
+pub fn locale_config_path(_app: &tauri::AppHandle) -> Option<PathBuf> {
+    Some(crate::infrastructure::app_paths::app_paths().locale_config_path().clone())
 }
 
 /// Locale configuration persisted to disk.

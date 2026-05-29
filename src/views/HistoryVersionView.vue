@@ -25,7 +25,7 @@ const router = useRouter()
 const { installToolchain } = useRustup()
 const { notifyToolchainChange } = useDataRefresh()
 const { toolchains } = useToolchainOptions()
-const { releases, loading, syncing, syncError, sync, refresh, search } = useHistoryVersions()
+const { releases, loading, syncing, syncError, syncFromManifests, refresh, search } = useHistoryVersions()
 const bgTask = useBackgroundTask()
 
 const selectedChannel = ref('stable')
@@ -123,9 +123,7 @@ function isInstalled(release: { version: string; date: string; channel: string }
 async function syncReleases() {
   syncingChannel.value = selectedChannel.value
   try {
-    const isFull = selectedChannel.value === 'stable'
-    const days = selectedChannel.value === 'stable' ? 0 : 90
-    await sync(selectedChannel.value, isFull, days)
+    await syncFromManifests()
   } catch {
     // error is captured in syncError ref
   } finally {

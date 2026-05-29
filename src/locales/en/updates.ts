@@ -9,6 +9,7 @@ export default {
     downloading: 'Downloading...',
     installNow: 'Install Now',
     restartLater: 'Restart Later',
+    restartNow: 'Restart Now',
   },
   status: {
     checking: 'Checking for updates...',

@@ -283,11 +283,7 @@ pub fn get_app_metadata(repo: &dyn ConfigRepository) -> (String, String, String)
 
 /// Check if config.toml or config.toml.migrated exists and is readable.
 fn has_config_file() -> bool {
-    let exe_path = match std::env::current_exe() {
-        Ok(p) => p,
-        Err(_) => return false,
-    };
-    let exe_dir = match exe_path.parent() {
+    let exe_dir = match crate::infrastructure::app_paths::app_paths().exe_dir().parent() {
         Some(d) => d,
         None => return false,
     };
@@ -311,28 +307,8 @@ fn has_config_file() -> bool {
 
 /// Try to read app metadata from config.toml or config.toml.migrated.
 fn get_app_metadata_from_config() -> (String, String, String) {
-    let exe_path = match std::env::current_exe() {
-        Ok(p) => p,
-        Err(_) => {
-            return (
-                defaults::app_name(),
-                defaults::app_version(),
-                defaults::app_description(),
-            );
-        }
-    };
-    let exe_dir = match exe_path.parent() {
-        Some(d) => d,
-        None => {
-            return (
-                defaults::app_name(),
-                defaults::app_version(),
-                defaults::app_description(),
-            );
-        }
-    };
+    let exe_dir = crate::infrastructure::app_paths::app_paths().exe_dir();
 
-    // Try config.toml first, then config.toml.migrated
     let toml_paths = [
         exe_dir.join("config.toml"),
         exe_dir.join("config.toml.migrated"),

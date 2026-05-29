@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use redb::Database;
 
+use crate::domain::constants::locale;
 use crate::domain::repository::DataStore;
 use crate::infrastructure::config_cache::AppConfigCache;
 use crate::infrastructure::db::RedbDataStore;
@@ -25,6 +26,7 @@ impl TaskState {
 ///
 /// Initialized during app startup and registered via `.manage()`.
 pub struct AppState {
+    pub db: Arc<Database>,
     pub rustup_path: Mutex<Option<std::path::PathBuf>>,
     pub cargo_path: Mutex<Option<std::path::PathBuf>>,
     pub store: Arc<dyn DataStore>,
@@ -36,13 +38,14 @@ pub struct AppState {
 impl AppState {
     pub fn new(db: Database) -> Self {
         let db_arc = Arc::new(db);
-        let store = Arc::new(RedbDataStore::new(db_arc));
+        let store = Arc::new(RedbDataStore::new(db_arc.clone()));
         Self {
+            db: db_arc,
             rustup_path: Mutex::new(None),
             cargo_path: Mutex::new(None),
             store,
             config_cache: AppConfigCache::new(),
-            locale: Mutex::new("C".to_string()),
+            locale: Mutex::new(locale::LC_C.to_string()),
             task_state: TaskState::new(),
         }
     }

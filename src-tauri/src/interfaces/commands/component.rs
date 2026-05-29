@@ -2,6 +2,7 @@
 
 use tauri::{AppHandle, State};
 
+use crate::domain::constants::page_route;
 use crate::domain::error::AppResult;
 use crate::domain::notification::{Category, NotificationKey, Priority};
 use crate::domain::parsing;
@@ -94,7 +95,7 @@ pub async fn add_component(
         Priority::Low,
         NotificationKey::ComponentAdded,
         &[("name", &display_comp), ("toolchain", &toolchain)],
-        Some("/components"),
+        Some(page_route::COMPONENTS),
     );
 
     Ok(())
@@ -158,7 +159,7 @@ pub async fn remove_component(
         Priority::Low,
         NotificationKey::ComponentRemoved,
         &[("name", &display_comp), ("toolchain", &toolchain)],
-        Some("/components"),
+        Some(page_route::COMPONENTS),
     );
 
     Ok(())

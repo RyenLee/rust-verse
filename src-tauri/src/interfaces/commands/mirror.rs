@@ -6,6 +6,7 @@ use crate::domain::error::AppResult;
 use crate::domain::mirror as mirror_svc;
 use crate::domain::notification::{Category, NotificationKey, Priority};
 use crate::domain::parsing;
+use crate::domain::constants::{page_route, system_binary};
 use crate::infrastructure::exec;
 use crate::infrastructure::notifier;
 use crate::state::AppState;
@@ -21,7 +22,7 @@ pub use crate::domain::parsing::{parse_mirror_list, parse_test_results};
 /// Check whether crm is installed and functional by running `crm version`.
 #[tauri::command]
 pub async fn check_crm_installed() -> AppResult<bool> {
-    match exec::run_command("crm", &["version"], 10).await {
+    match exec::run_command(system_binary::CRM, &["version"], 10).await {
         Ok(_) => Ok(true),
         Err(_) => Ok(false),
     }
@@ -86,7 +87,7 @@ pub async fn install_crm(
         Priority::Medium,
         NotificationKey::CrmInstalled,
         &[],
-        Some("/mirrors"),
+        Some(page_route::MIRRORS),
     );
 
     Ok(())
@@ -95,21 +96,21 @@ pub async fn install_crm(
 /// List available mirrors from `crm list`.
 #[tauri::command]
 pub async fn crm_list() -> AppResult<Vec<MirrorInfo>> {
-    let output = exec::run_command("crm", &["list"], 30).await?;
+    let output = exec::run_command(system_binary::CRM, &["list"], 30).await?;
     Ok(parsing::parse_mirror_list(&output))
 }
 
 /// Get the currently active mirror name from `crm current`.
 #[tauri::command]
 pub async fn crm_current() -> AppResult<String> {
-    let output = exec::run_command("crm", &["current"], 15).await?;
+    let output = exec::run_command(system_binary::CRM, &["current"], 15).await?;
     Ok(output.trim().to_string())
 }
 
 /// Get the installed crm version.
 #[tauri::command]
 pub async fn crm_version() -> AppResult<String> {
-    let output = exec::run_command("crm", &["version"], 15).await?;
+    let output = exec::run_command(system_binary::CRM, &["version"], 15).await?;
     Ok(output.trim().to_string())
 }
 
@@ -117,7 +118,7 @@ pub async fn crm_version() -> AppResult<String> {
 #[tauri::command]
 pub async fn crm_use(app: AppHandle, name: String) -> AppResult<()> {
     mirror_svc::validate_mirror_name(&name)?;
-    exec::run_command("crm", &["use", &name], 30).await?;
+    exec::run_command(system_binary::CRM, &["use", &name], 30).await?;
 
     notifier::notify(
         &app,
@@ -125,7 +126,7 @@ pub async fn crm_use(app: AppHandle, name: String) -> AppResult<()> {
         Priority::Medium,
         NotificationKey::MirrorSwitched,
         &[("name", &name)],
-        Some("/mirrors"),
+        Some(page_route::MIRRORS),
     );
 
     Ok(())
@@ -140,7 +141,7 @@ pub async fn crm_best(app: AppHandle, mode: String) -> AppResult<()> {
     } else {
         vec!["best", &mode]
     };
-    exec::run_command("crm", &args, 120).await?;
+    exec::run_command(system_binary::CRM, &args, 120).await?;
 
     let mode_str = if mode.is_empty() { "default" } else { &mode };
     notifier::notify(
@@ -149,7 +150,7 @@ pub async fn crm_best(app: AppHandle, mode: String) -> AppResult<()> {
         Priority::Medium,
         NotificationKey::MirrorBest,
         &[("mode", mode_str)],
-        Some("/mirrors"),
+        Some(page_route::MIRRORS),
     );
 
     Ok(())
@@ -158,7 +159,7 @@ pub async fn crm_best(app: AppHandle, mode: String) -> AppResult<()> {
 /// Restore the default official registry using `crm default`.
 #[tauri::command]
 pub async fn crm_default(app: AppHandle) -> AppResult<()> {
-    exec::run_command("crm", &["default"], 30).await?;
+    exec::run_command(system_binary::CRM, &["default"], 30).await?;
 
     notifier::notify(
         &app,
@@ -166,7 +167,7 @@ pub async fn crm_default(app: AppHandle) -> AppResult<()> {
         Priority::Low,
         NotificationKey::MirrorReset,
         &[],
-        Some("/mirrors"),
+        Some(page_route::MIRRORS),
     );
 
     Ok(())
@@ -182,7 +183,7 @@ pub async fn crm_test(name: Option<String>) -> AppResult<CrmTestResult> {
         Some(n) => vec!["test", n],
         None => vec!["test"],
     };
-    let output = exec::run_command("crm", &args, 120).await?;
+    let output = exec::run_command(system_binary::CRM, &args, 120).await?;
     Ok(parsing::parse_test_results(&output))
 }
 
