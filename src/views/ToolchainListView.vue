@@ -177,7 +177,7 @@ onDeactivated(() => {
 })
 
 onActivated(() => {
-  if (progressWasVisible || bgTask.state.status === 'running') {
+  if (progressWasVisible || (bgTask.state.status === 'running' && !bgTask.state.minimized)) {
     showProgress.value = true
     progressWasVisible = false
   }
