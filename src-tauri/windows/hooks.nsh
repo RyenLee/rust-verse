@@ -76,13 +76,17 @@ Var /GLOBAL DataDirPath
 !macroend
 
 !macro NSIS_HOOK_PREINSTALL
-  DetailPrint "Closing RustVerse..."
+  DetailPrint "Waiting for RustVerse to exit before updating..."
 
-  ExecWait 'taskkill /IM RustVerse.exe /T /F 2>nul'
+  ${For} $R0 1 20
+    FindWindow $0 "" "RustVerse" 0
+    ${If} $0 == 0
+      ${Break}
+    ${EndIf}
+    Sleep 500
+  ${Next}
 
-  Sleep 2000
-
-  DetailPrint "RustVerse closed."
+  DetailPrint "Ready to update files."
 !macroend
 
 !macro NSIS_HOOK_POSTINSTALL

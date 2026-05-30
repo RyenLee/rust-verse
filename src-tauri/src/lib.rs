@@ -6,7 +6,7 @@ mod state;
 
 use crate::domain::constants::{app as app_const, event_name, file_name, log_module, tray, tray_menu};
 use crate::infrastructure::app_paths;
-use crate::infrastructure::db::{migrate_from_toml, open_or_create};
+use crate::infrastructure::db::{migrate_from_toml, open_or_create, ensure_version_in_db};
 use crate::infrastructure::logger;
 use interfaces::commands::component::{add_component, list_components, remove_component};
 use interfaces::commands::env_check::{check_env, get_versions};
@@ -214,6 +214,7 @@ pub fn run() {
     dual_log!(log, "INFO", log_module::STARTUP, "Database opened successfully");
 
     try_migrate_from_toml(&db);
+    ensure_version_in_db(&db);
 
     let app_state = AppState::new(db);
 

@@ -1,6 +1,6 @@
 use crate::domain::constants::{error_pattern, event_name, log_module, process_name, system_binary, system_env};
 use crate::domain::entity::TerminalReinitResult;
-use crate::domain::error::AppResult;
+use crate::domain::error::{AppError, AppResult};
 use crate::infrastructure::system::env::binary_exists;
 use crate::infrastructure::{installer, logger};
 use crate::state::AppState;
@@ -386,15 +386,62 @@ pub fn reinit_terminal(state: tauri::State<'_, AppState>) -> AppResult<TerminalR
 }
 
 /// Restart the application to apply updates.
-/// Emits an event to the frontend, then exits the process after a brief delay.
+/// Spawns a platform-specific restart script, then exits the process.
 #[tauri::command]
 pub async fn restart_application(app: tauri::AppHandle) -> AppResult<()> {
     let log = logger::logger();
     log.info(log_module::UPDATE, "Application restart requested");
 
+    let exe_path = std::env::current_exe()
+        .map_err(|e| AppError::Command(format!("failed to get exe path: {e}")))?;
+
     app.emit(event_name::APP_RESTARTING, ()).ok();
 
-    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+
+        let script = format!(
+            "@echo off\r\n\
+             timeout /t 2 /nobreak >nul\r\n\
+             start \"\" \"{}\"\r\n\
+             del \"%~f0\"\r\n",
+            exe_path.display()
+        );
+        let script_path = std::env::temp_dir().join("rustverse_restart.bat");
+        std::fs::write(&script_path, script)
+            .map_err(|e| AppError::Command(format!("failed to write restart script: {e}")))?;
+
+        std::process::Command::new("cmd")
+            .args(["/C", &script_path.to_string_lossy()])
+            .creation_flags(0x08000000)
+            .spawn()
+            .map_err(|e| AppError::Command(format!("failed to spawn restart script: {e}")))?;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let script = format!(
+            "#!/bin/sh\nsleep 1\nexec '{}'\n",
+            exe_path.display()
+        );
+        let script_path = std::env::temp_dir().join("rustverse_restart.sh");
+        std::fs::write(&script_path, script)
+            .map_err(|e| AppError::Command(format!("failed to write restart script: {e}")))?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).ok();
+        }
+
+        std::process::Command::new("sh")
+            .arg(&script_path)
+            .spawn()
+            .map_err(|e| AppError::Command(format!("failed to spawn restart script: {e}")))?;
+    }
+
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     log.info(log_module::UPDATE, "Exiting application for restart");
     app.exit(0);

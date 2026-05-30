@@ -42,18 +42,13 @@ pub fn open_or_create(path: &Path) -> Result<Database, redb::Error> {
 
 /// Write all default values when the database is freshly created (no keys yet).
 fn seed_defaults_if_empty(db: &Database) -> Result<(), redb::Error> {
-    let read_tx = db.begin_read()?;
-    let needs_seed = match read_tx.open_table(SIMPLE) {
-        Ok(table) => table.len()? == 0,
-        Err(_) => true, // table does not exist yet
-    };
-    drop(read_tx);
-
-    if !needs_seed {
-        return Ok(());
-    }
-
     let write_tx = db.begin_write()?;
+    {
+        let table = write_tx.open_table(SIMPLE)?;
+        if table.len()? > 0 {
+            return Ok(());
+        }
+    }
     seed_simple_defaults(&write_tx)?;
     seed_plugin_defaults(&write_tx)?;
     seed_env_var_defaults(&write_tx)?;
@@ -281,12 +276,24 @@ pub fn get_app_metadata(repo: &dyn ConfigRepository) -> (String, String, String)
     )
 }
 
+pub fn ensure_version_in_db(db: &Database) {
+    let current_version = env!("CARGO_PKG_VERSION");
+    let stored = get_simple(db, keys::APP_VERSION);
+    if stored.as_deref() != Some(current_version) {
+        let _ = set_simple(db, keys::APP_VERSION, current_version);
+        crate::infrastructure::logger::logger().info(
+            crate::domain::constants::log_module::STARTUP,
+            &format!(
+                "Updated stored app version: {:?} -> {}",
+                stored, current_version
+            ),
+        );
+    }
+}
+
 /// Check if config.toml or config.toml.migrated exists and is readable.
 fn has_config_file() -> bool {
-    let exe_dir = match crate::infrastructure::app_paths::app_paths().exe_dir().parent() {
-        Some(d) => d,
-        None => return false,
-    };
+    let exe_dir = crate::infrastructure::app_paths::app_paths().exe_dir().clone();
 
     let toml_paths = [
         exe_dir.join("config.toml"),

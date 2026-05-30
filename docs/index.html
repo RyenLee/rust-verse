@@ -779,14 +779,14 @@
         <div class="hero-version">
           <span class="ver-label" data-lang="zh-CN">最新版本</span>
           <span class="ver-label" data-lang="en">Latest</span>
-          <span class="ver-num">v1.3.14</span>
+          <span class="ver-num">v1.3.15</span>
           <span class="ver-sep"></span>
           <span class="ver-date">2026-05-30</span>
         </div>
         <div class="cta-row">
           <a
             class="btn btn-primary"
-            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.14"
+            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.15"
             target="_blank"
             rel="noopener"
           >
@@ -990,14 +990,64 @@
           <h2 class="section-title" data-lang="en">Release History</h2>
         </div>
         <div class="changelog-timeline">
+          <!-- v1.3.15 -->
+          <div class="release-entry">
+            <div class="release-dot"></div>
+            <div class="release-head">
+              <span class="release-ver">v1.3.15</span>
+              <span class="release-date">2026-05-30</span>
+              <span class="release-latest" data-lang="zh-CN">最新</span>
+              <span class="release-latest" data-lang="en">Latest</span>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-fixed" data-lang="zh-CN">修复</span>
+              <span class="change-group-label label-fixed" data-lang="en">Fixed</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">
+                  修复 NSIS 安装器更新时 exe 文件未替换 — 移除 taskkill 自杀逻辑，改为 FindWindow 循环等待主进程自行退出，确保安装流程完整
+                </li>
+                <li data-lang="en">
+                  Fixed NSIS installer not replacing exe during update — removed taskkill self-kill logic, replaced with FindWindow loop waiting for main process to exit gracefully
+                </li>
+                <li data-lang="zh-CN">
+                  修复手动安装新版本后数据库版本号仍为旧值 — 修正 has_config_file() 路径查找错误，新增 ensure_version_in_db() 每次启动时同步编译版本到数据库
+                </li>
+                <li data-lang="en">
+                  Fixed database version mismatch after manual install — corrected has_config_file() path lookup, added ensure_version_in_db() to sync compile-time version to DB on every startup
+                </li>
+                <li data-lang="zh-CN">
+                  修复应用重启功能失效 — 实现基于临时脚本的真实进程重启（Windows bat / Unix shell），替代原先仅退出不重启的逻辑
+                </li>
+                <li data-lang="en">
+                  Fixed application restart not working — implemented script-based real process restart (Windows bat / Unix shell), replacing the exit-only logic
+                </li>
+              </ul>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-changed" data-lang="zh-CN">改进</span>
+              <span class="change-group-label label-changed" data-lang="en">Changed</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">
+                  消除数据库种子数据的 TOCTOU 竞态条件 — 将检查与播种合并到单个写事务中执行
+                </li>
+                <li data-lang="en">
+                  Eliminated TOCTOU race condition in database seed data — merged check and seed into a single write transaction
+                </li>
+                <li data-lang="zh-CN">
+                  完善前端下载事件回调处理 — downloadAndInstall 和 downloadOnly 均添加 default 分支日志输出
+                </li>
+                <li data-lang="en">
+                  Improved frontend download event callback handling — added default branch logging for both downloadAndInstall and downloadOnly
+                </li>
+              </ul>
+            </div>
+          </div>
           <!-- v1.3.14 -->
           <div class="release-entry">
             <div class="release-dot"></div>
             <div class="release-head">
               <span class="release-ver">v1.3.14</span>
               <span class="release-date">2026-05-30</span>
-              <span class="release-latest" data-lang="zh-CN">最新</span>
-              <span class="release-latest" data-lang="en">Latest</span>
             </div>
             <div class="change-group">
               <span class="change-group-label label-changed" data-lang="zh-CN">改进</span>

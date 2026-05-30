@@ -149,6 +149,8 @@ export function useAppUpdater() {
           case 'Finished':
             downloadPhase.value = 'installing'
             break
+          default:
+            console.warn('[AppUpdater] Unhandled download event:', event.event, event)
         }
       })
       downloadPhase.value = 'success'
@@ -183,6 +185,8 @@ export function useAppUpdater() {
             break
           case 'Finished':
             break
+          default:
+            console.warn('[AppUpdater] Unhandled download event:', event.event, event)
         }
       })
       downloadPhase.value = 'success'
