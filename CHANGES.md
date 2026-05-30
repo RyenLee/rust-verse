@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.14] - 2026-05-30
+
+### Changed
+
+- **Constant extraction refinement** — Added new submodules to `domain/constants.rs`: `rustup_mirror_var`, `error_pattern`, `tray_menu`, `process_name`, `env_check_event`, `installer_platform`. Fully eliminated hardcoded strings in core modules: `exec.rs` (rustup mirror env vars, error detection patterns), `system/env.rs` (path segments, binary validation), `system.rs` (lock process names), `installer.rs` (platform identifiers), `env_check.rs` (event names), `lib.rs` (tray menu labels)
+
+## [1.3.13] - 2026-05-30
+
+### Changed
+
+- **Constant extraction refactoring** — All hardcoded strings moved to `domain/constants.rs` module, organized by category submodules (channel, table_name, url, file_name, event_name, log_module, installer, tray, app, system_env, page_route, proxy_type, proxy_env_var, locale, manifest_parse, system_binary, registry_key, path_segment)
+
 ## [1.3.11] - 2026-05-29
 
 ### Fixed

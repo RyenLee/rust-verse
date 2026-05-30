@@ -4,7 +4,7 @@ mod infrastructure;
 mod interfaces;
 mod state;
 
-use crate::domain::constants::{app as app_const, event_name, file_name, log_module, tray};
+use crate::domain::constants::{app as app_const, event_name, file_name, log_module, tray, tray_menu};
 use crate::infrastructure::app_paths;
 use crate::infrastructure::db::{migrate_from_toml, open_or_create};
 use crate::infrastructure::logger;
@@ -261,8 +261,8 @@ pub fn run() {
             }
 
             // ── System Tray ──
-            let quit = MenuItem::with_id(app, tray::MENU_QUIT, "退出 RustVerse", true, None::<&str>)?;
-            let show = MenuItem::with_id(app, tray::MENU_SHOW, "显示窗口", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, tray::MENU_QUIT, tray_menu::LABEL_QUIT, true, None::<&str>)?;
+            let show = MenuItem::with_id(app, tray::MENU_SHOW, tray_menu::LABEL_SHOW, true, None::<&str>)?;
             let tray_menu = Menu::with_items(app, &[&show, &quit])?;
 
             let tray_icon = app.default_window_icon().cloned();

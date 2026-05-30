@@ -1,4 +1,4 @@
-use crate::domain::constants::{event_name, log_module, system_binary, system_env};
+use crate::domain::constants::{error_pattern, event_name, log_module, process_name, system_binary, system_env};
 use crate::domain::entity::TerminalReinitResult;
 use crate::domain::error::AppResult;
 use crate::infrastructure::system::env::binary_exists;
@@ -123,7 +123,7 @@ pub async fn uninstall_rustup(state: tauri::State<'_, AppState>) -> AppResult<St
     let rustup = state
         .store
         .get_config("binaries.rustup")
-        .unwrap_or_else(|| "rustup".to_string());
+        .unwrap_or_else(|| system_binary::RUSTUP.to_string());
     if !binary_exists(&rustup) {
         return Err(crate::domain::error::AppError::Command(
             "rustup is not installed".to_string(),
@@ -139,24 +139,17 @@ pub async fn uninstall_rustup(state: tauri::State<'_, AppState>) -> AppResult<St
         }
         Err(e) => {
             let err_msg = format!("{e}");
-            let is_locked = err_msg.contains("os error 32")
-                || err_msg.contains("being used")
-                || err_msg.contains("another program");
-            let is_access_denied = err_msg.contains("os error 5") || err_msg.contains("拒绝访问");
+            let is_locked = err_msg.contains(error_pattern::OS_ERROR_32)
+                || err_msg.contains(error_pattern::BEING_USED)
+                || err_msg.contains(error_pattern::ANOTHER_PROGRAM);
+            let is_access_denied = err_msg.contains(error_pattern::OS_ERROR_5) || err_msg.contains(error_pattern::ACCESS_DENIED_CN);
 
             if is_locked || is_access_denied {
                 #[cfg(target_os = "windows")]
                 {
-                    let lock_processes = [
-                        "cargo",
-                        "rustc",
-                        "rust-analyzer",
-                        "rustfmt",
-                        "clippy-driver",
-                    ];
-                    for proc_name in lock_processes {
-                        let _ = tokio::process::Command::new("taskkill")
-                            .args(["/F", "/IM", &format!("{proc_name}.exe")])
+                    for proc_name in process_name::LOCK_PROCESSES {
+                        let _ = tokio::process::Command::new(system_binary::TASKKILL)
+                            .args(["/F", "/IM", &format!("{}{}", proc_name, system_binary::WINDOWS_EXE_SUFFIX)])
                             .stdout(std::process::Stdio::null())
                             .stderr(std::process::Stdio::null())
                             .creation_flags(0x08000000)

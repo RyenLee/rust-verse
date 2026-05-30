@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::domain::constants::{path_segment, registry_key, system_binary, system_env};
 use crate::domain::error::{AppError, AppResult};
 
 /// Resolve CARGO_HOME and RUSTUP_HOME from environment variables.
@@ -10,23 +11,23 @@ use crate::domain::error::{AppError, AppResult};
 /// 3. Default paths: `~/.cargo` and `~/.rustup`
 pub fn resolve_rust_homes() -> (Option<String>, Option<String>) {
     let home_dir = dirs::home_dir();
-    let default_cargo = home_dir.as_ref().map(|h| h.join(".cargo"));
-    let default_rustup = home_dir.as_ref().map(|h| h.join(".rustup"));
+    let default_cargo = home_dir.as_ref().map(|h| h.join(path_segment::DOT_CARGO));
+    let default_rustup = home_dir.as_ref().map(|h| h.join(path_segment::DOT_RUSTUP));
 
-    let cargo_from_env = std::env::var("CARGO_HOME").ok();
-    let rustup_from_env = std::env::var("RUSTUP_HOME").ok();
+    let cargo_from_env = std::env::var(system_env::CARGO_HOME).ok();
+    let rustup_from_env = std::env::var(system_env::RUSTUP_HOME).ok();
 
     #[cfg(target_os = "windows")]
     {
         let cargo_from_registry = cargo_from_env
             .is_none()
-            .then(|| read_user_env_var("CARGO_HOME").or_else(|| read_system_env_var("CARGO_HOME")))
+            .then(|| read_user_env_var(system_env::CARGO_HOME).or_else(|| read_system_env_var(system_env::CARGO_HOME)))
             .flatten();
 
         let rustup_from_registry = rustup_from_env
             .is_none()
             .then(|| {
-                read_user_env_var("RUSTUP_HOME").or_else(|| read_system_env_var("RUSTUP_HOME"))
+                read_user_env_var(system_env::RUSTUP_HOME).or_else(|| read_system_env_var(system_env::RUSTUP_HOME))
             })
             .flatten();
 
@@ -73,9 +74,9 @@ pub fn find_binary(name: &str) -> AppResult<PathBuf> {
     }
 
     // 3. Check CARGO_HOME/bin if CARGO_HOME is set
-    if let Ok(cargo_home) = std::env::var("CARGO_HOME") {
+    if let Ok(cargo_home) = std::env::var(system_env::CARGO_HOME) {
         let bin = PathBuf::from(&cargo_home)
-            .join("bin")
+            .join(path_segment::BIN)
             .join(format_bin_name(name));
         if bin.exists() {
             return Ok(bin);
@@ -85,9 +86,9 @@ pub fn find_binary(name: &str) -> AppResult<PathBuf> {
     // 4. Check system CARGO_HOME from registry (Windows)
     #[cfg(target_os = "windows")]
     {
-        if let Some(cargo_home) = read_system_env_var("CARGO_HOME") {
+        if let Some(cargo_home) = read_system_env_var(system_env::CARGO_HOME) {
             let bin = PathBuf::from(&cargo_home)
-                .join("bin")
+                .join(path_segment::BIN)
                 .join(format_bin_name(name));
             if bin.exists() {
                 return Ok(bin);
@@ -124,17 +125,18 @@ pub fn validate_rust_binary(name: &str) -> Result<(), String> {
         .unwrap_or(name);
 
     match stem {
-        "rustup" | "cargo" => Ok(()),
+        system_binary::RUSTUP | system_binary::CARGO => Ok(()),
         other => Err(format!(
-            "invalid binary name '{other}': only 'rustup' and 'cargo' are allowed"
+            "invalid binary name '{other}': only '{}' and '{}' are allowed",
+            system_binary::RUSTUP, system_binary::CARGO
         )),
     }
 }
 
 /// Add `.exe` suffix on Windows.
 fn format_bin_name(name: &str) -> String {
-    if cfg!(target_os = "windows") && !name.ends_with(".exe") {
-        format!("{name}.exe")
+    if cfg!(target_os = "windows") && !name.ends_with(system_binary::WINDOWS_EXE_SUFFIX) {
+        format!("{}{}", name, system_binary::WINDOWS_EXE_SUFFIX)
     } else {
         name.to_string()
     }
@@ -152,7 +154,7 @@ pub fn read_system_env_var(name: &str) -> Option<String> {
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
     let env = hklm
         .open_subkey_with_flags(
-            r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
+            registry_key::SYSTEM_ENV,
             KEY_READ,
         )
         .ok()?;
@@ -169,7 +171,7 @@ pub fn read_user_env_var(name: &str) -> Option<String> {
     use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let env = hkcu.open_subkey_with_flags("Environment", KEY_READ).ok()?;
+    let env = hkcu.open_subkey_with_flags(registry_key::USER_ENV, KEY_READ).ok()?;
     env.get_value(name).ok()
 }
 
@@ -184,7 +186,7 @@ fn find_binary_in_system_path(name: &str) -> Option<PathBuf> {
     // Collect PATH directories from both system and user registry
     let mut path_dirs: Vec<PathBuf> = Vec::new();
 
-    if let Some(system_path) = read_system_env_var("Path") {
+    if let Some(system_path) = read_system_env_var(system_env::PATH) {
         for dir in system_path.split(';') {
             let p = PathBuf::from(dir.trim());
             if !p.as_os_str().is_empty() {
@@ -193,7 +195,7 @@ fn find_binary_in_system_path(name: &str) -> Option<PathBuf> {
         }
     }
 
-    if let Some(user_path) = read_user_env_var("Path") {
+    if let Some(user_path) = read_user_env_var(system_env::PATH) {
         for dir in user_path.split(';') {
             let p = PathBuf::from(dir.trim());
             if !p.as_os_str().is_empty() && !path_dirs.contains(&p) {
@@ -203,14 +205,14 @@ fn find_binary_in_system_path(name: &str) -> Option<PathBuf> {
     }
 
     // Also check CARGO_HOME/bin from registry
-    if let Some(cargo_home) = read_system_env_var("CARGO_HOME") {
-        let bin_dir = PathBuf::from(&cargo_home).join("bin");
+    if let Some(cargo_home) = read_system_env_var(system_env::CARGO_HOME) {
+        let bin_dir = PathBuf::from(&cargo_home).join(path_segment::BIN);
         if !path_dirs.contains(&bin_dir) {
             path_dirs.push(bin_dir);
         }
     }
-    if let Some(cargo_home) = read_user_env_var("CARGO_HOME") {
-        let bin_dir = PathBuf::from(&cargo_home).join("bin");
+    if let Some(cargo_home) = read_user_env_var(system_env::CARGO_HOME) {
+        let bin_dir = PathBuf::from(&cargo_home).join(path_segment::BIN);
         if !path_dirs.contains(&bin_dir) {
             path_dirs.push(bin_dir);
         }

@@ -73,8 +73,8 @@ pub mod app {
 
 pub mod system_env {
     pub const PATH: &str = "Path";
- 
-   pub const CARGO_HOME: &str = "CARGO_HOME";
+
+    pub const CARGO_HOME: &str = "CARGO_HOME";
     pub const RUSTUP_HOME: &str = "RUSTUP_HOME";
 }
 
@@ -108,9 +108,18 @@ pub mod proxy_env_var {
     pub const NO_PROXY_LOWER: &str = "no_proxy";
 
     pub static ALL: &[&str] = &[
-        HTTP_PROXY, HTTPS_PROXY, HTTP_PROXY_LOWER, HTTPS_PROXY_LOWER,
-        ALL_PROXY, ALL_PROXY_LOWER, SOCKS_PROXY, SOCKS_PROXY_LOWER,
-        SOCKS5_PROXY, SOCKS5_PROXY_LOWER, NO_PROXY, NO_PROXY_LOWER,
+        HTTP_PROXY,
+        HTTPS_PROXY,
+        HTTP_PROXY_LOWER,
+        HTTPS_PROXY_LOWER,
+        ALL_PROXY,
+        ALL_PROXY_LOWER,
+        SOCKS_PROXY,
+        SOCKS_PROXY_LOWER,
+        SOCKS5_PROXY,
+        SOCKS5_PROXY_LOWER,
+        NO_PROXY,
+        NO_PROXY_LOWER,
     ];
 }
 
@@ -154,4 +163,53 @@ pub mod path_segment {
     pub const LOGS: &str = "logs";
     pub const WEBVIEW: &str = "webview";
     pub const TEMP: &str = "temp";
+}
+
+pub mod rustup_mirror_var {
+    pub const RUSTUP_DIST_SERVER: &str = "RUSTUP_DIST_SERVER";
+    pub const RUSTUP_UPDATE_ROOT: &str = "RUSTUP_UPDATE_ROOT";
+
+    pub static ALL: &[&str] = &[RUSTUP_DIST_SERVER, RUSTUP_UPDATE_ROOT];
+}
+
+pub mod error_pattern {
+    pub const PROGRAM_NOT_FOUND: &str = "program not found";
+    pub const FILE_NOT_FOUND: &str = "cannot find the file specified";
+    pub const NO_SUCH_FILE: &str = "No such file or directory";
+    pub const OS_ERROR_448: &str = "os error 448";
+    pub const OS_ERROR_448_SHORT: &str = "448";
+    pub const OS_ERROR_32: &str = "os error 32";
+    pub const OS_ERROR_5: &str = "os error 5";
+    pub const BEING_USED: &str = "being used";
+    pub const ANOTHER_PROGRAM: &str = "another program";
+    pub const ACCESS_DENIED_CN: &str = "拒绝访问";
+}
+
+pub mod tray_menu {
+    pub const LABEL_QUIT: &str = "退出 RustVerse";
+    pub const LABEL_SHOW: &str = "显示窗口";
+}
+
+pub mod process_name {
+    pub const CARGO: &str = "cargo";
+    pub const RUSTC: &str = "rustc";
+    pub const RUST_ANALYZER: &str = "rust-analyzer";
+    pub const RUSTFMT: &str = "rustfmt";
+    pub const CLIPPY_DRIVER: &str = "clippy-driver";
+
+    pub static LOCK_PROCESSES: &[&str] = &[CARGO, RUSTC, RUST_ANALYZER, RUSTFMT, CLIPPY_DRIVER];
+}
+
+pub mod env_check_event {
+    pub const LOG_EVENT: &str = "env-check-log";
+    pub const LOG_MODULE: &str = "env-check";
+}
+
+pub mod installer_platform {
+    pub const ARCH_AARCH64: &str = "aarch64";
+    pub const ARCH_X86_64: &str = "x86_64";
+    pub const TARGET_AARCH64_DARWIN: &str = "aarch64-apple-darwin";
+    pub const TARGET_X86_64_DARWIN: &str = "x86_64-apple-darwin";
+    pub const TARGET_AARCH64_LINUX: &str = "aarch64-unknown-linux-gnu";
+    pub const TARGET_X86_64_LINUX: &str = "x86_64-unknown-linux-gnu";
 }

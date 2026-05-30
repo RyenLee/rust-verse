@@ -5,7 +5,7 @@ use std::error::Error;
 use tauri::{AppHandle, State};
 
 use crate::domain::config_keys::keys;
-use crate::domain::constants::page_route;
+use crate::domain::constants::{log_module, page_route};
 use crate::domain::error::AppResult;
 use crate::domain::notification::{Category, NotificationKey, Priority};
 use crate::domain::parsing;
@@ -45,7 +45,7 @@ pub async fn check_update(
     let timeout = state.config_cache.get_timeout_rustup_check(&*state.store);
     let output = exec::run_command_with_timeout_allow_codes(&rustup_path, &["check"], timeout, &[100]).await?;
     logger::logger().debug(
-        "update",
+        log_module::UPDATE,
         &format!("[check_update] raw rustup check output:\n{output}"),
     );
 
@@ -334,7 +334,7 @@ an HTTP-level proxy blocking the connection. Check your system proxy settings an
             Priority::High,
             NotificationKey::NetworkDiagFailed,
             &[],
-            Some("/about"),
+            Some(page_route::ABOUT),
         );
     }
 

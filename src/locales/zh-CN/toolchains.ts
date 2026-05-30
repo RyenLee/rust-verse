@@ -16,6 +16,7 @@ export default {
     installTitle: '安装工具链',
     confirmUninstall: '确认卸载',
     uninstallConfirm: '移除工具链 {name}？',
+    uninstallSuccess: '工具链 {name} 已成功卸载',
   },
   form: {
     channel: '频道',

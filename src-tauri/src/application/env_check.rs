@@ -2,14 +2,15 @@
 //!
 //! Core env check routines separated from Tauri command concerns.
 
+use crate::domain::constants::env_check_event;
 use crate::infrastructure::logger;
 use crate::infrastructure::system::find_binary;
 use tauri::Emitter;
 
 /// Emit a log event to both the frontend and the log file.
 pub fn emit_log<R: tauri::Runtime>(app: &tauri::AppHandle<R>, msg: &str) {
-    let _ = app.emit("env-check-log", msg);
-    logger::logger().info("env-check", msg);
+    let _ = app.emit(env_check_event::LOG_EVENT, msg);
+    logger::logger().info(env_check_event::LOG_MODULE, msg);
 }
 
 /// Check rustup/cargo by running `<binary> --version` with a 10s timeout.

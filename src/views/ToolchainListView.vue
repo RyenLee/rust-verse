@@ -31,6 +31,7 @@ const showInstallPanel = ref(false)
 const showProgress = ref(false)
 const newChannel = ref('stable')
 const confirmUninstall = ref<string | null>(null)
+const uninstalling = ref(false)
 const searchQuery = ref('')
 
 const filteredToolchains = computed(() => {
@@ -85,13 +86,17 @@ async function installToolchain() {
 }
 
 async function uninstallToolchain(name: string) {
+  uninstalling.value = true
   try {
     await doUninstall(name)
     confirmUninstall.value = null
     notifyToolchainChange()
     await refresh()
-  } catch {
-    // ignore
+    toast.success(t('toolchains.dialog.uninstallSuccess', { name }))
+  } catch (e: any) {
+    toast.error(e?.message || e?.toString?.() || String(e))
+  } finally {
+    uninstalling.value = false
   }
 }
 
@@ -186,6 +191,10 @@ onActivated(() => {
     :description="t('toolchains.description')"
   >
     <template #actions>
+      <BaseButton variant="ghost" :loading="loading" @click="refresh">
+        <iconify-icon icon="mdi:refresh" width="16"></iconify-icon>
+        {{ t('common.action.refresh') }}
+      </BaseButton>
       <BaseButton variant="ghost" @click="goToHistoryVersions">
         <iconify-icon icon="mdi:history" width="16"></iconify-icon>
         {{ t('toolchains.action.historyVersions') }}
@@ -321,6 +330,7 @@ onActivated(() => {
       :message="t('toolchains.dialog.uninstallConfirm', { name: confirmUninstall })"
       :confirm-label="t('common.action.uninstall')"
       :danger="true"
+      :loading="uninstalling"
       @confirm="uninstallToolchain(confirmUninstall!)"
       @cancel="confirmUninstall = null"
     />

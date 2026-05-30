@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import BaseButton from './BaseButton.vue'
 
 const { t } = useI18n()
 
@@ -10,9 +11,11 @@ withDefaults(
     message: string
     confirmLabel?: string
     danger?: boolean
+    loading?: boolean
   }>(),
   {
     visible: true,
+    loading: false,
   }
 )
 
@@ -37,21 +40,16 @@ const emit = defineEmits<{
           <slot>{{ message }}</slot>
         </p>
         <div class="flex justify-end gap-2">
-          <button
-            class="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
-            @click="emit('cancel')"
-          >
+          <BaseButton variant="ghost" :disabled="loading" @click="emit('cancel')">
             {{ t('common.action.cancel') }}
-          </button>
-          <button
-            :class="[
-              'px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors',
-              danger ? 'bg-red-600 hover:bg-red-500' : 'bg-sky-600 hover:bg-sky-500',
-            ]"
+          </BaseButton>
+          <BaseButton
+            :variant="danger ? 'danger' : 'primary'"
+            :loading="loading"
             @click="emit('confirm')"
           >
-            {{ confirmLabel || t('common.action.confirm') }}
-          </button>
+            {{ loading ? t('common.status.loading') : (confirmLabel || t('common.action.confirm')) }}
+          </BaseButton>
         </div>
       </div>
     </div>

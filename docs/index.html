@@ -779,14 +779,14 @@
         <div class="hero-version">
           <span class="ver-label" data-lang="zh-CN">最新版本</span>
           <span class="ver-label" data-lang="en">Latest</span>
-          <span class="ver-num">v1.3.13</span>
+          <span class="ver-num">v1.3.14</span>
           <span class="ver-sep"></span>
           <span class="ver-date">2026-05-30</span>
         </div>
         <div class="cta-row">
           <a
             class="btn btn-primary"
-            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.13"
+            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.14"
             target="_blank"
             rel="noopener"
           >
@@ -990,14 +990,37 @@
           <h2 class="section-title" data-lang="en">Release History</h2>
         </div>
         <div class="changelog-timeline">
+          <!-- v1.3.14 -->
+          <div class="release-entry">
+            <div class="release-dot"></div>
+            <div class="release-head">
+              <span class="release-ver">v1.3.14</span>
+              <span class="release-date">2026-05-30</span>
+              <span class="release-latest" data-lang="zh-CN">最新</span>
+              <span class="release-latest" data-lang="en">Latest</span>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-changed" data-lang="zh-CN">改进</span>
+              <span class="change-group-label label-changed" data-lang="en">Changed</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">
+                  常量抽取重构完善 — 新增 rustup_mirror_var、error_pattern、tray_menu、process_name、env_check_event、installer_platform
+                  等子模块，全面消除 exec.rs、env.rs、system.rs 等核心模块中的硬编码文本
+                </li>
+                <li data-lang="en">
+                  Constant extraction refinement — Added submodules (rustup_mirror_var, error_pattern, tray_menu,
+                  process_name, env_check_event, installer_platform) to fully eliminate hardcoded strings in core
+                  modules (exec.rs, env.rs, system.rs)
+                </li>
+              </ul>
+            </div>
+          </div>
           <!-- v1.3.13 -->
           <div class="release-entry">
             <div class="release-dot"></div>
             <div class="release-head">
               <span class="release-ver">v1.3.13</span>
               <span class="release-date">2026-05-30</span>
-              <span class="release-latest" data-lang="zh-CN">最新</span>
-              <span class="release-latest" data-lang="en">Latest</span>
             </div>
             <div class="change-group">
               <span class="change-group-label label-changed" data-lang="zh-CN">改进</span>

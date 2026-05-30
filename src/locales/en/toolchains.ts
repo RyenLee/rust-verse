@@ -16,6 +16,7 @@ export default {
     installTitle: 'Install Toolchain',
     confirmUninstall: 'Confirm Uninstall',
     uninstallConfirm: 'Remove toolchain {name}?',
+    uninstallSuccess: 'Toolchain {name} has been uninstalled',
   },
   form: {
     channel: 'Channel',

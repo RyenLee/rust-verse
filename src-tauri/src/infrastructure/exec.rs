@@ -5,14 +5,13 @@ use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
-use crate::domain::constants::{locale, log_module};
+use crate::domain::constants::{error_pattern, locale, log_module, rustup_mirror_var};
 use crate::domain::error::{AppError, AppResult};
 
 /// Rust-related environment variables that affect download sources.
 /// These are read from the Windows Registry (or process env on other platforms)
 /// and injected into rustup/cargo child processes so they use the configured
 /// mirror instead of the default `static.rust-lang.org`.
-const RUSTUP_MIRROR_VARS: &[&str] = &["RUSTUP_DIST_SERVER", "RUSTUP_UPDATE_ROOT"];
 
 /// Inject `RUSTUP_DIST_SERVER` and `RUSTUP_UPDATE_ROOT` into a child process
 /// if they are set in the Windows Registry (user or system level) but not
@@ -23,7 +22,7 @@ const RUSTUP_MIRROR_VARS: &[&str] = &["RUSTUP_DIST_SERVER", "RUSTUP_UPDATE_ROOT"
 /// commands, even though the current process may not have been restarted
 /// after the user set those variables.
 fn inject_rustup_mirror_env(cmd: &mut Command) {
-    for &var_name in RUSTUP_MIRROR_VARS {
+    for &var_name in rustup_mirror_var::ALL {
         if std::env::var(var_name).is_ok() {
             continue;
         }
@@ -113,16 +112,14 @@ pub async fn run_command(bin: &str, args: &[&str], timeout_secs: u64) -> AppResu
         }
         Ok(Err(e)) => {
             let raw = e.to_string();
-            // Detect "program not found" errors — likely means the binary
-            // was not in PATH at process startup and resolve_binary fallback failed.
-            if raw.contains("program not found")
-                || raw.contains("cannot find the file specified")
-                || raw.contains("No such file or directory")
+            if raw.contains(error_pattern::PROGRAM_NOT_FOUND)
+                || raw.contains(error_pattern::FILE_NOT_FOUND)
+                || raw.contains(error_pattern::NO_SUCH_FILE)
             {
                 Err(AppError::BinaryNotFound(format!(
                     "'{bin}' not found in PATH or ~/.cargo/bin. Please install it first."
                 )))
-            } else if raw.contains("os error 448") || raw.contains("448") {
+            } else if raw.contains(error_pattern::OS_ERROR_448) || raw.contains(error_pattern::OS_ERROR_448_SHORT) {
                 Err(AppError::Command(format!(
                     "failed to execute '{bin}': Windows security blocked execution (os error 448 - untrusted mount point). \
                     This is usually caused by Windows Controlled Folder Access. Try adding the Rust toolchain \
@@ -184,14 +181,14 @@ pub async fn run_command_with_timeout_allow_codes(
         }
         Ok(Err(e)) => {
             let raw = e.to_string();
-            if raw.contains("program not found")
-                || raw.contains("cannot find the file specified")
-                || raw.contains("No such file or directory")
+            if raw.contains(error_pattern::PROGRAM_NOT_FOUND)
+                || raw.contains(error_pattern::FILE_NOT_FOUND)
+                || raw.contains(error_pattern::NO_SUCH_FILE)
             {
                 Err(AppError::BinaryNotFound(format!(
                     "'{bin}' not found in PATH or ~/.cargo/bin. Please install it first."
                 )))
-            } else if raw.contains("os error 448") || raw.contains("448") {
+            } else if raw.contains(error_pattern::OS_ERROR_448) || raw.contains(error_pattern::OS_ERROR_448_SHORT) {
                 Err(AppError::Command(format!(
                     "failed to execute '{bin}': Windows security blocked execution (os error 448 - untrusted mount point). \
                     This is usually caused by Windows Controlled Folder Access. Try adding the Rust toolchain \
@@ -250,9 +247,9 @@ pub async fn run_command_with_cancel(
 
     let mut child = child_cmd.spawn().map_err(|e| {
         let raw = e.to_string();
-        if raw.contains("program not found")
-            || raw.contains("cannot find the file specified")
-            || raw.contains("No such file or directory")
+        if raw.contains(error_pattern::PROGRAM_NOT_FOUND)
+            || raw.contains(error_pattern::FILE_NOT_FOUND)
+            || raw.contains(error_pattern::NO_SUCH_FILE)
         {
             AppError::BinaryNotFound(format!(
                 "'{command}' not found in PATH or ~/.cargo/bin. Please install it first."

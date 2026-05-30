@@ -4,7 +4,7 @@
 
 use tauri::{AppHandle, State};
 
-use crate::domain::constants::{channel, log_module, page_route};
+use crate::domain::constants::{channel as channel_consts, log_module, page_route};
 use crate::domain::error::AppResult;
 use crate::domain::notification::{Category, NotificationKey, Priority};
 use crate::domain::parsing;
@@ -41,8 +41,10 @@ pub async fn list_toolchains(
     // Also resolves version for default channel toolchains (e.g. stable-x86_64-pc-windows-msvc)
     for tc in &mut toolchains {
         let needs_version = parsing::toolchain_name_has_date(&tc.name)
-            || (matches!(tc.channel.as_str(), channel::STABLE | channel::BETA | channel::NIGHTLY)
-                && !tc.display_name.contains('.'));
+            || (matches!(
+                tc.channel.as_str(),
+                channel_consts::STABLE | channel_consts::BETA | channel_consts::NIGHTLY
+            ) && !tc.display_name.contains('.'));
         if needs_version {
             if let Ok(ver_output) =
                 exec::run_command(&rustup_path, &["run", &tc.name, "rustc", "--version"], 15).await
@@ -68,7 +70,7 @@ pub async fn install_toolchain(
     app: AppHandle,
     state: State<'_, AppState>,
     rustup_path: String,
-    ch: String,
+    channel: String,
     version: Option<String>,
     date: Option<String>,
 ) -> AppResult<()> {
@@ -76,7 +78,7 @@ pub async fn install_toolchain(
         log_module::TOOLCHAIN,
         &format!(
             "install_toolchain requested: {} (version={:?}, date={:?})",
-            ch, version, date
+            channel, version, date
         ),
     );
     crate::infrastructure::system::env::validate_rust_binary(&rustup_path)
@@ -87,27 +89,27 @@ pub async fn install_toolchain(
         (locale_key, events.install_log, events.install_finished)
     };
 
-    let toolchain_name = if ch == channel::NIGHTLY {
+    let toolchain_name = if channel == channel_consts::NIGHTLY {
         if let Some(ref d) = date {
-            format!("{ch}-{d}")
+            format!("{channel}-{d}")
         } else {
-            ch.clone()
+            channel.clone()
         }
     } else if let Some(ref v) = version {
         let v = v.split_whitespace().next().unwrap_or(v);
-        if v == ch {
+        if v == channel {
             if let Some(ref d) = date {
-                format!("{ch}-{d}")
+                format!("{channel}-{d}")
             } else {
-                ch.clone()
+                channel.clone()
             }
         } else {
             v.to_string()
         }
     } else if let Some(ref d) = date {
-        format!("{ch}-{d}")
+        format!("{channel}-{d}")
     } else {
-        ch.clone()
+        channel.clone()
     };
 
     // ── Set running flag & reset cancel flag ──
@@ -148,7 +150,7 @@ pub async fn install_toolchain(
                 Category::Install,
                 Priority::High,
                 NotificationKey::ToolchainInstalled,
-                &[("channel", &ch)],
+                &[("channel", &channel)],
                 Some(page_route::TOOLCHAINS),
             );
             Ok(())
@@ -159,7 +161,7 @@ pub async fn install_toolchain(
                 Category::Operation,
                 Priority::High,
                 NotificationKey::ToolchainInstallFailed,
-                &[("channel", &ch), ("error", &format!("{e}"))],
+                &[("channel", &channel), ("error", &format!("{e}"))],
                 Some(page_route::TOOLCHAINS),
             );
             Err(e)

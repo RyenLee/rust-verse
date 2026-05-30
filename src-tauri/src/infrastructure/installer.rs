@@ -4,14 +4,15 @@ use std::sync::atomic::AtomicBool;
 
 use tauri::{AppHandle, Emitter};
 
-use crate::domain::constants::{channel, event_name, file_name, installer, url};
+#[cfg_attr(target_os = "windows", allow(unused_imports))]
+use crate::domain::constants::{channel, event_name, file_name, installer, installer_platform, log_module, path_segment, system_binary, url};
 use crate::domain::error::{AppError, AppResult};
 use crate::infrastructure::logger;
 
 fn install_log(app: &AppHandle, msg: impl AsRef<str>) {
     let msg = msg.as_ref();
     let _ = app.emit(event_name::INSTALL_LOG, msg);
-    logger::logger().info("install", msg);
+    logger::logger().info(log_module::INSTALL, msg);
 }
 
 const MAX_RETRIES: u32 = 3;
@@ -24,9 +25,9 @@ struct InstallerMeta {
 #[cfg(target_os = "windows")]
 fn get_installer_meta() -> InstallerMeta {
     let arch = if cfg!(target_arch = "aarch64") {
-        "aarch64"
+        installer_platform::ARCH_AARCH64
     } else {
-        "x86_64"
+        installer_platform::ARCH_X86_64
     };
     InstallerMeta {
         url: format!("{}{}", url::RUSTUP_WIN, arch),
@@ -37,9 +38,9 @@ fn get_installer_meta() -> InstallerMeta {
 #[cfg(target_os = "macos")]
 fn get_installer_meta() -> InstallerMeta {
     let arch = if cfg!(target_arch = "aarch64") {
-        "aarch64-apple-darwin"
+        installer_platform::TARGET_AARCH64_DARWIN
     } else {
-        "x86_64-apple-darwin"
+        installer_platform::TARGET_X86_64_DARWIN
     };
     InstallerMeta {
         url: format!(
@@ -55,9 +56,9 @@ fn get_installer_meta() -> InstallerMeta {
 #[cfg(target_os = "linux")]
 fn get_installer_meta() -> InstallerMeta {
     let arch = if cfg!(target_arch = "aarch64") {
-        "aarch64-unknown-linux-gnu"
+        installer_platform::TARGET_AARCH64_LINUX
     } else {
-        "x86_64-unknown-linux-gnu"
+        installer_platform::TARGET_X86_64_LINUX
     };
     InstallerMeta {
         url: format!(
@@ -230,7 +231,7 @@ pub async fn ensure_installer(app: &AppHandle) -> AppResult<PathBuf> {
                 } else {
                     let data_dir = get_data_dir()
                         .map(|p| p.to_string_lossy().to_string())
-                        .unwrap_or_else(|_| "<app_dir>/data".to_string());
+                        .unwrap_or_else(|_| format!("<app_dir>/{}", path_segment::DATA));
 
                     install_log(app, "All download attempts failed.");
                     install_log(
@@ -312,7 +313,7 @@ pub async fn execute_installer(app: AppHandle, installer_path: &Path) -> AppResu
 
         let is_script = installer_path.extension().is_some_and(|ext| ext == "sh");
         let mut child = if is_script {
-            tokio::process::Command::new("sh")
+            tokio::process::Command::new(system_binary::SH)
                 .args([
                     &installer_path.to_string_lossy(),
                     installer::FLAG_YES,
@@ -386,7 +387,7 @@ pub async fn execute_installer_with_cancel(
         if is_script {
             crate::infrastructure::exec::run_command_with_cancel(
                 app,
-                "sh",
+                system_binary::SH,
                 &[
                     &installer_path.to_string_lossy(),
                     installer::FLAG_YES,
