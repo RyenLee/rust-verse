@@ -673,6 +673,217 @@
         display: flex;
       }
 
+      /* === PREVIEW / SCREENSHOTS === */
+      .preview-section {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1rem 1.5rem 3rem;
+      }
+      .preview-header {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+      .preview-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--accent);
+        margin-bottom: 0.5rem;
+      }
+      .preview-title {
+        font-family: var(--font-display);
+        font-size: clamp(1.5rem, 3vw, 2rem);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .preview-hero {
+        position: relative;
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background: var(--bg-surface);
+        box-shadow:
+          0 20px 60px rgba(0, 0, 0, 0.4),
+          0 0 0 1px rgba(255, 255, 255, 0.04);
+        margin-bottom: 1.25rem;
+        transition:
+          transform 0.4s ease,
+          box-shadow 0.4s ease;
+      }
+      .preview-hero:hover {
+        transform: translateY(-4px);
+        box-shadow:
+          0 28px 80px rgba(0, 0, 0, 0.5),
+          0 0 0 1px rgba(232, 83, 63, 0.15);
+      }
+      .preview-hero-img {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .preview-hero-caption {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 1rem 1.25rem;
+        background: linear-gradient(to top, rgba(6, 8, 15, 0.85) 0%, transparent 100%);
+        font-size: 0.82rem;
+        color: var(--text-secondary);
+      }
+      .preview-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+      }
+      .preview-card {
+        position: relative;
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background: var(--bg-surface);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+        transition: all 0.35s ease;
+        cursor: pointer;
+      }
+      .preview-card:hover {
+        transform: translateY(-3px);
+        border-color: var(--border-accent);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      }
+      .preview-card-img {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .preview-card-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(6, 8, 15, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      .preview-card:hover .preview-card-overlay {
+        opacity: 1;
+      }
+      .preview-card-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        padding: 0.4rem 1rem;
+        background: rgba(232, 83, 63, 0.2);
+        border: 1px solid var(--border-accent);
+        border-radius: 50px;
+        backdrop-filter: blur(8px);
+      }
+      .preview-badge-row {
+        display: flex;
+        justify-content: center;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+        flex-wrap: wrap;
+      }
+      .preview-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 0.35rem 0.85rem;
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+      }
+      .preview-badge-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+      .preview-badge-dot.light {
+        background: #e2e8f0;
+        box-shadow: 0 0 6px rgba(226, 232, 240, 0.5);
+      }
+      .preview-badge-dot.dark {
+        background: #4a5568;
+        box-shadow: 0 0 6px rgba(74, 85, 104, 0.5);
+      }
+      .preview-badge-dot.zh {
+        background: var(--accent);
+        box-shadow: 0 0 6px var(--accent-glow);
+      }
+      .preview-badge-dot.en {
+        background: var(--rust);
+        box-shadow: 0 0 6px var(--rust-glow);
+      }
+
+      /* === LIGHTBOX === */
+      .lightbox {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: rgba(6, 8, 15, 0.92);
+        backdrop-filter: blur(12px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+      .lightbox.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .lightbox-img {
+        max-width: 90vw;
+        max-height: 85vh;
+        border-radius: var(--radius-md);
+        box-shadow: 0 20px 80px rgba(0, 0, 0, 0.6);
+        transition: transform 0.3s ease;
+      }
+      .lightbox-close {
+        position: absolute;
+        top: 1.5rem;
+        right: 1.5rem;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: var(--bg-surface);
+        color: var(--text-primary);
+        font-size: 1.2rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+      }
+      .lightbox-close:hover {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .lightbox-caption {
+        position: absolute;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 0.5rem 1.25rem;
+        white-space: nowrap;
+      }
+
       /* === RESPONSIVE === */
       @media (max-width: 768px) {
         .hero {
@@ -702,6 +913,12 @@
           flex-direction: column;
           text-align: center;
         }
+        .preview-grid {
+          grid-template-columns: 1fr;
+        }
+        .preview-section {
+          padding: 1rem 1.25rem 2rem;
+        }
       }
       @media (max-width: 480px) {
         .nav-inner {
@@ -726,6 +943,12 @@
         .hero-version {
           flex-wrap: wrap;
           justify-content: center;
+        }
+        .preview-grid {
+          grid-template-columns: 1fr;
+        }
+        .preview-badge-row {
+          gap: 0.5rem;
         }
       }
     </style>
@@ -810,6 +1033,118 @@
           </a>
         </div>
       </header>
+
+      <!-- PREVIEW SCREENSHOTS -->
+      <section class="preview-section reveal">
+        <div class="preview-header">
+          <div class="preview-label">
+            <span>✦</span>
+            <span data-lang="zh-CN">应用预览</span>
+            <span data-lang="en">App Preview</span>
+          </div>
+          <h2 class="preview-title" data-lang="zh-CN">界面一览</h2>
+          <h2 class="preview-title" data-lang="en">Interface at a Glance</h2>
+        </div>
+        <div
+          class="preview-hero"
+          data-lightbox="index-white"
+          data-caption-zh="RustVerse 主界面 — 浅色主题"
+          data-caption-en="RustVerse Main Interface — Light Theme"
+        >
+          <img
+            class="preview-hero-img"
+            src="https://github.com/RyenLee/rust-verse/raw/main/public/imgs/en-w-d.png"
+            alt="RustVerse main interface in light theme showing toolchain management dashboard"
+            loading="lazy"
+          />
+          <div class="preview-hero-caption">
+            <span data-lang="zh-CN">RustVerse 主界面 — 浅色主题</span>
+            <span data-lang="en">RustVerse Main Interface — Light Theme</span>
+          </div>
+        </div>
+        <div class="preview-grid">
+          <div
+            class="preview-card"
+            data-lightbox="index-black"
+            data-caption-zh="RustVerse 主界面 — 深色主题"
+            data-caption-en="RustVerse Main Interface — Dark Theme"
+          >
+            <img
+              class="preview-card-img"
+              src="https://github.com/RyenLee/rust-verse/raw/main/public/imgs/en-b-d.png"
+              alt="RustVerse main interface in dark theme showing toolchain management dashboard"
+              loading="lazy"
+            />
+            <div class="preview-card-overlay">
+              <span class="preview-card-label" data-lang="zh-CN">深色主题</span>
+              <span class="preview-card-label" data-lang="en">Dark Theme</span>
+            </div>
+          </div>
+          <div
+            class="preview-card"
+            data-lightbox="zh-b-d"
+            data-caption-zh="中文界面 — 深色主题详情"
+            data-caption-en="Chinese Interface — Dark Theme Detail"
+          >
+            <img
+              class="preview-card-img"
+              src="https://github.com/RyenLee/rust-verse/raw/main/public/imgs/zh-b-d.png"
+              alt="RustVerse Chinese interface in dark theme showing detailed toolchain operations"
+              loading="lazy"
+            />
+            <div class="preview-card-overlay">
+              <span class="preview-card-label" data-lang="zh-CN">中文 · 深色</span>
+              <span class="preview-card-label" data-lang="en">Chinese · Dark</span>
+            </div>
+          </div>
+          <div
+            class="preview-card"
+            data-lightbox="en-w-d"
+            data-caption-zh="英文界面 — 浅色主题详情"
+            data-caption-en="English Interface — Light Theme Detail"
+          >
+            <img
+              class="preview-card-img"
+              src="https://github.com/RyenLee/rust-verse/raw/main/public/imgs/en-w-d.png"
+              alt="RustVerse English interface in light theme showing detailed component management"
+              loading="lazy"
+            />
+            <div class="preview-card-overlay">
+              <span class="preview-card-label" data-lang="zh-CN">英文 · 浅色</span>
+              <span class="preview-card-label" data-lang="en">English · Light</span>
+            </div>
+          </div>
+        </div>
+        <div class="preview-badge-row">
+          <span class="preview-badge">
+            <span class="preview-badge-dot light"></span>
+            <span data-lang="zh-CN">浅色主题</span>
+            <span data-lang="en">Light Theme</span>
+          </span>
+          <span class="preview-badge">
+            <span class="preview-badge-dot dark"></span>
+            <span data-lang="zh-CN">深色主题</span>
+            <span data-lang="en">Dark Theme</span>
+          </span>
+          <span class="preview-badge">
+            <span class="preview-badge-dot zh"></span>
+            <span data-lang="zh-CN">中文界面</span>
+            <span data-lang="en">Chinese UI</span>
+          </span>
+          <span class="preview-badge">
+            <span class="preview-badge-dot en"></span>
+            <span data-lang="zh-CN">英文界面</span>
+            <span data-lang="en">English UI</span>
+          </span>
+        </div>
+      </section>
+
+      <!-- LIGHTBOX -->
+      <div class="lightbox" id="lightbox">
+        <button class="lightbox-close" id="lightbox-close" aria-label="Close preview">&#10005;</button>
+        <img class="lightbox-img" id="lightbox-img" src="" alt="Full-size preview" />
+        <div class="lightbox-caption" id="lightbox-caption"></div>
+      </div>
 
       <!-- FEATURES -->
       <section class="section reveal">
@@ -1003,13 +1338,19 @@
               <span class="change-group-label label-improved" data-lang="zh-CN">改进</span>
               <span class="change-group-label label-improved" data-lang="en">Improved</span>
               <ul class="change-list">
-                <li data-lang="zh-CN">ToolchainSelector 自动刷新 — 添加 watch 监听工具链列表变化，当已安装工具链被移除时自动更新选择</li>
-                <li data-lang="en">
-                  ToolchainSelector auto-refresh — Added watch to detect toolchains list changes and auto-update selection when installed toolchain is removed
+                <li data-lang="zh-CN">
+                  ToolchainSelector 自动刷新 — 添加 watch 监听工具链列表变化，当已安装工具链被移除时自动更新选择
                 </li>
-                <li data-lang="zh-CN">跨页面工具链同步 — TargetsView 和 ComponentsView 现在在工具链选择变化时自动重新加载数据</li>
                 <li data-lang="en">
-                  Cross-page toolchain sync — TargetsView and ComponentsView now automatically reload data when toolchain selection changes
+                  ToolchainSelector auto-refresh — Added watch to detect toolchains list changes and auto-update
+                  selection when installed toolchain is removed
+                </li>
+                <li data-lang="zh-CN">
+                  跨页面工具链同步 — TargetsView 和 ComponentsView 现在在工具链选择变化时自动重新加载数据
+                </li>
+                <li data-lang="en">
+                  Cross-page toolchain sync — TargetsView and ComponentsView now automatically reload data when
+                  toolchain selection changes
                 </li>
               </ul>
             </div>
@@ -1017,9 +1358,12 @@
               <span class="change-group-label label-fixed" data-lang="zh-CN">修复</span>
               <span class="change-group-label label-fixed" data-lang="en">Fixed</span>
               <ul class="change-list">
-                <li data-lang="zh-CN">组件/目标自动重载 — 修复了更改工具链选择时不会触发组件/目标管理页面数据刷新的问题</li>
+                <li data-lang="zh-CN">
+                  组件/目标自动重载 — 修复了更改工具链选择时不会触发组件/目标管理页面数据刷新的问题
+                </li>
                 <li data-lang="en">
-                  Component/Target auto-reload — Fixed issue where changing toolchain selection didn't trigger data refresh in components/targets management pages
+                  Component/Target auto-reload — Fixed issue where changing toolchain selection didn't trigger data
+                  refresh in components/targets management pages
                 </li>
               </ul>
             </div>
@@ -1918,6 +2262,61 @@
             if (lang) switchLang(lang)
           })
         })
+
+        // ===== Lightbox =====
+        var lightbox = document.getElementById('lightbox')
+        var lightboxImg = document.getElementById('lightbox-img')
+        var lightboxCaption = document.getElementById('lightbox-caption')
+        var lightboxClose = document.getElementById('lightbox-close')
+        var currentLang = initialLang
+
+        var imgMap = {
+          'index-white': 'https://github.com/RyenLee/rust-verse/raw/main/public/imgs/index-white.png',
+          'index-black': 'https://github.com/RyenLee/rust-verse/raw/main/public/imgs/index-black.png',
+          'zh-b-d': 'https://github.com/RyenLee/rust-verse/raw/main/public/imgs/zh-b-d.png',
+          'en-w-d': 'https://github.com/RyenLee/rust-verse/raw/main/public/imgs/en-w-d.png',
+        }
+
+        function openLightbox(key) {
+          var url = imgMap[key]
+          if (!url) return
+          lightboxImg.src = url
+          var el = document.querySelector('[data-lightbox="' + key + '"]')
+          var caption = el ? el.getAttribute('data-' + (currentLang === 'zh-CN' ? 'caption-zh' : 'caption-en')) : ''
+          lightboxCaption.textContent = caption || ''
+          lightbox.classList.add('active')
+          document.body.style.overflow = 'hidden'
+        }
+
+        function closeLightbox() {
+          lightbox.classList.remove('active')
+          document.body.style.overflow = ''
+          setTimeout(function () {
+            lightboxImg.src = ''
+          }, 300)
+        }
+
+        document.querySelectorAll('[data-lightbox]').forEach(function (el) {
+          el.addEventListener('click', function () {
+            openLightbox(this.getAttribute('data-lightbox'))
+          })
+        })
+
+        lightboxClose.addEventListener('click', closeLightbox)
+        lightbox.addEventListener('click', function (e) {
+          if (e.target === lightbox) closeLightbox()
+        })
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && lightbox.classList.contains('active')) {
+            closeLightbox()
+          }
+        })
+
+        var origSwitchLang = switchLang
+        switchLang = function (lang) {
+          origSwitchLang(lang)
+          currentLang = lang
+        }
       })()
     </script>
   </body>
