@@ -34,11 +34,6 @@ const router = createRouter({
       component: () => import('@/views/OverrideView.vue'),
     },
     {
-      path: '/updates',
-      name: 'updates',
-      component: () => import('@/views/UpdateView.vue'),
-    },
-    {
       path: '/plugins',
       name: 'plugins',
       component: () => import('@/views/PluginsView.vue'),

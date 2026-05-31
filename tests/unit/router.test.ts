@@ -9,7 +9,6 @@ describe('Router', () => {
     expect(routeNames).toContain('components')
     expect(routeNames).toContain('targets')
     expect(routeNames).toContain('overrides')
-    expect(routeNames).toContain('updates')
     expect(routeNames).toContain('plugins')
   })
 
@@ -21,11 +20,6 @@ describe('Router', () => {
   it('resolves /toolchains to toolchains', async () => {
     await router.push('/toolchains')
     expect(router.currentRoute.value.name).toBe('toolchains')
-  })
-
-  it('resolves /updates to updates', async () => {
-    await router.push('/updates')
-    expect(router.currentRoute.value.name).toBe('updates')
   })
 
   it('uses hash history mode', () => {

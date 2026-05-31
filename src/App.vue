@@ -180,7 +180,6 @@ const navGroups = computed<NavGroup[]>(() => [
     icon: 'mdi:rocket-launch-outline',
     color: 'emerald',
     items: [
-      { path: '/updates', label: t('nav.updates'), icon: 'mdi:cloud-download-outline' },
       { path: '/plugins', label: t('nav.plugins'), icon: 'mdi:power-plug-outline' },
     ],
   },

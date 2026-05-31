@@ -2,6 +2,7 @@ export default {
   title: 'Updates',
   description: 'Check and apply Rust toolchain and rustup updates',
   action: {
+    update: 'Update',
     updateRustup: 'Update Rustup Only',
     updateAll: 'Update All',
     checkAppUpdate: 'Check for Update',

@@ -8,6 +8,7 @@ export default {
     viewGuide: 'View installation guide',
     manageToolchains: 'Manage installed toolchains',
     checkUpdates: 'Check and apply updates',
+    updateToolchains: 'Update toolchains and rustup',
     addRemoveComponents: 'Add or remove components',
     uninstallRustupDesc: 'Completely remove rustup and all toolchains from your system',
   },

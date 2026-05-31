@@ -20,7 +20,14 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
-const { installToolchain: doInstall, uninstallToolchain: doUninstall, setDefaultToolchain: doSetDefault } = useRustup()
+const {
+  installToolchain: doInstall,
+  uninstallToolchain: doUninstall,
+  setDefaultToolchain: doSetDefault,
+  checkUpdate: doCheck,
+  updateAll: doUpdateAll,
+  updateRustup: doUpdateRustup,
+} = useRustup()
 const { notifyToolchainChange, onToolchainChange } = useDataRefresh()
 const { toolchains, loading, refresh } = useToolchainOptions()
 const bgTask = useBackgroundTask()
@@ -33,6 +40,14 @@ const newChannel = ref('stable')
 const confirmUninstall = ref<string | null>(null)
 const uninstalling = ref(false)
 const searchQuery = ref('')
+const updating = ref(false)
+const updatingRustup = ref(false)
+const updateLogs = ref<string[]>([])
+const updateStatus = ref<'running' | 'success' | 'error'>('running')
+const updateMode = ref<'all' | 'rustup'>('all')
+const showUpdateProgress = ref(false)
+const showUpdateDropdown = ref(false)
+const updateDropdownRef = ref<HTMLElement | null>(null)
 
 const filteredToolchains = computed(() => {
   const query = searchQuery.value.toLowerCase().trim()
@@ -143,17 +158,105 @@ function minimizeInstall() {
   )
 }
 
+async function updateAll() {
+  if (!(await bgTask.guardStart())) {
+    return
+  }
+  updating.value = true
+  updateLogs.value = []
+  updateStatus.value = 'running'
+  updateMode.value = 'all'
+  showUpdateProgress.value = true
+  bgTask.startTask(t('updates.progress.updatingAllTitle'))
+  try {
+    await doUpdateAll()
+    updateStatus.value = 'success'
+    bgTask.finishTask('completed')
+    notifyToolchainChange()
+    await refresh()
+  } catch (e: any) {
+    updateStatus.value = 'error'
+    updateLogs.value.push(`Error: ${e?.message || String(e)}`)
+    bgTask.finishTask('failed')
+  } finally {
+    updating.value = false
+  }
+}
+
+async function updateRustup() {
+  if (!(await bgTask.guardStart())) {
+    return
+  }
+  updatingRustup.value = true
+  updateLogs.value = []
+  updateStatus.value = 'running'
+  updateMode.value = 'rustup'
+  showUpdateProgress.value = true
+  bgTask.startTask(t('updates.progress.updatingRustupTitle'))
+  try {
+    await doUpdateRustup()
+    updateStatus.value = 'success'
+    bgTask.finishTask('completed')
+    notifyToolchainChange()
+    await refresh()
+  } catch (e: any) {
+    updateStatus.value = 'error'
+    updateLogs.value.push(`Error: ${e?.message || String(e)}`)
+    bgTask.finishTask('failed')
+  } finally {
+    updatingRustup.value = false
+  }
+}
+
+function closeUpdateProgress() {
+  showUpdateProgress.value = false
+}
+
+async function cancelUpdateOp() {
+  await bgTask.requestCancel()
+  updateStatus.value = 'error'
+  updateLogs.value.push('操作已取消')
+}
+
+function minimizeUpdateOp() {
+  bgTask.minimize(
+    () => {
+      showUpdateProgress.value = false
+    },
+    () => {
+      showUpdateProgress.value = true
+    }
+  )
+}
+
 function goToHistoryVersions() {
   router.push('/history-versions')
 }
 
+function handleClickOutside(e: MouseEvent) {
+  if (updateDropdownRef.value && !updateDropdownRef.value.contains(e.target as Node)) {
+    showUpdateDropdown.value = false
+  }
+}
+
+function handleUpdateAction(action: 'all' | 'rustup') {
+  showUpdateDropdown.value = false
+  if (action === 'all') {
+    updateAll()
+  } else {
+    updateRustup()
+  }
+}
+
 let unlistenLog: (() => void) | null = null
 let unlistenFinish: (() => void) | null = null
+let unlistenUpdateLog: (() => void) | null = null
 
 // Refresh when any page installs/uninstalls a toolchain (keep-alive safe)
 onToolchainChange(() => refresh())
 
 onMounted(async () => {
+  document.addEventListener('click', handleClickOutside, true)
   unlistenLog = await listen<string>('install-log', event => {
     installLogs.value.push(event.payload)
     bgTask.appendLine(event.payload)
@@ -161,25 +264,37 @@ onMounted(async () => {
   unlistenFinish = await listen('install-finished', () => {
     installing.value = false
   })
+  unlistenUpdateLog = await listen<string>('update-log', event => {
+    updateLogs.value.push(event.payload)
+  })
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside, true)
   unlistenLog?.()
   unlistenFinish?.()
+  unlistenUpdateLog?.()
 })
 
 let progressWasVisible = false
+let updateProgressWasVisible = false
 
 onDeactivated(() => {
   progressWasVisible = showProgress.value
+  updateProgressWasVisible = showUpdateProgress.value
   showInstallPanel.value = false
   showProgress.value = false
+  showUpdateProgress.value = false
 })
 
 onActivated(() => {
   if (progressWasVisible || (bgTask.state.status === 'running' && !bgTask.state.minimized)) {
     showProgress.value = true
     progressWasVisible = false
+  }
+  if (updateProgressWasVisible) {
+    showUpdateProgress.value = true
+    updateProgressWasVisible = false
   }
 })
 </script>
@@ -202,6 +317,45 @@ onActivated(() => {
       <BaseButton @click="openInstallPanel">
         {{ t('toolchains.action.installNew') }}
       </BaseButton>
+
+      <div class="relative" ref="updateDropdownRef">
+        <BaseButton
+          variant="secondary"
+          :loading="updating || updatingRustup"
+          @click="showUpdateDropdown = !showUpdateDropdown"
+        >
+          <iconify-icon icon="mdi:update" width="16"></iconify-icon>
+          {{ t('updates.action.update') }}
+          <iconify-icon :icon="showUpdateDropdown ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="16"></iconify-icon>
+        </BaseButton>
+        <Transition name="dropdown">
+          <div
+            v-if="showUpdateDropdown"
+            class="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden z-50 min-w-[180px]"
+          >
+            <button
+              class="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-colors text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="updating || updatingRustup"
+              @click="handleUpdateAction('rustup')"
+            >
+              <iconify-icon
+                icon="mdi:cloud-download-outline"
+                width="16"
+                class="text-gray-400 dark:text-gray-500"
+              ></iconify-icon>
+              <span class="flex-1 text-left">{{ t('updates.action.updateRustup') }}</span>
+            </button>
+            <button
+              class="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-colors text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="updating || updatingRustup"
+              @click="handleUpdateAction('all')"
+            >
+              <iconify-icon icon="mdi:update" width="16" class="text-gray-400 dark:text-gray-500"></iconify-icon>
+              <span class="flex-1 text-left">{{ t('updates.action.updateAll') }}</span>
+            </button>
+          </div>
+        </Transition>
+      </div>
     </template>
 
     <template #filters>
@@ -351,6 +505,27 @@ onActivated(() => {
       @cancel="cancelInstall"
       @minimize="minimizeInstall"
     />
+
+    <ProgressDialog
+      :visible="showUpdateProgress"
+      :title="updateMode === 'all' ? t('updates.progress.updatingAllTitle') : t('updates.progress.updatingRustupTitle')"
+      :status="updateStatus"
+      :status-text="
+        updateStatus === 'running'
+          ? updateMode === 'all'
+            ? t('updates.progress.updatingAllStatus')
+            : t('updates.progress.updatingRustupStatus')
+          : updateStatus === 'success'
+          ? updateMode === 'all'
+            ? t('updates.progress.allUpdated')
+            : t('updates.progress.rustupUpdated')
+          : t('updates.progress.failed')
+      "
+      :lines="updateLogs"
+      @close="closeUpdateProgress"
+      @cancel="cancelUpdateOp"
+      @minimize="minimizeUpdateOp"
+    />
   </PageLayout>
 </template>
 
@@ -370,5 +545,15 @@ onActivated(() => {
 .slide-panel-enter-from > div:last-child,
 .slide-panel-leave-to > div:last-child {
   transform: translateX(100%);
+}
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
 }
 </style>

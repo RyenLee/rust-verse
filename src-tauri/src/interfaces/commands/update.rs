@@ -87,7 +87,7 @@ pub async fn check_update(
             Priority::High,
             NotificationKey::ToolchainUpdatesAvailable,
             &[("count", &count_str), ("names", &names_str)],
-            Some(page_route::UPDATES),
+            Some(page_route::TOOLCHAINS),
         );
     }
 
@@ -160,7 +160,7 @@ pub async fn update_all(
                 Priority::High,
                 NotificationKey::ToolchainsUpdated,
                 &[],
-                Some(page_route::UPDATES),
+                Some(page_route::TOOLCHAINS),
             );
             Ok(())
         }
@@ -171,7 +171,7 @@ pub async fn update_all(
                 Priority::High,
                 NotificationKey::ToolchainUpdateFailed,
                 &[("error", &format!("{e}"))],
-                Some(page_route::UPDATES),
+                Some(page_route::TOOLCHAINS),
             );
             Err(e)
         }
@@ -244,7 +244,7 @@ pub async fn update_rustup(
                 Priority::High,
                 NotificationKey::RustupUpdated,
                 &[],
-                Some(page_route::UPDATES),
+                Some(page_route::TOOLCHAINS),
             );
             Ok(())
         }
@@ -255,7 +255,7 @@ pub async fn update_rustup(
                 Priority::High,
                 NotificationKey::RustupUpdateFailed,
                 &[("error", &format!("{e}"))],
-                Some(page_route::UPDATES),
+                Some(page_route::TOOLCHAINS),
             );
             Err(e)
         }

@@ -2,6 +2,7 @@ export default {
   title: '更新',
   description: '检查并应用 Rust 工具链和 rustup 更新',
   action: {
+    update: '更新',
     updateRustup: '仅更新 Rustup',
     updateAll: '全部更新',
     checkAppUpdate: '检查软件更新',

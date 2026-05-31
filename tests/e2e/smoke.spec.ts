@@ -16,7 +16,6 @@ test.describe('Smoke Tests', () => {
     await expect(page.locator('text=Components')).toBeVisible()
     await expect(page.locator('text=Targets')).toBeVisible()
     await expect(page.locator('text=Overrides')).toBeVisible()
-    await expect(page.locator('text=Updates')).toBeVisible()
     await expect(page.locator('text=Plugins')).toBeVisible()
   })
 
@@ -25,13 +24,6 @@ test.describe('Smoke Tests', () => {
     await page.waitForSelector('text=Toolchains', { timeout: 10000 })
     await page.click('a[href="/toolchains"]')
     await expect(page.locator('h1')).toContainText('Toolchains')
-  })
-
-  test('navigate to updates page', async ({ page }) => {
-    await page.goto('/')
-    await page.waitForSelector('text=Updates', { timeout: 10000 })
-    await page.click('a[href="/updates"]')
-    await expect(page.locator('h1')).toContainText('Updates')
   })
 
   test('navigate to plugins page', async ({ page }) => {

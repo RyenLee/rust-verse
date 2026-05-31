@@ -8,6 +8,7 @@ export default {
     viewGuide: '查看安装指南',
     manageToolchains: '管理已安装的工具链',
     checkUpdates: '检查并应用更新',
+    updateToolchains: '更新工具链和 rustup',
     addRemoveComponents: '添加或移除组件',
     uninstallRustupDesc: '从系统中完全移除 rustup 及所有工具链',
   },

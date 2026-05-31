@@ -2,7 +2,7 @@ export default {
   title: 'Toolchains',
   description: 'Install, uninstall and manage Rust toolchains',
   action: {
-    installNew: 'Install New',
+    installNew: 'Install',
     setDefault: 'Set Default',
     historyVersions: 'History',
     browseHistory: 'Browse History Versions',

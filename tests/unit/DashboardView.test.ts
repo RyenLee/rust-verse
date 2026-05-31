@@ -10,7 +10,6 @@ function createTestRouter() {
     routes: [
       { path: '/', name: 'dashboard', component: { template: '<div/>' } },
       { path: '/toolchains', name: 'toolchains', component: { template: '<div/>' } },
-      { path: '/updates', name: 'updates', component: { template: '<div/>' } },
       { path: '/components', name: 'components', component: { template: '<div/>' } },
     ],
   })
