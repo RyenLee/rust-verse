@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.18] - 2026-05-31
+
+### Changed
+
+- **ToolchainSelector auto-refresh** — Added `watch` to detect toolchains list changes and auto-update selection when installed toolchain is removed
+- **Cross-page toolchain sync** — TargetsView and ComponentsView now automatically reload data when toolchain selection changes
+
+### Fixed
+
+- **Component/Target auto-reload** — Fixed issue where changing toolchain selection didn't trigger data refresh in components/targets management pages
+
 ## [1.3.17] - 2026-05-31
 
 ### Changed
@@ -342,6 +353,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo plugins management
 - Dashboard with system status
 
+[1.3.18]: https://github.com/RyenLee/rust-verse/compare/v1.3.17...v1.3.18
 [1.3.17]: https://github.com/RyenLee/rust-verse/compare/v1.3.16...v1.3.17
 [1.3.16]: https://github.com/RyenLee/rust-verse/compare/v1.3.15...v1.3.16
 [1.3.15]: https://github.com/RyenLee/rust-verse/compare/v1.3.14...v1.3.15
@@ -371,7 +383,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 本文件记录了 RustVerse 项目的所有重要变更。
 
-- [最新版本 1.3.17](#1317---2026-05-31) — 缓存优化、unwrap/expect 安全修复、CARGO_HOME PATH 实际路径写入、i18n 补全
+- [最新版本 1.3.18](#1318---2026-05-31) — 工具链选择器自动刷新、跨页面工具链同步、组件/目标管理页面自动重载修复
 - [版本 1.3.8](#138---2026-05-27) — DDD架构重构、通知中心、设置页面、历史版本浏览、DateRangePicker组件
 - [版本 1.3.7](#137---2026-05-25) — 日期范围选择组件、useCalendar 组合式函数、跨组件工具链刷新、安装面板简化
 - [版本 1.3.6](#136---2026-05-25) — 历史版本页面、自定义日期选择组件、安装面板简化、项目主页上线

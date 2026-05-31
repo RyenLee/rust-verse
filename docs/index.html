@@ -779,14 +779,14 @@
         <div class="hero-version">
           <span class="ver-label" data-lang="zh-CN">最新版本</span>
           <span class="ver-label" data-lang="en">Latest</span>
-          <span class="ver-num">v1.3.17</span>
+          <span class="ver-num">v1.3.18</span>
           <span class="ver-sep"></span>
           <span class="ver-date">2026-05-31</span>
         </div>
         <div class="cta-row">
           <a
             class="btn btn-primary"
-            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.17"
+            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.18"
             target="_blank"
             rel="noopener"
           >
@@ -990,14 +990,46 @@
           <h2 class="section-title" data-lang="en">Release History</h2>
         </div>
         <div class="changelog-timeline">
+          <!-- v1.3.18 -->
+          <div class="release-entry">
+            <div class="release-dot"></div>
+            <div class="release-head">
+              <span class="release-ver">v1.3.18</span>
+              <span class="release-date">2026-05-31</span>
+              <span class="release-latest" data-lang="zh-CN">最新</span>
+              <span class="release-latest" data-lang="en">Latest</span>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-improved" data-lang="zh-CN">改进</span>
+              <span class="change-group-label label-improved" data-lang="en">Improved</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">ToolchainSelector 自动刷新 — 添加 watch 监听工具链列表变化，当已安装工具链被移除时自动更新选择</li>
+                <li data-lang="en">
+                  ToolchainSelector auto-refresh — Added watch to detect toolchains list changes and auto-update selection when installed toolchain is removed
+                </li>
+                <li data-lang="zh-CN">跨页面工具链同步 — TargetsView 和 ComponentsView 现在在工具链选择变化时自动重新加载数据</li>
+                <li data-lang="en">
+                  Cross-page toolchain sync — TargetsView and ComponentsView now automatically reload data when toolchain selection changes
+                </li>
+              </ul>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-fixed" data-lang="zh-CN">修复</span>
+              <span class="change-group-label label-fixed" data-lang="en">Fixed</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">组件/目标自动重载 — 修复了更改工具链选择时不会触发组件/目标管理页面数据刷新的问题</li>
+                <li data-lang="en">
+                  Component/Target auto-reload — Fixed issue where changing toolchain selection didn't trigger data refresh in components/targets management pages
+                </li>
+              </ul>
+            </div>
+          </div>
           <!-- v1.3.17 -->
           <div class="release-entry">
             <div class="release-dot"></div>
             <div class="release-head">
               <span class="release-ver">v1.3.17</span>
               <span class="release-date">2026-05-31</span>
-              <span class="release-latest" data-lang="zh-CN">最新</span>
-              <span class="release-latest" data-lang="en">Latest</span>
             </div>
             <div class="change-group">
               <span class="change-group-label label-improved" data-lang="zh-CN">改进</span>
