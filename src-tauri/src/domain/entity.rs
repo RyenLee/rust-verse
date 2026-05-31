@@ -4,12 +4,12 @@
 //! toolchains, mirrors, environment variables, components, targets,
 //! plugins, overrides, historical releases, and updates.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 // ── Toolchain ──
 
 /// Information about a single installed toolchain.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolchainInfo {
     /// The raw toolchain name from `rustup toolchain list` (e.g. `stable-2026-03-26-x86_64-pc-windows-msvc`).
     /// Used as the identifier for rustup commands (install, uninstall, default).
@@ -75,7 +75,7 @@ pub struct EnvVarInfo {
 
 // ── Component ──
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentInfo {
     pub name: String,
     pub installed: bool,
@@ -83,7 +83,7 @@ pub struct ComponentInfo {
 
 // ── Target ──
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TargetInfo {
     pub name: String,
     pub installed: bool,
@@ -125,7 +125,7 @@ pub struct HistRelease {
 
 // ── Update ──
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateInfo {
     pub toolchain: String,
     pub up_to_date: bool,
@@ -174,4 +174,15 @@ pub struct TerminalReinitResult {
     pub proxy_applied: String,
     pub env_refreshed: String,
     pub message: String,
+}
+
+// ── Rustup Mirror ──
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustupMirrorSource {
+    pub id: String,
+    pub name: String,
+    pub dist_server: String,
+    pub update_root: String,
+    pub is_builtin: bool,
 }

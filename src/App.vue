@@ -160,6 +160,7 @@ const navGroups = computed<NavGroup[]>(() => [
       { path: '/history-versions', label: t('nav.historyVersions'), icon: 'mdi:history' },
       { path: '/components', label: t('nav.components'), icon: 'mdi:puzzle-outline' },
       { path: '/targets', label: t('nav.targets'), icon: 'mdi:target' },
+      { path: '/rustup-mirror', label: t('nav.rustupMirror'), icon: 'mdi:lightning-bolt' },
     ],
   },
   {

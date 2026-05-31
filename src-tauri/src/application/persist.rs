@@ -15,7 +15,9 @@ const RUSTVERSE_MARKER: &str = "# RustVerse managed";
 #[allow(unused_variables)]
 pub fn persist_env_var(name: &str, value: &str) -> AppResult<()> {
     if name.is_empty() {
-        return Err(AppError::Config("Variable name cannot be empty".to_string()));
+        return Err(AppError::Config(
+            "Variable name cannot be empty".to_string(),
+        ));
     }
     if name.contains('=') || name.contains('\0') {
         return Err(AppError::Config(
@@ -37,7 +39,9 @@ pub fn persist_env_var(name: &str, value: &str) -> AppResult<()> {
 #[allow(unused_variables)]
 pub fn remove_persisted_env_var(name: &str) -> AppResult<()> {
     if name.is_empty() {
-        return Err(AppError::Config("Variable name cannot be empty".to_string()));
+        return Err(AppError::Config(
+            "Variable name cannot be empty".to_string(),
+        ));
     }
 
     #[cfg(windows)]
@@ -135,26 +139,35 @@ fn persist_env_var_windows(name: &str, value: &str) -> AppResult<()> {
 }
 
 #[cfg(windows)]
-fn add_cargo_home_bin_to_path_windows(env: &winreg::RegKey, cargo_home_value: &str) -> AppResult<()> {
-    let bin_entry = format!("%{}%\\bin", "CARGO_HOME");
+fn add_cargo_home_bin_to_path_windows(
+    env: &winreg::RegKey,
+    cargo_home_value: &str,
+) -> AppResult<()> {
+    let resolved_bin = format!(r"{}\bin", cargo_home_value);
     let current_path: Result<String, _> = env.get_value("Path");
     let new_path = match current_path {
         Ok(path) => {
             let entries: Vec<&str> = path.split(';').collect();
-            if entries.iter().any(|e| e.eq_ignore_ascii_case(&bin_entry)) {
+            let legacy_entry = format!("%{}%\\bin", "CARGO_HOME");
+            if entries
+                .iter()
+                .any(|e| e.eq_ignore_ascii_case(&resolved_bin))
+            {
                 return Ok(());
             }
-            let resolved_bin = format!(r"{}\bin", cargo_home_value);
-            if entries.iter().any(|e| e.eq_ignore_ascii_case(&resolved_bin)) {
+            if entries
+                .iter()
+                .any(|e| e.eq_ignore_ascii_case(&legacy_entry))
+            {
                 return Ok(());
             }
             if path.ends_with(';') {
-                format!("{}{}", path, bin_entry)
+                format!("{}{}", path, resolved_bin)
             } else {
-                format!("{};{}", path, bin_entry)
+                format!("{};{}", path, resolved_bin)
             }
         }
-        Err(_) => bin_entry.clone(),
+        Err(_) => resolved_bin.clone(),
     };
     env.set_value("Path", &new_path)
         .map_err(|e| AppError::Config(format!("failed to update PATH in registry: {e}")))?;
@@ -175,7 +188,8 @@ fn remove_persisted_env_var_windows(name: &str) -> AppResult<()> {
         return Ok(());
     }
     if name == "CARGO_HOME" {
-        let _ = remove_cargo_home_bin_from_path_windows(&env);
+        let cargo_home_value: Result<String, _> = env.get_value("CARGO_HOME");
+        let _ = remove_cargo_home_bin_from_path_windows(&env, cargo_home_value.ok());
     }
     env.delete_value(name)
         .map_err(|e| AppError::Config(format!("failed to delete registry value: {e}")))?;
@@ -184,14 +198,28 @@ fn remove_persisted_env_var_windows(name: &str) -> AppResult<()> {
 }
 
 #[cfg(windows)]
-fn remove_cargo_home_bin_from_path_windows(env: &winreg::RegKey) -> AppResult<()> {
-    let bin_entry = r"%CARGO_HOME%\bin";
+fn remove_cargo_home_bin_from_path_windows(
+    env: &winreg::RegKey,
+    cargo_home_value: Option<String>,
+) -> AppResult<()> {
+    let legacy_entry = r"%CARGO_HOME%\bin";
     let current_path: Result<String, _> = env.get_value("Path");
     if let Ok(path) = current_path {
         let entries: Vec<&str> = path.split(';').collect();
         let filtered: Vec<&str> = entries
             .iter()
-            .filter(|e| !e.eq_ignore_ascii_case(bin_entry))
+            .filter(|e| {
+                if e.eq_ignore_ascii_case(legacy_entry) {
+                    return false;
+                }
+                if let Some(ref val) = cargo_home_value {
+                    let resolved = format!(r"{}\bin", val);
+                    if e.eq_ignore_ascii_case(&resolved) {
+                        return false;
+                    }
+                }
+                true
+            })
             .copied()
             .collect();
         if filtered.len() != entries.len() {
@@ -356,7 +384,11 @@ fn find_shell_config() -> AppResult<std::path::PathBuf> {
         home.join(".zshrc")
     } else if shell.contains("bash") {
         let bashrc = home.join(".bashrc");
-        if bashrc.exists() { bashrc } else { home.join(".bash_profile") }
+        if bashrc.exists() {
+            bashrc
+        } else {
+            home.join(".bash_profile")
+        }
     } else {
         home.join(".profile")
     };

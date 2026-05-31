@@ -12,4 +12,5 @@ pub mod mirror;
 pub mod notification;
 pub mod parsing;
 pub mod repository;
+pub mod rustup_mirror;
 pub mod settings;

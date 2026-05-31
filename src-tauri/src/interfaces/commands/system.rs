@@ -1,4 +1,4 @@
-use crate::domain::constants::{error_pattern, event_name, log_module, process_name, system_binary, system_env};
+use crate::domain::constants::{error_pattern, event_name, log_module, rustup_mirror_var, system_binary, system_env};
 use crate::domain::entity::TerminalReinitResult;
 use crate::domain::error::{AppError, AppResult};
 use crate::infrastructure::system::env::binary_exists;
@@ -34,7 +34,12 @@ pub fn refresh_process_path_inner() -> AppResult<String> {
             }
         }
 
-        for var_name in &[system_env::CARGO_HOME, system_env::RUSTUP_HOME] {
+        for var_name in &[
+            system_env::CARGO_HOME,
+            system_env::RUSTUP_HOME,
+            rustup_mirror_var::RUSTUP_DIST_SERVER,
+            rustup_mirror_var::RUSTUP_UPDATE_ROOT,
+        ] {
             let current = std::env::var(var_name).ok();
             let from_system = read_system_env_var(var_name);
             let from_user = read_user_env_var(var_name);
@@ -146,41 +151,32 @@ pub async fn uninstall_rustup(state: tauri::State<'_, AppState>) -> AppResult<St
 
             if is_locked || is_access_denied {
                 #[cfg(target_os = "windows")]
-                {
-                    for proc_name in process_name::LOCK_PROCESSES {
-                        let _ = tokio::process::Command::new(system_binary::TASKKILL)
-                            .args(["/F", "/IM", &format!("{}{}", proc_name, system_binary::WINDOWS_EXE_SUFFIX)])
-                            .stdout(std::process::Stdio::null())
-                            .stderr(std::process::Stdio::null())
-                            .creation_flags(0x08000000)
-                            .status()
-                            .await;
-                    }
-                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                }
-
-                let retry = run_command(&rustup, &["self", "uninstall", "-y"], 120).await;
-                match retry {
-                    Ok(output) => {
-                        *state.rustup_path.lock().unwrap() = None;
-                        *state.cargo_path.lock().unwrap() = None;
-                        Ok(output)
-                    }
-                    Err(retry_err) => {
-                        #[cfg(target_os = "windows")]
-                        if is_access_denied {
-                            let elevated = try_elevated_uninstall(&rustup).await;
-                            match elevated {
-                                Ok(()) => {
-                                    *state.rustup_path.lock().unwrap() = None;
-                                    *state.cargo_path.lock().unwrap() = None;
-                                    return Ok("Elevated uninstall completed.".to_string());
-                                }
-                                Err(_) => return Err(retry_err),
-                            }
+                if is_access_denied {
+                    let elevated = try_elevated_uninstall(&rustup).await;
+                    match elevated {
+                        Ok(()) => {
+                            *state.rustup_path.lock().unwrap() = None;
+                            *state.cargo_path.lock().unwrap() = None;
+                            return Ok("Elevated uninstall completed.".to_string());
                         }
-                        Err(retry_err)
+                        Err(_) => {
+                            return Err(crate::domain::error::AppError::Command(
+                                "Failed to uninstall rustup. Please close all Rust-related programs (VS Code, terminal, cargo, rust-analyzer, etc.) and try again.".to_string(),
+                            ));
+                        }
                     }
+                }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    return Err(crate::domain::error::AppError::Command(
+                        "Failed to uninstall rustup. Please close all Rust-related programs (editors, terminals, cargo processes, etc.) and try again.".to_string(),
+                    ));
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    return Err(crate::domain::error::AppError::Command(
+                        "Failed to uninstall rustup. Please close all Rust-related programs (VS Code, terminal, cargo, rust-analyzer, etc.) and try again.".to_string(),
+                    ));
                 }
             } else {
                 Err(e)
@@ -268,6 +264,7 @@ pub fn cancel_background_task(state: tauri::State<'_, AppState>) -> AppResult<()
         .task_state
         .cancel_flag
         .store(true, std::sync::atomic::Ordering::SeqCst);
+    state.task_state.cancel_notify.notify_one();
     Ok(())
 }
 
@@ -298,29 +295,43 @@ pub fn invalidate_config_cache(state: tauri::State<'_, AppState>) -> AppResult<(
 /// 3. Apply proxy environment variables to the current process
 /// 4. Refresh PATH and Rust-related environment variables from the system
 #[tauri::command]
-pub fn reinit_terminal(state: tauri::State<'_, AppState>) -> AppResult<TerminalReinitResult> {
+pub fn reinit_terminal(
+    state: tauri::State<'_, AppState>,
+    cancel_running_tasks: Option<bool>,
+) -> AppResult<TerminalReinitResult> {
     let log = logger::logger();
     log.info(log_module::TERMINAL, "Terminal reinitialization requested");
 
-    // 1. Cancel any running background task
-    let tasks_killed = {
+    let should_cancel = cancel_running_tasks.unwrap_or(true);
+
+    // 1. Cancel running background task only when needed (e.g. proxy/mirror changes)
+    let tasks_killed = if should_cancel {
         let running = *state.task_state.running.lock().unwrap();
         if running {
             state
                 .task_state
                 .cancel_flag
                 .store(true, std::sync::atomic::Ordering::SeqCst);
+            state.task_state.cancel_notify.notify_one();
             log.info(log_module::TERMINAL, "Cancelled running background task for reinitialization");
             true
         } else {
             false
         }
+    } else {
+        false
     };
 
     // 2. Invalidate proxy cache so next read fetches fresh settings from DB
     crate::infrastructure::proxy::invalidate_cache();
 
-    // 3. Re-read proxy config and apply to current process
+    // 3. Invalidate query cache so rustup list commands re-fetch with new settings
+    state.query_cache.invalidate_all();
+
+    // 4. Invalidate mirror env cache so next subprocess gets fresh registry values
+    crate::infrastructure::exec::invalidate_mirror_env_cache();
+
+    // 5. Re-read proxy config and apply to current process
     let proxy_config = crate::infrastructure::proxy::get_proxy_config();
     crate::infrastructure::proxy::apply_to_current_process(&proxy_config);
     let proxy_applied = format!("{:?}", proxy_config);

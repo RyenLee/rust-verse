@@ -1,6 +1,6 @@
 [app]
 name = "RustVerse"
-version = "1.3.16"
+version = "1.3.18"
 description = "Rust Toolchain Visual Version Manager"
 
 [binaries]
@@ -33,6 +33,24 @@ codes = ["en","zh-CN"]
 [locale.meta."zh-CN"]
   name = "简体中文"
   english_name = "Chinese Simplified"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

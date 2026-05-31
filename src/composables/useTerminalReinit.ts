@@ -9,8 +9,10 @@ export interface TerminalReinitResult {
 }
 
 export function useTerminalReinit() {
-  async function reinitTerminal(): Promise<TerminalReinitResult> {
-    return invoke<TerminalReinitResult>('reinit_terminal')
+  async function reinitTerminal(cancelRunningTasks?: boolean): Promise<TerminalReinitResult> {
+    return invoke<TerminalReinitResult>('reinit_terminal', {
+      cancelRunningTasks: cancelRunningTasks ?? true,
+    })
   }
 
   return { reinitTerminal }

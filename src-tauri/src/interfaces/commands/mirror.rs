@@ -61,7 +61,7 @@ pub async fn install_crm(
         .task_state
         .cancel_flag
         .store(false, std::sync::atomic::Ordering::SeqCst);
-    let cancel_flag = state.task_state.cancel_flag.clone();
+    let cancel_notify = state.task_state.cancel_notify.clone();
 
     let result = exec::run_command_with_cancel(
         app.clone(),
@@ -71,7 +71,7 @@ pub async fn install_crm(
         &log_event,
         &finished_event,
         600,
-        cancel_flag,
+        cancel_notify,
     )
     .await;
 

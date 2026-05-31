@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
 
 use tauri::{AppHandle, Emitter};
+use tokio::sync::Notify;
 
 #[cfg_attr(target_os = "windows", allow(unused_imports))]
 use crate::domain::constants::{channel, event_name, file_name, installer, installer_platform, log_module, path_segment, system_binary, url};
@@ -349,7 +349,7 @@ pub async fn execute_installer(app: AppHandle, installer_path: &Path) -> AppResu
 pub async fn execute_installer_with_cancel(
     app: AppHandle,
     installer_path: &Path,
-    cancel_flag: Arc<AtomicBool>,
+    cancel_notify: Arc<Notify>,
 ) -> AppResult<()> {
     install_log(&app, "Running installer...");
 
@@ -363,7 +363,7 @@ pub async fn execute_installer_with_cancel(
             event_name::INSTALL_LOG,
             event_name::INSTALL_FINISHED,
             600,
-            cancel_flag,
+            cancel_notify,
         )
         .await
     }
@@ -398,7 +398,7 @@ pub async fn execute_installer_with_cancel(
                 event_name::INSTALL_LOG,
                 event_name::INSTALL_FINISHED,
                 600,
-                cancel_flag,
+                cancel_notify,
             )
             .await
         } else {
@@ -410,7 +410,7 @@ pub async fn execute_installer_with_cancel(
                 event_name::INSTALL_LOG,
                 event_name::INSTALL_FINISHED,
                 600,
-                cancel_flag,
+                cancel_notify,
             )
             .await
         }

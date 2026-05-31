@@ -16,4 +16,5 @@ pub mod logger;
 pub mod notifier;
 pub mod pool;
 pub mod proxy;
+pub mod query_cache;
 pub mod system;

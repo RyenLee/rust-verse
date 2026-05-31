@@ -4,9 +4,11 @@ mod infrastructure;
 mod interfaces;
 mod state;
 
-use crate::domain::constants::{app as app_const, event_name, file_name, log_module, tray, tray_menu};
+use crate::domain::constants::{
+    app as app_const, event_name, file_name, log_module, tray, tray_menu,
+};
 use crate::infrastructure::app_paths;
-use crate::infrastructure::db::{migrate_from_toml, open_or_create, ensure_version_in_db};
+use crate::infrastructure::db::{ensure_version_in_db, migrate_from_toml, open_or_create};
 use crate::infrastructure::logger;
 use interfaces::commands::component::{add_component, list_components, remove_component};
 use interfaces::commands::env_check::{check_env, get_versions};
@@ -40,6 +42,10 @@ use interfaces::commands::persist::{
 use interfaces::commands::plugin::{
     install_plugin, list_cargo_plugins, search_plugins, uninstall_plugin,
 };
+use interfaces::commands::rustup_mirror::{
+    add_rustup_mirror_source, delete_rustup_mirror_source, init_rustup_mirror_sources,
+    list_rustup_mirror_sources, update_rustup_mirror_source,
+};
 use interfaces::commands::settings::{get_config, get_settings, save_settings};
 use interfaces::commands::system::{
     cancel_background_task, frontend_log, get_log_dir, install_rustup, invalidate_config_cache,
@@ -55,7 +61,7 @@ use state::AppState;
 use tauri::{
     Emitter, Manager, WebviewUrl, WebviewWindowBuilder,
     menu::{Menu, MenuItem},
-    tray::{TrayIconBuilder},
+    tray::TrayIconBuilder,
 };
 
 macro_rules! dual_log {
@@ -177,9 +183,27 @@ pub fn run() {
         &format!("=== RustVerse v{} startup ===", env!("CARGO_PKG_VERSION")),
     );
 
-    dual_log!(log, "INFO", log_module::STARTUP, "Exe dir: {:?}", paths.exe_dir());
-    dual_log!(log, "INFO", log_module::STARTUP, "Data dir: {:?}", paths.data_dir());
-    dual_log!(log, "INFO", log_module::STARTUP, "Log dir: {:?}", paths.log_dir());
+    dual_log!(
+        log,
+        "INFO",
+        log_module::STARTUP,
+        "Exe dir: {:?}",
+        paths.exe_dir()
+    );
+    dual_log!(
+        log,
+        "INFO",
+        log_module::STARTUP,
+        "Data dir: {:?}",
+        paths.data_dir()
+    );
+    dual_log!(
+        log,
+        "INFO",
+        log_module::STARTUP,
+        "Log dir: {:?}",
+        paths.log_dir()
+    );
     dual_log!(
         log,
         "INFO",
@@ -199,7 +223,13 @@ pub fn run() {
     migrate_db_to_data_dir();
 
     let db_path = paths.db_path().clone();
-    dual_log!(log, "INFO", log_module::STARTUP, "Database path: {:?}", db_path);
+    dual_log!(
+        log,
+        "INFO",
+        log_module::STARTUP,
+        "Database path: {:?}",
+        db_path
+    );
     let db = open_or_create(&db_path).unwrap_or_else(|e| {
         dual_log!(
             log,
@@ -211,7 +241,12 @@ pub fn run() {
             .create_with_backend(redb::backends::InMemoryBackend::new())
             .expect("in-memory database should always succeed")
     });
-    dual_log!(log, "INFO", log_module::STARTUP, "Database opened successfully");
+    dual_log!(
+        log,
+        "INFO",
+        log_module::STARTUP,
+        "Database opened successfully"
+    );
 
     try_migrate_from_toml(&db);
     ensure_version_in_db(&db);
@@ -230,7 +265,13 @@ pub fn run() {
         "Webview data dir: {:?}",
         webview_data_dir
     );
-    dual_log!(log, "INFO", log_module::STARTUP, "Log directory: {:?}", log.log_dir());
+    dual_log!(
+        log,
+        "INFO",
+        log_module::STARTUP,
+        "Log directory: {:?}",
+        log.log_dir()
+    );
 
     let log_for_setup = log;
     log.info(log_module::STARTUP, "Building Tauri application...");
@@ -239,20 +280,24 @@ pub fn run() {
         .setup(move |app| {
             log_for_setup.info(log_module::SETUP, "Tauri setup started");
 
-            let main_window =
-                WebviewWindowBuilder::new(app, app_const::WINDOW_MAIN, WebviewUrl::App(app_const::FRONTEND_URL.into()))
-                    .title(app_const::TITLE)
-                    .inner_size(1024.0, 720.0)
-                    .min_inner_size(768.0, 480.0)
-                    .resizable(true)
-                    .data_directory(webview_data_dir)
-                    .build();
+            let main_window = WebviewWindowBuilder::new(
+                app,
+                app_const::WINDOW_MAIN,
+                WebviewUrl::App(app_const::FRONTEND_URL.into()),
+            )
+            .title(app_const::TITLE)
+            .inner_size(975.0, 975.0)
+            .min_inner_size(768.0, 890.0)
+            .resizable(true)
+            .data_directory(webview_data_dir)
+            .build();
 
             match main_window {
                 Ok(_) => log_for_setup.info(log_module::SETUP, "Main window created successfully"),
-                Err(e) => {
-                    log_for_setup.error(log_module::SETUP, &format!("Failed to create main window: {e}"))
-                }
+                Err(e) => log_for_setup.error(
+                    log_module::SETUP,
+                    &format!("Failed to create main window: {e}"),
+                ),
             }
 
             #[cfg(desktop)]
@@ -262,17 +307,34 @@ pub fn run() {
             }
 
             // ── System Tray ──
-            let quit = MenuItem::with_id(app, tray::MENU_QUIT, tray_menu::LABEL_QUIT, true, None::<&str>)?;
-            let show = MenuItem::with_id(app, tray::MENU_SHOW, tray_menu::LABEL_SHOW, true, None::<&str>)?;
+            let quit = MenuItem::with_id(
+                app,
+                tray::MENU_QUIT,
+                tray_menu::LABEL_QUIT,
+                true,
+                None::<&str>,
+            )?;
+            let show = MenuItem::with_id(
+                app,
+                tray::MENU_SHOW,
+                tray_menu::LABEL_SHOW,
+                true,
+                None::<&str>,
+            )?;
             let tray_menu = Menu::with_items(app, &[&show, &quit])?;
 
             let tray_icon = app.default_window_icon().cloned();
 
-            let _tray = TrayIconBuilder::new()
-                .icon(tray_icon.unwrap())
+            let mut builder = TrayIconBuilder::new()
                 .menu(&tray_menu)
                 .show_menu_on_left_click(true)
-                .tooltip(app_const::TITLE)
+                .tooltip(app_const::TITLE);
+
+            if let Some(icon) = tray_icon {
+                builder = builder.icon(icon);
+            }
+
+            let _tray = builder
                 .on_menu_event(move |app, event| match event.id().0.as_str() {
                     tray::MENU_QUIT => {
                         app.exit(0);
@@ -336,6 +398,12 @@ pub fn run() {
             {
                 let db = app.handle().state::<AppState>().db.clone();
                 startup_sync_manifests(db);
+            }
+
+            // ── Init rustup mirror sources (seed built-in on first run) ──
+            {
+                let state = app.handle().state::<AppState>();
+                init_rustup_mirror_sources(&state);
             }
 
             Ok(())
@@ -420,6 +488,11 @@ pub fn run() {
             notify_mark_unread,
             notify_unread_count,
             notification_delete_read_before,
+            // Rustup Mirror
+            list_rustup_mirror_sources,
+            add_rustup_mirror_source,
+            update_rustup_mirror_source,
+            delete_rustup_mirror_source,
         ])
         .manage(app_state)
         .manage(locale_scan_state)

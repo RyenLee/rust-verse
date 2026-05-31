@@ -1,16 +1,19 @@
 use std::sync::{Arc, Mutex};
 
 use redb::Database;
+use tokio::sync::Notify;
 
 use crate::domain::constants::locale;
 use crate::domain::repository::DataStore;
 use crate::infrastructure::config_cache::AppConfigCache;
 use crate::infrastructure::db::RedbDataStore;
+use crate::infrastructure::query_cache::QueryCache;
 
 /// Tracks the state of long-running async tasks (e.g. toolchain install/update).
 pub struct TaskState {
     pub running: Mutex<bool>,
     pub cancel_flag: Arc<std::sync::atomic::AtomicBool>,
+    pub cancel_notify: Arc<Notify>,
 }
 
 impl TaskState {
@@ -18,6 +21,7 @@ impl TaskState {
         Self {
             running: Mutex::new(false),
             cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            cancel_notify: Arc::new(Notify::new()),
         }
     }
 }
@@ -33,6 +37,7 @@ pub struct AppState {
     pub config_cache: AppConfigCache,
     pub locale: Mutex<String>,
     pub task_state: TaskState,
+    pub query_cache: Arc<QueryCache>,
 }
 
 impl AppState {
@@ -47,6 +52,7 @@ impl AppState {
             config_cache: AppConfigCache::new(),
             locale: Mutex::new(locale::LC_C.to_string()),
             task_state: TaskState::new(),
+            query_cache: Arc::new(QueryCache::new(60)),
         }
     }
 }

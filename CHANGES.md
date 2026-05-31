@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.17] - 2026-05-31
+
+### Changed
+
+- **QueryCache sharded lock** — Single `Mutex` replaced with 4 shards for reduced contention
+- **AppConfigCache TTL support** (default 300s) — Stale entries auto-refresh from DB without manual invalidation
+- **MIRROR_ENV_CACHE zero-copy** — Returns `Arc` reference instead of cloning the entire `Vec` per subprocess spawn
+- **LocaleScanCache explicit invalidate()** — Allows immediate cache refresh after locale package updates
+- **check_update result caching** — Avoids redundant network requests when navigating between pages
+- **reinit_terminal smart cancellation** — New `cancel_running_tasks` parameter; PATH changes no longer interrupt active downloads
+- **CARGO_HOME PATH persistence** — Writes resolved path (e.g. `C:\Users\x\.cargo\bin`) instead of `%CARGO_HOME%\bin` to Windows Registry
+- **SettingsView type safety** — Replaced 7 `as any` casts with `keyof UserSettings` constrained access
+
+### Fixed
+
+- **Tray icon unwrap panic** — `tray_icon.unwrap()` replaced with conditional builder; app no longer crashes when no default icon
+- **Manifest parsing expect context** — `grouped.get_mut().unwrap()` replaced with `expect()` providing diagnostic context
+- **CRM test parsing expect context** — `latencies.last_mut().unwrap()` replaced with `expect()`
+- **Mirror env cache expect context** — `guard.as_ref().unwrap()` replaced with `expect()`
+- **RustupMirrorView i18n** — Added missing `BUILTIN_I18N_MAP` entries for rsproxy, bfsu, sjtu, nju mirrors
+- **Removed unused get_or_execute dead code** from QueryCache
+
+## [1.3.16] - 2026-05-30
+
+### Fixed
+
+- Minor bug fixes and stability improvements
+
+## [1.3.15] - 2026-05-30
+
+### Changed
+
+- **Mirror acceleration env var persistence** — `set_env_var` / `remove_env_var` now persist to Windows Registry (HKCU\\Environment) or Unix shell config files, surviving app restarts
+- **Terminal reinit env var sync** — `refresh_process_path_inner` now also refreshes `RUSTUP_DIST_SERVER` and `RUSTUP_UPDATE_ROOT` from the system registry
+- **Mirror system separation** — Clarified that "镜像加速" uses environment variables while "Crates镜像源" uses `crm` commands; removed incorrect cross-contamination
+
 ## [1.3.14] - 2026-05-30
 
 ### Changed
@@ -306,6 +342,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo plugins management
 - Dashboard with system status
 
+[1.3.17]: https://github.com/RyenLee/rust-verse/compare/v1.3.16...v1.3.17
+[1.3.16]: https://github.com/RyenLee/rust-verse/compare/v1.3.15...v1.3.16
+[1.3.15]: https://github.com/RyenLee/rust-verse/compare/v1.3.14...v1.3.15
+[1.3.14]: https://github.com/RyenLee/rust-verse/compare/v1.3.13...v1.3.14
+[1.3.13]: https://github.com/RyenLee/rust-verse/compare/v1.3.11...v1.3.13
 [1.3.10]: https://github.com/RyenLee/rust-verse/compare/v1.3.9...v1.3.10
 [1.3.9]: https://github.com/RyenLee/rust-verse/compare/v1.3.8...v1.3.9
 [1.3.8]: https://github.com/RyenLee/rust-verse/compare/v1.3.7...v1.3.8
@@ -330,7 +371,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 本文件记录了 RustVerse 项目的所有重要变更。
 
-- [最新版本 1.3.10](#1310---2026-05-28) — Windows PATH缓存修复、BinaryNotFound错误区分、镜像管理降级策略
+- [最新版本 1.3.17](#1317---2026-05-31) — 缓存优化、unwrap/expect 安全修复、CARGO_HOME PATH 实际路径写入、i18n 补全
 - [版本 1.3.8](#138---2026-05-27) — DDD架构重构、通知中心、设置页面、历史版本浏览、DateRangePicker组件
 - [版本 1.3.7](#137---2026-05-25) — 日期范围选择组件、useCalendar 组合式函数、跨组件工具链刷新、安装面板简化
 - [版本 1.3.6](#136---2026-05-25) — 历史版本页面、自定义日期选择组件、安装面板简化、项目主页上线

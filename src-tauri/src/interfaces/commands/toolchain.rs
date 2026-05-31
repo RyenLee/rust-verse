@@ -33,27 +33,41 @@ pub async fn list_toolchains(
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
     let parsing = state.config_cache.get_parsing(&*state.store);
 
+    let cache_key = format!("toolchain_list:{}", rustup_path);
+
+    if let Some(cached_json) = state.query_cache.get(&cache_key) {
+        if let Ok(toolchains) = serde_json::from_str::<Vec<ToolchainInfo>>(&cached_json) {
+            return Ok(toolchains);
+        }
+    }
+
     let output = exec::run_command(&rustup_path, &["toolchain", "list"], 30).await?;
     let mut toolchains =
         parsing::parse_toolchain_list(&output, &parsing.default_marker, &parsing.active_marker)?;
 
-    // Resolve version numbers for date-based toolchain names
-    // Also resolves version for default channel toolchains (e.g. stable-x86_64-pc-windows-msvc)
-    for tc in &mut toolchains {
-        let needs_version = parsing::toolchain_name_has_date(&tc.name)
+    // Resolve version numbers via a single `rustup show` call instead of
+    // N individual `rustup run <tc> rustc --version` calls (N+1 → 2 processes).
+    let needs_versions = toolchains.iter().any(|tc| {
+        parsing::toolchain_name_has_date(&tc.name)
             || (matches!(
                 tc.channel.as_str(),
                 channel_consts::STABLE | channel_consts::BETA | channel_consts::NIGHTLY
-            ) && !tc.display_name.contains('.'));
-        if needs_version {
-            if let Ok(ver_output) =
-                exec::run_command(&rustup_path, &["run", &tc.name, "rustc", "--version"], 15).await
-            {
-                if let Some(version) = parsing::parse_rustc_version(&ver_output) {
-                    tc.display_name = parsing::build_display_name(&tc.name, &version);
+            ) && !tc.display_name.contains('.'))
+    });
+
+    if needs_versions {
+        if let Ok(show_output) = exec::run_command(&rustup_path, &["show"], 30).await {
+            let versions = parsing::parse_rustup_show_versions(&show_output);
+            for tc in &mut toolchains {
+                if let Some(version) = versions.get(&tc.name) {
+                    tc.display_name = parsing::build_display_name(&tc.name, version);
                 }
             }
         }
+    }
+
+    if let Ok(json) = serde_json::to_string(&toolchains) {
+        state.query_cache.set(cache_key, json);
     }
 
     Ok(toolchains)
@@ -126,7 +140,7 @@ pub async fn install_toolchain(
         .task_state
         .cancel_flag
         .store(false, std::sync::atomic::Ordering::SeqCst);
-    let cancel_flag = state.task_state.cancel_flag.clone();
+    let cancel_notify = state.task_state.cancel_notify.clone();
 
     let result = exec::run_command_with_cancel(
         app.clone(),
@@ -136,12 +150,13 @@ pub async fn install_toolchain(
         &log_event,
         &finished_event,
         600,
-        cancel_flag,
+        cancel_notify,
     )
     .await;
 
     // ── Clear running flag ──
     *state.task_state.running.lock().unwrap() = false;
+    state.query_cache.invalidate_all();
 
     match result {
         Ok(()) => {
@@ -173,12 +188,14 @@ pub async fn install_toolchain(
 #[tauri::command]
 pub async fn uninstall_toolchain(
     app: AppHandle,
+    state: State<'_, AppState>,
     rustup_path: String,
     name: String,
 ) -> AppResult<()> {
     crate::infrastructure::system::env::validate_rust_binary(&rustup_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
     exec::run_command(&rustup_path, &["toolchain", "uninstall", &name], 120).await?;
+    state.query_cache.invalidate_all();
 
     // ── Notification: toolchain uninstalled ──
     let display_name = name.clone();
@@ -198,12 +215,14 @@ pub async fn uninstall_toolchain(
 #[tauri::command]
 pub async fn set_default_toolchain(
     app: AppHandle,
+    state: State<'_, AppState>,
     rustup_path: String,
     name: String,
 ) -> AppResult<()> {
     crate::infrastructure::system::env::validate_rust_binary(&rustup_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
     exec::run_command(&rustup_path, &["default", &name], 30).await?;
+    state.query_cache.invalidate_all();
 
     // ── Notification: default toolchain changed ──
     let display_name = name.clone();

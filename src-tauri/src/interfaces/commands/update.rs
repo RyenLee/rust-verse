@@ -33,6 +33,11 @@ fn read_retry_config(store: &dyn crate::domain::repository::DataStore) -> (u32, 
 }
 
 /// Check for available updates with a configurable timeout.
+///
+/// Results are cached for the duration of the global QueryCache TTL (60s)
+/// to avoid repeated network requests when the user navigates back and forth.
+/// The cache is invalidated automatically after any toolchain install/uninstall
+/// or update operation.
 #[tauri::command]
 pub async fn check_update(
     app: AppHandle,
@@ -42,6 +47,14 @@ pub async fn check_update(
     logger::logger().log_request("check_update", &format!("rustup_path={:?}", rustup_path));
     crate::infrastructure::system::env::validate_rust_binary(&rustup_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
+
+    let cache_key = format!("update_check:{}", rustup_path);
+    if let Some(cached_json) = state.query_cache.get(&cache_key) {
+        if let Ok(updates) = serde_json::from_str::<Vec<UpdateInfo>>(&cached_json) {
+            return Ok(updates);
+        }
+    }
+
     let timeout = state.config_cache.get_timeout_rustup_check(&*state.store);
     let output = exec::run_command_with_timeout_allow_codes(&rustup_path, &["check"], timeout, &[100]).await?;
     logger::logger().debug(
@@ -57,6 +70,10 @@ pub async fn check_update(
         &db_parsing.update_available,
         &db_parsing.version_separator,
     );
+
+    if let Ok(json) = serde_json::to_string(&updates) {
+        state.query_cache.set(cache_key, json);
+    }
 
     // ── Notification: updates available ──
     let pending: Vec<_> = updates.iter().filter(|u| !u.up_to_date).collect();
@@ -114,6 +131,7 @@ pub async fn update_all(
         .cancel_flag
         .store(false, std::sync::atomic::Ordering::SeqCst);
     let cancel_flag = state.task_state.cancel_flag.clone();
+    let cancel_notify = state.task_state.cancel_notify.clone();
 
     let result = exec::run_command_with_cancel_retry(
         app.clone(),
@@ -126,11 +144,13 @@ pub async fn update_all(
         retry_delay_ms,
         600,
         cancel_flag,
+        cancel_notify,
     )
     .await;
 
     // ── Clear running flag ──
     *state.task_state.running.lock().unwrap() = false;
+    state.query_cache.invalidate_all();
 
     match result {
         Ok(()) => {
@@ -195,6 +215,7 @@ pub async fn update_rustup(
         .cancel_flag
         .store(false, std::sync::atomic::Ordering::SeqCst);
     let cancel_flag = state.task_state.cancel_flag.clone();
+    let cancel_notify = state.task_state.cancel_notify.clone();
 
     let result = exec::run_command_with_cancel_retry(
         app.clone(),
@@ -207,11 +228,13 @@ pub async fn update_rustup(
         retry_delay_ms,
         300,
         cancel_flag,
+        cancel_notify,
     )
     .await;
 
     // ── Clear running flag ──
     *state.task_state.running.lock().unwrap() = false;
+    state.query_cache.invalidate_all();
 
     match result {
         Ok(()) => {

@@ -55,17 +55,17 @@ fn parse_manifests_body(body: &str) -> BTreeMap<&str, Vec<(String, String)>> {
         if inner == channel::NIGHTLY {
             grouped
                 .get_mut(channel::NIGHTLY)
-                .unwrap()
+                .expect("nightly key must exist in grouped map")
                 .push((date.to_string(), inner.to_string()));
         } else if is_beta_version(inner) {
             grouped
                 .get_mut(channel::BETA)
-                .unwrap()
+                .expect("beta key must exist in grouped map")
                 .push((date.to_string(), inner.to_string()));
         } else if is_stable_version(inner) {
             grouped
                 .get_mut(channel::STABLE)
-                .unwrap()
+                .expect("stable key must exist in grouped map")
                 .push((date.to_string(), inner.to_string()));
         }
     }

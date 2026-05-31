@@ -75,6 +75,9 @@ const bestLoading = ref('')
 const testingAll = ref(false)
 const testingMirror = ref('')
 
+// Switch state: track which mirror is currently being switched to
+const switchingMirror = ref('')
+
 const currentMirrorName = computed(() => {
   if (!currentMirror.value) return t('mirror.status.official')
   return currentMirror.value
@@ -141,6 +144,7 @@ async function handleEnable() {
 }
 
 async function handleSwitch(name: string) {
+  switchingMirror.value = name
   try {
     await doUse(name)
     currentMirror.value = name
@@ -154,6 +158,8 @@ async function handleSwitch(name: string) {
     } else {
       error(t('mirror.message.switchFailed', { error: e?.message || String(e) }))
     }
+  } finally {
+    switchingMirror.value = ''
   }
 }
 
@@ -481,11 +487,16 @@ watch(
               </div>
               <button
                 v-if="m.name !== currentMirror"
-                class="inline-flex items-center justify-center w-7 h-7 rounded-md text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors"
+                class="inline-flex items-center justify-center w-7 h-7 rounded-md text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors disabled:opacity-50"
                 :title="t('mirror.action.switchTo')"
+                :disabled="switchingMirror === m.name"
                 @click="handleSwitch(m.name)"
               >
-                <iconify-icon icon="mdi:swap-horizontal" width="14"></iconify-icon>
+                <iconify-icon
+                  :icon="switchingMirror === m.name ? 'mdi:loading' : 'mdi:swap-horizontal'"
+                  :class="{ 'animate-spin': switchingMirror === m.name }"
+                  width="14"
+                ></iconify-icon>
               </button>
               <button
                 class="inline-flex items-center justify-center w-7 h-7 rounded-md text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors disabled:opacity-50"

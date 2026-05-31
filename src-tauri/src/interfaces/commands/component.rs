@@ -24,6 +24,14 @@ pub async fn list_components(
 ) -> AppResult<Vec<ComponentInfo>> {
     crate::infrastructure::system::env::validate_rust_binary(&rustup_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
+
+    let cache_key = format!("component_list:{}:{}", rustup_path, toolchain);
+    if let Some(cached_json) = state.query_cache.get(&cache_key) {
+        if let Ok(components) = serde_json::from_str::<Vec<ComponentInfo>>(&cached_json) {
+            return Ok(components);
+        }
+    }
+
     let output = exec::run_command(
         &rustup_path,
         &["component", "list", "--toolchain", &toolchain],
@@ -31,10 +39,16 @@ pub async fn list_components(
     )
     .await?;
     let db_parsing = state.config_cache.get_parsing(&*state.store);
-    Ok(parsing::parse_component_list(
+    let components = parsing::parse_component_list(
         &output,
         &db_parsing.installed_marker,
-    ))
+    );
+
+    if let Ok(json) = serde_json::to_string(&components) {
+        state.query_cache.set(cache_key, json);
+    }
+
+    Ok(components)
 }
 
 /// Add a component to a toolchain.
@@ -63,7 +77,7 @@ pub async fn add_component(
         .task_state
         .cancel_flag
         .store(false, std::sync::atomic::Ordering::SeqCst);
-    let cancel_flag = state.task_state.cancel_flag.clone();
+    let cancel_notify = state.task_state.cancel_notify.clone();
 
     let (locale_key, log_event, finished_event) = {
         let events = state.config_cache.get_events(&*state.store);
@@ -79,12 +93,13 @@ pub async fn add_component(
         &log_event,
         &finished_event,
         120,
-        cancel_flag,
+        cancel_notify,
     )
     .await;
 
     // ── Clear running flag ──
     *state.task_state.running.lock().unwrap() = false;
+    state.query_cache.invalidate_all();
 
     result?;
 
@@ -127,7 +142,7 @@ pub async fn remove_component(
         .task_state
         .cancel_flag
         .store(false, std::sync::atomic::Ordering::SeqCst);
-    let cancel_flag = state.task_state.cancel_flag.clone();
+    let cancel_notify = state.task_state.cancel_notify.clone();
 
     let (locale_key, log_event, finished_event) = {
         let events = state.config_cache.get_events(&*state.store);
@@ -143,12 +158,13 @@ pub async fn remove_component(
         &log_event,
         &finished_event,
         60,
-        cancel_flag,
+        cancel_notify,
     )
     .await;
 
     // ── Clear running flag ──
     *state.task_state.running.lock().unwrap() = false;
+    state.query_cache.invalidate_all();
 
     result?;
 

@@ -23,18 +23,46 @@ pub async fn list_targets(
 ) -> AppResult<Vec<TargetInfo>> {
     crate::infrastructure::system::env::validate_rust_binary(&rustup_path)
         .map_err(|e| crate::domain::error::AppError::Command(e))?;
-    let output = exec::run_command(
+
+    let cache_key = format!("target_list:{}:{}", rustup_path, toolchain);
+    if let Some(cached_json) = state.query_cache.get(&cache_key) {
+        if let Ok(targets) = serde_json::from_str::<Vec<TargetInfo>>(&cached_json) {
+            return Ok(targets);
+        }
+    }
+
+    let output = match exec::run_command(
         &rustup_path,
         &["target", "list", "--toolchain", &toolchain],
         30,
     )
-    .await?;
+    .await
+    {
+        Ok(out) => out,
+        Err(crate::domain::error::AppError::Command(msg)) => {
+            let lower = msg.to_lowercase();
+            if lower.contains("missing manifest") {
+                return Err(crate::domain::error::AppError::Command(format!(
+                    "Toolchain '{toolchain}' is corrupted or incomplete. \
+                    Please reinstall it via 'rustup toolchain uninstall {toolchain}' then 'rustup toolchain install {toolchain}'."
+                )));
+            }
+            return Err(crate::domain::error::AppError::Command(msg));
+        }
+        Err(e) => return Err(e),
+    };
     let db_parsing = state.config_cache.get_parsing(&*state.store);
-    Ok(parsing::parse_target_list(
+    let targets = parsing::parse_target_list(
         &output,
         &db_parsing.installed_marker,
         &db_parsing.default_marker,
-    ))
+    );
+
+    if let Ok(json) = serde_json::to_string(&targets) {
+        state.query_cache.set(cache_key, json);
+    }
+
+    Ok(targets)
 }
 
 /// Add a target to a toolchain.
@@ -63,7 +91,7 @@ pub async fn add_target(
         .task_state
         .cancel_flag
         .store(false, std::sync::atomic::Ordering::SeqCst);
-    let cancel_flag = state.task_state.cancel_flag.clone();
+    let cancel_notify = state.task_state.cancel_notify.clone();
 
     let (locale_key, log_event, finished_event) = {
         let events = state.config_cache.get_events(&*state.store);
@@ -79,12 +107,13 @@ pub async fn add_target(
         &log_event,
         &finished_event,
         120,
-        cancel_flag,
+        cancel_notify,
     )
     .await;
 
     // ── Clear running flag ──
     *state.task_state.running.lock().unwrap() = false;
+    state.query_cache.invalidate_all();
 
     result?;
 
@@ -127,7 +156,7 @@ pub async fn remove_target(
         .task_state
         .cancel_flag
         .store(false, std::sync::atomic::Ordering::SeqCst);
-    let cancel_flag = state.task_state.cancel_flag.clone();
+    let cancel_notify = state.task_state.cancel_notify.clone();
 
     let (locale_key, log_event, finished_event) = {
         let events = state.config_cache.get_events(&*state.store);
@@ -143,12 +172,13 @@ pub async fn remove_target(
         &log_event,
         &finished_event,
         60,
-        cancel_flag,
+        cancel_notify,
     )
     .await;
 
     // ── Clear running flag ──
     *state.task_state.running.lock().unwrap() = false;
+    state.query_cache.invalidate_all();
 
     result?;
 

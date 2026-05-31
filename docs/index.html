@@ -779,14 +779,14 @@
         <div class="hero-version">
           <span class="ver-label" data-lang="zh-CN">最新版本</span>
           <span class="ver-label" data-lang="en">Latest</span>
-          <span class="ver-num">v1.3.16</span>
+          <span class="ver-num">v1.3.17</span>
           <span class="ver-sep"></span>
-          <span class="ver-date">2026-05-30</span>
+          <span class="ver-date">2026-05-31</span>
         </div>
         <div class="cta-row">
           <a
             class="btn btn-primary"
-            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.16"
+            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.3.17"
             target="_blank"
             rel="noopener"
           >
@@ -990,25 +990,94 @@
           <h2 class="section-title" data-lang="en">Release History</h2>
         </div>
         <div class="changelog-timeline">
+          <!-- v1.3.17 -->
+          <div class="release-entry">
+            <div class="release-dot"></div>
+            <div class="release-head">
+              <span class="release-ver">v1.3.17</span>
+              <span class="release-date">2026-05-31</span>
+              <span class="release-latest" data-lang="zh-CN">最新</span>
+              <span class="release-latest" data-lang="en">Latest</span>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-improved" data-lang="zh-CN">改进</span>
+              <span class="change-group-label label-improved" data-lang="en">Improved</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">QueryCache 分片锁优化 — 单一 Mutex 拆分为 4 分片，降低并发锁争用</li>
+                <li data-lang="en">
+                  QueryCache sharded lock — single Mutex replaced with 4 shards for reduced contention
+                </li>
+                <li data-lang="zh-CN">
+                  AppConfigCache 新增 TTL 机制（默认 300s）— 缓存过期自动从数据库刷新，无需手动失效
+                </li>
+                <li data-lang="en">
+                  AppConfigCache TTL support (default 300s) — stale entries auto-refresh from DB without manual
+                  invalidation
+                </li>
+                <li data-lang="zh-CN">
+                  MIRROR_ENV_CACHE 深拷贝优化 — 返回 Arc 共享引用，避免每次子进程创建时克隆整个 Vec
+                </li>
+                <li data-lang="en">
+                  MIRROR_ENV_CACHE zero-copy — returns Arc reference instead of cloning the entire Vec per subprocess
+                  spawn
+                </li>
+                <li data-lang="zh-CN">LocaleScanCache 新增显式 invalidate() 方法 — 语言包更新后可立即刷新缓存</li>
+                <li data-lang="en">
+                  LocaleScanCache explicit invalidate() — allows immediate cache refresh after locale package updates
+                </li>
+                <li data-lang="zh-CN">check_update 查询结果缓存 — 避免页面切换时重复发起网络请求</li>
+                <li data-lang="en">
+                  check_update result caching — avoids redundant network requests when navigating between pages
+                </li>
+                <li data-lang="zh-CN">
+                  reinit_terminal 智能取消 — 新增 cancel_running_tasks 参数，PATH 变更时不再中断正在进行的下载
+                </li>
+                <li data-lang="en">
+                  reinit_terminal smart cancellation — new cancel_running_tasks parameter; PATH changes no longer
+                  interrupt active downloads
+                </li>
+                <li data-lang="zh-CN">
+                  CARGO_HOME PATH 持久化 — 写入实际路径（如 C:\Users\x\.cargo\bin）而非 %CARGO_HOME%\bin 到注册表
+                </li>
+                <li data-lang="en">
+                  CARGO_HOME PATH persistence — writes resolved path instead of %CARGO_HOME%\bin to Windows Registry
+                </li>
+                <li data-lang="zh-CN">SettingsView 类型安全 — 7 处 as any 替换为 keyof UserSettings 约束访问</li>
+                <li data-lang="en">
+                  SettingsView type safety — 7 as any casts replaced with keyof UserSettings constrained access
+                </li>
+              </ul>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-fixed" data-lang="zh-CN">修复</span>
+              <span class="change-group-label label-fixed" data-lang="en">Fixed</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">移除 QueryCache 中未使用的 get_or_execute 死代码</li>
+                <li data-lang="en">Removed unused get_or_execute dead code from QueryCache</li>
+                <li data-lang="zh-CN">系统托盘图标 unwrap panic — 无默认图标时应用启动崩溃</li>
+                <li data-lang="en">Tray icon unwrap panic — app crashed on startup when no default icon available</li>
+                <li data-lang="zh-CN">manifest/parsing/exec 中 unwrap() 替换为 expect() 提供诊断上下文</li>
+                <li data-lang="en">Replaced unwrap() with expect() in manifest/parsing/exec for diagnostic context</li>
+                <li data-lang="zh-CN">RustupMirrorView i18n — 补全 rsproxy/bfsu/sjtu/nju 镜像源翻译</li>
+                <li data-lang="en">
+                  RustupMirrorView i18n — added missing translations for rsproxy/bfsu/sjtu/nju mirrors
+                </li>
+              </ul>
+            </div>
+          </div>
           <!-- v1.3.16 -->
           <div class="release-entry">
             <div class="release-dot"></div>
             <div class="release-head">
               <span class="release-ver">v1.3.16</span>
               <span class="release-date">2026-05-30</span>
-              <span class="release-latest" data-lang="zh-CN">最新</span>
-              <span class="release-latest" data-lang="en">Latest</span>
             </div>
             <div class="change-group">
               <span class="change-group-label label-fixed" data-lang="zh-CN">修复</span>
               <span class="change-group-label label-fixed" data-lang="en">Fixed</span>
               <ul class="change-list">
-                <li data-lang="zh-CN">
-                  小问题修复与稳定性改进
-                </li>
-                <li data-lang="en">
-                  Minor bug fixes and stability improvements
-                </li>
+                <li data-lang="zh-CN">小问题修复与稳定性改进</li>
+                <li data-lang="en">Minor bug fixes and stability improvements</li>
               </ul>
             </div>
           </div>
@@ -1024,22 +1093,28 @@
               <span class="change-group-label label-fixed" data-lang="en">Fixed</span>
               <ul class="change-list">
                 <li data-lang="zh-CN">
-                  修复 NSIS 安装器更新时 exe 文件未替换 — 移除 taskkill 自杀逻辑，改为 FindWindow 循环等待主进程自行退出，确保安装流程完整
+                  修复 NSIS 安装器更新时 exe 文件未替换 — 移除 taskkill 自杀逻辑，改为 FindWindow
+                  循环等待主进程自行退出，确保安装流程完整
                 </li>
                 <li data-lang="en">
-                  Fixed NSIS installer not replacing exe during update — removed taskkill self-kill logic, replaced with FindWindow loop waiting for main process to exit gracefully
+                  Fixed NSIS installer not replacing exe during update — removed taskkill self-kill logic, replaced with
+                  FindWindow loop waiting for main process to exit gracefully
                 </li>
                 <li data-lang="zh-CN">
-                  修复手动安装新版本后数据库版本号仍为旧值 — 修正 has_config_file() 路径查找错误，新增 ensure_version_in_db() 每次启动时同步编译版本到数据库
+                  修复手动安装新版本后数据库版本号仍为旧值 — 修正 has_config_file() 路径查找错误，新增
+                  ensure_version_in_db() 每次启动时同步编译版本到数据库
                 </li>
                 <li data-lang="en">
-                  Fixed database version mismatch after manual install — corrected has_config_file() path lookup, added ensure_version_in_db() to sync compile-time version to DB on every startup
+                  Fixed database version mismatch after manual install — corrected has_config_file() path lookup, added
+                  ensure_version_in_db() to sync compile-time version to DB on every startup
                 </li>
                 <li data-lang="zh-CN">
-                  修复应用重启功能失效 — 实现基于临时脚本的真实进程重启（Windows bat / Unix shell），替代原先仅退出不重启的逻辑
+                  修复应用重启功能失效 — 实现基于临时脚本的真实进程重启（Windows bat / Unix
+                  shell），替代原先仅退出不重启的逻辑
                 </li>
                 <li data-lang="en">
-                  Fixed application restart not working — implemented script-based real process restart (Windows bat / Unix shell), replacing the exit-only logic
+                  Fixed application restart not working — implemented script-based real process restart (Windows bat /
+                  Unix shell), replacing the exit-only logic
                 </li>
               </ul>
             </div>
@@ -1047,17 +1122,17 @@
               <span class="change-group-label label-changed" data-lang="zh-CN">改进</span>
               <span class="change-group-label label-changed" data-lang="en">Changed</span>
               <ul class="change-list">
-                <li data-lang="zh-CN">
-                  消除数据库种子数据的 TOCTOU 竞态条件 — 将检查与播种合并到单个写事务中执行
-                </li>
+                <li data-lang="zh-CN">消除数据库种子数据的 TOCTOU 竞态条件 — 将检查与播种合并到单个写事务中执行</li>
                 <li data-lang="en">
-                  Eliminated TOCTOU race condition in database seed data — merged check and seed into a single write transaction
+                  Eliminated TOCTOU race condition in database seed data — merged check and seed into a single write
+                  transaction
                 </li>
                 <li data-lang="zh-CN">
                   完善前端下载事件回调处理 — downloadAndInstall 和 downloadOnly 均添加 default 分支日志输出
                 </li>
                 <li data-lang="en">
-                  Improved frontend download event callback handling — added default branch logging for both downloadAndInstall and downloadOnly
+                  Improved frontend download event callback handling — added default branch logging for both
+                  downloadAndInstall and downloadOnly
                 </li>
               </ul>
             </div>
@@ -1074,7 +1149,8 @@
               <span class="change-group-label label-changed" data-lang="en">Changed</span>
               <ul class="change-list">
                 <li data-lang="zh-CN">
-                  常量抽取重构完善 — 新增 rustup_mirror_var、error_pattern、tray_menu、process_name、env_check_event、installer_platform
+                  常量抽取重构完善 — 新增
+                  rustup_mirror_var、error_pattern、tray_menu、process_name、env_check_event、installer_platform
                   等子模块，全面消除 exec.rs、env.rs、system.rs 等核心模块中的硬编码文本
                 </li>
                 <li data-lang="en">

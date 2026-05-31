@@ -162,7 +162,7 @@ pub fn parse_test_results(output: &str) -> CrmTestResult {
         let entry = latencies.iter_mut().find(|l| l.name == name);
         let entry = if let Some(e) = entry { e } else {
             latencies.push(MirrorLatency { name: name.clone(), is_current, network_ms: None, download_ms: None });
-            latencies.last_mut().unwrap()
+            latencies.last_mut().expect("just pushed entry must exist")
         };
         if is_current { entry.is_current = true; }
         if value_part != "failed" {
@@ -239,6 +239,68 @@ pub fn parse_rustc_version(output: &str) -> Option<String> {
         return None;
     }
     Some(version.to_string())
+}
+
+/// Parse `rustup show` output to extract toolchain→version mappings.
+///
+/// Scans the "installed toolchains" section of `rustup show` output.  
+/// Each toolchain entry is a toolchain name line followed by a `rustc <version>` line:
+///
+/// ```text
+/// stable-x86_64-pc-windows-msvc (default)
+/// rustc 1.85.0 (4d91de4e4 2025-02-17)
+/// nightly-x86_64-pc-windows-msvc
+/// rustc 1.87.0-nightly (3a4b44391 2025-01-19)
+/// ```
+///
+/// Returns a map of `toolchain_name → rustc_version`.
+pub fn parse_rustup_show_versions(output: &str) -> std::collections::HashMap<String, String> {
+    let mut versions = std::collections::HashMap::new();
+    let mut in_installed_section = false;
+    let mut pending_toolchain: Option<String> = None;
+
+    for line in output.lines() {
+        let line = line.trim();
+
+        if line == "installed toolchains" {
+            in_installed_section = true;
+            continue;
+        }
+        if in_installed_section && (line.starts_with("active toolchain") || line.starts_with("----")) {
+            // Still in header or separator — skip
+            continue;
+        }
+        if in_installed_section && line.starts_with("active") && !line.starts_with("active toolchain") {
+            // "active toolchain" section started — stop collecting
+            in_installed_section = false;
+            continue;
+        }
+
+        if !in_installed_section {
+            continue;
+        }
+
+        if let Some(version) = line.strip_prefix("rustc ") {
+            if let Some(tc_name) = pending_toolchain.take() {
+                if let Some(ver) = parse_rustc_version(&format!("rustc {version}")) {
+                    versions.insert(tc_name, ver);
+                }
+            }
+        } else if !line.is_empty() {
+            // Looks like a toolchain name line — strip markers
+            let name = line
+                .split('(')
+                .next()
+                .unwrap_or(line)
+                .trim()
+                .to_string();
+            if !name.is_empty() && name.chars().any(|c| c == '-') {
+                pending_toolchain = Some(name);
+            }
+        }
+    }
+
+    versions
 }
 
 pub fn parse_channel_from_name(name: &str) -> String {

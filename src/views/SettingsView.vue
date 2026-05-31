@@ -215,11 +215,12 @@ function clearSavedTimer(key: SettingKey) {
 // ── Toggle handler: flip + save (with revert on failure) ──
 function handleToggle(key: SettingKey) {
   if (key.includes('.')) {
-    // Nested key like "notifications.install_progress"
-    const [parent, child] = key.split('.') as [string, string]
-    ;(settings.value as any)[parent][child] = !(settings.value as any)[parent][child]
+    const [parent, child] = key.split('.') as [keyof UserSettings, string]
+    const parentObj = settings.value[parent] as Record<string, unknown>
+    parentObj[child] = !parentObj[child]
   } else {
-    ;(settings.value as any)[key] = !(settings.value as any)[key]
+    const k = key as keyof UserSettings
+    ;(settings.value as Record<string, unknown>)[k] = !(settings.value as Record<string, unknown>)[k]
   }
   commitSetting(key)
 }
@@ -269,19 +270,20 @@ const notifItems = computed<NotifItem[]>(() => [
 function handleSelect(key: SettingKey, value: number | string) {
   // ── Custom cleanup minutes ──
   if (key === 'notifications.auto_cleanup_minutes' && value === -1) {
-    // Open custom — use the custom value
-    ;(settings.value as any).notifications.auto_cleanup_minutes = customCleanupMinutes.value
+    settings.value.notifications.auto_cleanup_minutes = customCleanupMinutes.value
     commitSetting(key)
     return
   }
 
   if (key.includes('.')) {
-    const [parent, child] = key.split('.') as [string, string]
-    if ((settings.value as any)[parent][child] === value) return
-    ;(settings.value as any)[parent][child] = value
+    const [parent, child] = key.split('.') as [keyof UserSettings, string]
+    const parentObj = settings.value[parent] as Record<string, unknown>
+    if (parentObj[child] === value) return
+    parentObj[child] = value
   } else {
-    if ((settings.value as any)[key] === value) return
-    ;(settings.value as any)[key] = value
+    const k = key as keyof UserSettings
+    if ((settings.value as Record<string, unknown>)[k] === value) return
+    ;(settings.value as Record<string, unknown>)[k] = value
   }
 
   // Theme changes must apply immediately to the DOM + TopBar

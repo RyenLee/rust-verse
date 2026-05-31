@@ -19,6 +19,7 @@ import welcome from './welcome'
 import about from './about'
 import settings from './settings'
 import notifications from './notifications'
+import rustupMirror from './rustupMirror'
 
 export default {
   app,
@@ -42,4 +43,5 @@ export default {
   about,
   settings,
   notifications,
+  rustupMirror,
 }

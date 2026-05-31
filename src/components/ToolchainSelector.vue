@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 
 const props = withDefaults(defineProps<{
   modelValue: string
@@ -35,13 +35,28 @@ function onClickOutside(event: MouseEvent) {
   }
 }
 
-onMounted(() => {
-  if (!props.modelValue) {
+function selectDefaultIfNeeded() {
+  if (!props.modelValue || !props.toolchains.find(t => t.name === props.modelValue)) {
     const defaultToolchain = props.toolchains.find(t => t.is_default)
-    if (defaultToolchain) {
-      emit('update:modelValue', defaultToolchain.name)
+    const fallback = props.toolchains[0]
+    const target = defaultToolchain || fallback
+    if (target) {
+      emit('update:modelValue', target.name)
+      emit('change', target.name)
     }
   }
+}
+
+watch(
+  () => props.toolchains,
+  () => {
+    selectDefaultIfNeeded()
+  },
+  { deep: true }
+)
+
+onMounted(() => {
+  selectDefaultIfNeeded()
   document.addEventListener('click', onClickOutside)
 })
 

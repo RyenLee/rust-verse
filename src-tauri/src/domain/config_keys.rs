@@ -51,4 +51,8 @@ pub mod keys {
     // ── Retry ──
     pub const RETRY_UPDATE_MAX: &str = "retry.update_max_retries";
     pub const RETRY_UPDATE_DELAY: &str = "retry.update_delay_ms";
+
+    // ── Rustup Mirror ──
+    pub const RUSTUP_MIRROR_BUILTIN: &str = "rustup_mirror.builtin_sources";
+    pub const RUSTUP_MIRROR_CUSTOM: &str = "rustup_mirror.custom_sources";
 }

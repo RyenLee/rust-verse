@@ -1,43 +1,54 @@
 use std::process::Stdio;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
+use tokio::sync::Notify;
 
 use crate::domain::constants::{error_pattern, locale, log_module, rustup_mirror_var};
 use crate::domain::error::{AppError, AppResult};
 
-/// Rust-related environment variables that affect download sources.
-/// These are read from the Windows Registry (or process env on other platforms)
-/// and injected into rustup/cargo child processes so they use the configured
-/// mirror instead of the default `static.rust-lang.org`.
+static MIRROR_ENV_CACHE: OnceLock<Mutex<Option<Arc<Vec<(String, String)>>>>> = OnceLock::new();
+
+fn get_cached_mirror_env() -> Arc<Vec<(String, String)>> {
+    let cache = MIRROR_ENV_CACHE.get_or_init(|| Mutex::new(None));
+    let mut guard = cache.lock().unwrap();
+    if guard.is_none() {
+        let mut entries = Vec::new();
+        for &var_name in rustup_mirror_var::ALL {
+            if std::env::var(var_name).is_ok() {
+                continue;
+            }
+            #[cfg(target_os = "windows")]
+            {
+                let value = crate::infrastructure::system::env::read_user_env_var(var_name)
+                    .or_else(|| crate::infrastructure::system::env::read_system_env_var(var_name));
+                if let Some(val) = value {
+                    entries.push((var_name.to_string(), val));
+                }
+            }
+        }
+        *guard = Some(Arc::new(entries));
+    }
+    Arc::clone(guard.as_ref().expect("mirror env cache must be initialized after population"))
+}
+
+pub fn invalidate_mirror_env_cache() {
+    if let Some(cache) = MIRROR_ENV_CACHE.get() {
+        *cache.lock().unwrap() = None;
+    }
+}
 
 /// Inject `RUSTUP_DIST_SERVER` and `RUSTUP_UPDATE_ROOT` into a child process
 /// if they are set in the Windows Registry (user or system level) but not
 /// already present in the current process environment.
 ///
-/// This ensures that mirror settings configured via the app's Environment
-/// Variables page are respected by `rustup toolchain install` and similar
-/// commands, even though the current process may not have been restarted
-/// after the user set those variables.
+/// Results are cached after the first Windows Registry read to avoid
+/// repeated I/O on every subprocess spawn.
 fn inject_rustup_mirror_env(cmd: &mut Command) {
-    for &var_name in rustup_mirror_var::ALL {
-        if std::env::var(var_name).is_ok() {
-            continue;
-        }
-        #[cfg(target_os = "windows")]
-        {
-            let value = crate::infrastructure::system::env::read_user_env_var(var_name)
-                .or_else(|| crate::infrastructure::system::env::read_system_env_var(var_name));
-            if let Some(val) = value {
-                cmd.env(var_name, &val);
-            }
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            let _ = var_name;
-        }
+    for (var_name, value) in get_cached_mirror_env().iter() {
+        cmd.env(&var_name, &value);
     }
 }
 
@@ -227,11 +238,14 @@ fn spawn_line_reader(
 
 // ── Cancel-aware streaming variant ────────────────────────────────────────
 
-/// Like `run_command_with_streaming`, but polls `cancel_flag` every 500ms
-/// and kills the child process if cancellation is requested.
+/// Like `run_command_with_streaming`, but awaits `cancel_notify` and
+/// kills the child process if cancellation is requested.
 ///
 /// This variant is used by long-running background tasks (e.g., `install_rustup`)
 /// that need to support user-initiated cancellation from the frontend.
+///
+/// Uses `tokio::sync::Notify` for zero-latency event-driven cancellation
+/// instead of polling `AtomicBool` every 500ms.
 pub async fn run_command_with_cancel(
     app: AppHandle,
     command: &str,
@@ -240,7 +254,7 @@ pub async fn run_command_with_cancel(
     log_event: &str,
     finished_event: &str,
     timeout_secs: u64,
-    cancel_flag: Arc<AtomicBool>,
+    cancel_notify: Arc<Notify>,
 ) -> AppResult<()> {
     let resolved = resolve_binary(command);
     let mut child_cmd = init_command_from_path(&resolved, args, locale_key);
@@ -266,28 +280,17 @@ pub async fn run_command_with_cancel(
         spawn_line_reader(app.clone(), stdout, log_event.to_string());
     }
 
-    let cancel_flag_clone = cancel_flag.clone();
-    let cancel_future = async move {
-        loop {
-            if cancel_flag_clone.load(Ordering::SeqCst) {
-                return;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        }
-    };
-
+    let cancel_fut = cancel_notify.notified();
     let wait_fut = child.wait();
     let timeout_fut = tokio::time::sleep(std::time::Duration::from_secs(timeout_secs));
 
     tokio::select! {
-        // Cancel was requested — kill the process
-        _ = cancel_future => {
+        _ = cancel_fut => {
             let _ = child.kill().await;
             let _ = app.emit(finished_event, ());
             Err(AppError::Command("Task cancelled by user".to_string()))
         }
 
-        // Process exited normally
         status_result = wait_fut => {
             match status_result {
                 Ok(status) => {
@@ -310,7 +313,6 @@ pub async fn run_command_with_cancel(
             }
         }
 
-        // Timeout elapsed
         _ = timeout_fut => {
             let _ = child.kill().await;
             let _ = app.emit(finished_event, ());
@@ -373,6 +375,11 @@ pub async fn run_command_with_cwd(
 }
 
 /// Like `run_command_with_cancel`, but with automatic retry on failure.
+///
+/// Checks `cancel_flag` (AtomicBool) between retry attempts for fast
+/// cancellation, and passes `cancel_notify` (Notify) to the inner
+/// `run_command_with_cancel` for zero-latency event-driven cancellation
+/// during execution.
 pub async fn run_command_with_cancel_retry(
     app: AppHandle,
     command: &str,
@@ -384,11 +391,11 @@ pub async fn run_command_with_cancel_retry(
     retry_delay_ms: u64,
     timeout_secs: u64,
     cancel_flag: Arc<AtomicBool>,
+    cancel_notify: Arc<Notify>,
 ) -> AppResult<()> {
     let mut attempt: u32 = 0;
 
     loop {
-        // Check cancellation before each attempt
         if cancel_flag.load(Ordering::SeqCst) {
             return Err(AppError::Command("Task cancelled by user".to_string()));
         }
@@ -412,14 +419,13 @@ pub async fn run_command_with_cancel_retry(
             log_event,
             finished_event,
             timeout_secs,
-            cancel_flag.clone(),
+            cancel_notify.clone(),
         )
         .await;
 
         match result {
             Ok(()) => return Ok(()),
             Err(e) => {
-                // If cancelled, propagate immediately
                 if cancel_flag.load(Ordering::SeqCst) {
                     return Err(AppError::Command("Task cancelled by user".to_string()));
                 }

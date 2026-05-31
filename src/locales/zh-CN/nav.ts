@@ -8,6 +8,7 @@ export default {
   targets: '编译目标',
   overrides: '目录覆盖',
   updates: '更新',
+  rustupMirror: '镜像加速',
   plugins: 'Cargo 插件',
   help: '帮助',
   group: {

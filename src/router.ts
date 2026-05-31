@@ -54,6 +54,11 @@ const router = createRouter({
       component: () => import('@/views/MirrorView.vue'),
     },
     {
+      path: '/rustup-mirror',
+      name: 'rustup-mirror',
+      component: () => import('@/views/RustupMirrorView.vue'),
+    },
+    {
       path: '/about',
       name: 'about',
       component: () => import('@/views/AppUpdateView.vue'),

@@ -80,6 +80,11 @@ impl LocaleScanState {
             cache: Mutex::new(None),
         }
     }
+
+    #[allow(dead_code)]
+    pub fn invalidate(&self) {
+        *self.cache.lock().unwrap() = None;
+    }
 }
 
 /// Cache duration in seconds (5 minutes).
@@ -253,7 +258,11 @@ pub fn get_locales_from_config_or_db(
 
 /// Get locale config path from the centralized AppPaths module.
 pub fn locale_config_path(_app: &tauri::AppHandle) -> Option<PathBuf> {
-    Some(crate::infrastructure::app_paths::app_paths().locale_config_path().clone())
+    Some(
+        crate::infrastructure::app_paths::app_paths()
+            .locale_config_path()
+            .clone(),
+    )
 }
 
 /// Locale configuration persisted to disk.

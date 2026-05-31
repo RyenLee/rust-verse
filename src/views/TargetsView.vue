@@ -24,6 +24,7 @@ const targets = ref<TargetInfo[]>([])
 const loading = ref(false)
 const loaded = ref(false)
 const searchQuery = ref('')
+const errorMessage = ref('')
 
 // Progress dialog state
 const showProgress = ref(false)
@@ -35,11 +36,12 @@ const progressLogs = ref<string[]>([])
 async function loadTargets() {
   if (!selectedToolchain.value) return
   loading.value = true
+  errorMessage.value = ''
   try {
     targets.value = await listTargets(selectedToolchain.value)
     loaded.value = true
-  } catch {
-    // ignore
+  } catch (e: any) {
+    errorMessage.value = e?.message || String(e)
   } finally {
     loading.value = false
   }
@@ -47,6 +49,8 @@ async function loadTargets() {
 
 function onToolchainChange() {
   loaded.value = false
+  errorMessage.value = ''
+  loadTargets()
 }
 
 async function toggleTarget(target: TargetInfo) {
@@ -151,6 +155,12 @@ const { listHeight, listContainerRef } = useResponsiveListHeight({
 
     <template v-else>
       <div v-if="loading" class="text-gray-500 dark:text-gray-400">{{ t('common.status.loading') }}</div>
+      <div v-else-if="errorMessage" class="flex flex-col items-center py-8">
+        <div class="flex items-start gap-3 max-w-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3">
+          <iconify-icon icon="mdi:alert-circle" width="20" class="text-red-500 dark:text-red-400 mt-0.5 shrink-0"></iconify-icon>
+          <p class="text-sm text-red-600 dark:text-red-400">{{ errorMessage }}</p>
+        </div>
+      </div>
       <div v-else-if="!loaded" class="text-gray-400 dark:text-gray-500 text-sm py-8 text-center">
         {{ t('targets.status.selectPrompt') }}
       </div>

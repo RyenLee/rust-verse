@@ -53,10 +53,12 @@ pub fn get_env_var(name: String) -> EnvVarEntry {
     }
 }
 
-/// Set an environment variable for the current process.
+/// Set an environment variable for the current process and persist it to the system.
 ///
-/// Note: this only affects the current application process and its children.
-/// It does NOT persist across application restarts or set system-level env vars.
+/// Persistence writes to the Windows Registry (HKCU\Environment) or Unix shell
+/// config files, so the variable survives application restarts and is visible
+/// to external terminals. Persistence is best-effort — a failure to persist
+/// does not fail the command as long as the process-level variable was set.
 ///
 /// Special variables like `RUST_LOG` will trigger additional actions (e.g. log level change).
 #[tauri::command]
@@ -76,6 +78,8 @@ pub fn set_env_var(app: AppHandle, name: String, value: String) -> AppResult<Env
         env::set_var(&name, &value);
     }
 
+    let _ = crate::application::persist::persist_env_var(&name, &value);
+
     env_var_svc::handle_special_env_var_set(&name, &value);
 
     notifier::notify(
@@ -94,7 +98,10 @@ pub fn set_env_var(app: AppHandle, name: String, value: String) -> AppResult<Env
     })
 }
 
-/// Remove (unset) an environment variable from the current process.
+/// Remove (unset) an environment variable from the current process and system.
+///
+/// Also removes the variable from the Windows Registry (HKCU\Environment)
+/// or Unix shell config files. Persistence removal is best-effort.
 ///
 /// Special variables like `RUST_LOG` will trigger additional actions (e.g. reset log level to ERROR).
 #[tauri::command]
@@ -108,6 +115,8 @@ pub fn remove_env_var(app: AppHandle, name: String) -> AppResult<EnvVarEntry> {
     unsafe {
         env::remove_var(&name);
     }
+
+    let _ = crate::application::persist::remove_persisted_env_var(&name);
 
     env_var_svc::handle_special_env_var_remove(&name);
 

@@ -8,6 +8,7 @@ export default {
   targets: 'Targets',
   overrides: 'Directory Overrides',
   updates: 'Updates',
+  rustupMirror: 'Mirror Acceleration',
   plugins: 'Cargo Plugins',
   help: 'Help',
   group: {

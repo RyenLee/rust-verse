@@ -9,6 +9,7 @@ pub mod notification;
 pub mod override_cmd;
 pub mod persist;
 pub mod plugin;
+pub mod rustup_mirror;
 pub mod settings;
 pub mod system;
 pub mod target;

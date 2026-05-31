@@ -47,6 +47,7 @@ async function loadComponents() {
 
 function onToolchainChange() {
   loaded.value = false
+  loadComponents()
 }
 
 async function toggleComponent(comp: ComponentInfo) {
