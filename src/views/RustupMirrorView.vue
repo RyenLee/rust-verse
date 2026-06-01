@@ -312,7 +312,9 @@ onMounted(async () => {
                     width="16"
                     :class="isActive(source) ? 'text-emerald-500' : 'text-transparent'"
                   ></iconify-icon>
-                  <span class="font-medium text-gray-900 dark:text-gray-100">{{ getDisplayName(source) }}</span>
+                  <span class="font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap truncate">{{
+                    getDisplayName(source)
+                  }}</span>
                   <span
                     :class="
                       source.is_builtin
@@ -325,21 +327,21 @@ onMounted(async () => {
                   </span>
                 </div>
                 <div class="md:hidden mt-1 space-y-0.5">
-                  <div class="text-xs text-gray-500 dark:text-gray-400 font-mono truncate max-w-[250px]">
+                  <div class="text-xs text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap truncate">
                     <span class="text-gray-400 dark:text-gray-500">DIST:</span> {{ source.dist_server }}
                   </div>
-                  <div class="text-xs text-gray-500 dark:text-gray-400 font-mono truncate max-w-[250px]">
+                  <div class="text-xs text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap truncate">
                     <span class="text-gray-400 dark:text-gray-500">ROOT:</span> {{ source.update_root }}
                   </div>
                 </div>
               </td>
-              <td class="px-4 py-3 hidden md:table-cell">
-                <span class="text-xs text-gray-600 dark:text-gray-400 font-mono truncate block max-w-[320px]">
+              <td class="px-4 py-3 hidden md:table-cell min-w-[150px] max-w-[400px]">
+                <span class="text-xs text-gray-600 dark:text-gray-400 font-mono whitespace-nowrap truncate block">
                   {{ source.dist_server }}
                 </span>
               </td>
-              <td class="px-4 py-3 hidden md:table-cell">
-                <span class="text-xs text-gray-600 dark:text-gray-400 font-mono truncate block max-w-[320px]">
+              <td class="px-4 py-3 hidden md:table-cell min-w-[150px] max-w-[400px]">
+                <span class="text-xs text-gray-600 dark:text-gray-400 font-mono whitespace-nowrap truncate block">
                   {{ source.update_root }}
                 </span>
               </td>
