@@ -128,7 +128,7 @@ function main() {
 
   const beforeStash = getStashCount()
   const hadUnstaged = hasUnstagedChanges()
-  
+
   try {
     if (hadUnstaged) {
       console.log('=== Stashing unstaged changes ===')
@@ -180,40 +180,62 @@ function main() {
       console.log()
     }
 
-  if (all || pushMain) {
-    run('git push origin main', dryRun)
-  }
-
-  if (all || pushTag) {
-    const tagExists = (() => {
-      try {
-        execSync(`git rev-parse ${tag}`, { stdio: 'pipe' })
-        return true
-      } catch {
-        return false
-      }
-    })()
-
-    if (tagExists) {
-      console.log(`Tag ${tag} already exists, pushing...`)
-      run(`git push origin ${tag}`, dryRun)
-    } else {
-      console.log(`Creating tag ${tag}...`)
-      const tagMessage = `v${version}\n\n${changes}`
-      const tempFile = path.join(process.cwd(), '.tag-msg.tmp')
-      if (!dryRun) {
-        fs.writeFileSync(tempFile, tagMessage)
-      }
-      run(`git tag ${tag} -F ${tempFile}`, dryRun)
-      if (!dryRun) {
-        fs.unlinkSync(tempFile)
-      }
-      run(`git push origin ${tag}`, dryRun)
+    if (all || pushMain) {
+      run('git push origin main', dryRun)
     }
-  }
 
-  console.log()
-  console.log('Done! Check GitHub Actions: https://github.com/RyenLee/rust-verse/actions')
+    if (all || pushTag) {
+      const tagExists = (() => {
+        try {
+          execSync(`git rev-parse ${tag}`, { stdio: 'pipe' })
+          return true
+        } catch {
+          return false
+        }
+      })()
+
+      if (tagExists) {
+        console.log(`Tag ${tag} already exists, pushing...`)
+        run(`git push origin ${tag}`, dryRun)
+      } else {
+        console.log(`Creating tag ${tag}...`)
+        const tagMessage = `v${version}\n\n${changes}`
+        const tempFile = path.join(process.cwd(), '.tag-msg.tmp')
+        if (!dryRun) {
+          fs.writeFileSync(tempFile, tagMessage)
+        }
+        run(`git tag ${tag} -F ${tempFile}`, dryRun)
+        if (!dryRun) {
+          fs.unlinkSync(tempFile)
+        }
+        run(`git push origin ${tag}`, dryRun)
+      }
+    }
+
+    console.log()
+    console.log('Done! Check GitHub Actions: https://github.com/RyenLee/rust-verse/actions')
+  } catch (err) {
+    console.error()
+    console.error('========================================')
+    console.error('              ERROR OCCURRED             ')
+    console.error('========================================')
+    console.error(err.message)
+    console.error()
+
+    // 恢复用户的修改
+    if (hadUnstaged) {
+      console.log('=== Attempting to restore your changes ===')
+      try {
+        runAllowFail('git stash pop', false)
+        console.log('✓ Your changes have been restored')
+      } catch (e) {
+        console.error('✗ Failed to restore changes automatically')
+        console.error('  Please run: git stash pop')
+      }
+    }
+
+    process.exit(1)
+  }
 }
 
 main()
