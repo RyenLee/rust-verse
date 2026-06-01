@@ -128,55 +128,57 @@ function main() {
 
   const beforeStash = getStashCount()
   const hadUnstaged = hasUnstagedChanges()
-  if (hadUnstaged) {
-    console.log('=== Stashing unstaged changes ===')
-    run('git stash push -m "wip: pre-release stash"', dryRun)
-  }
-  console.log('=== Pulling latest code ===')
-  run('git pull --rebase origin main', dryRun)
-  if (hadUnstaged) {
-    console.log('=== Restoring stashed changes ===')
-    // After pull, CRLF/LF normalization may cause files to appear modified,
-    // which blocks git stash pop. Discard those phantom changes first.
-    const phantomFiles = getModifiedFiles()
-    if (phantomFiles.length > 0) {
-      console.log('Discarding CRLF/LF phantom changes before stash pop...')
-      restoreModifiedFiles(phantomFiles, dryRun)
+  
+  try {
+    if (hadUnstaged) {
+      console.log('=== Stashing unstaged changes ===')
+      run('git stash push -m "wip: pre-release stash"', dryRun)
     }
-    runAllowFail('git stash pop', dryRun)
-  }
-  console.log()
-
-  // Discard CRLF/LF line-ending noise that may block commits
-  console.log('=== Normalizing line endings ===')
-  runAllowFail('git add --renormalize .', dryRun)
-  console.log()
-
-  if (!skipBump) {
-    console.log('=== Running bump-version ===')
-    runBumpVersion(newVersion, dryRun)
-    console.log()
-  }
-
-  const version = readVersion()
-  const tag = `v${version}`
-  const changes = readChangesForVersion(version)
-
-  console.log(`Version: ${version}`)
-  console.log(`Tag: ${tag}`)
-  console.log(`Changes:\n${changes.split('\n').slice(0, 5).join('\n')}${changes.split('\n').length > 5 ? '\n...' : ''}`)
-  console.log()
-
-  if (!skipBump) {
-    console.log('=== Committing version bump ===')
-    run(`git add -A`, dryRun)
-    if (hasStagedChanges()) {
-      run(`git commit -m "chore: release v${version}"`, dryRun)
-    } else {
-      console.log('No changes to commit (version already up to date)')
+    console.log('=== Pulling latest code ===')
+    run('git pull --rebase origin main', dryRun)
+    if (hadUnstaged) {
+      console.log('=== Restoring stashed changes ===')
+      // After pull, CRLF/LF normalization may cause files to appear modified,
+      // which blocks git stash pop. Discard those phantom changes first.
+      const phantomFiles = getModifiedFiles()
+      if (phantomFiles.length > 0) {
+        console.log('Discarding CRLF/LF phantom changes before stash pop...')
+        restoreModifiedFiles(phantomFiles, dryRun)
+      }
+      runAllowFail('git stash pop', dryRun)
     }
     console.log()
-  }
+
+    // Discard CRLF/LF line-ending noise that may block commits
+    console.log('=== Normalizing line endings ===')
+    runAllowFail('git add --renormalize .', dryRun)
+    console.log()
+
+    if (!skipBump) {
+      console.log('=== Running bump-version ===')
+      runBumpVersion(newVersion, dryRun)
+      console.log()
+    }
+
+    const version = readVersion()
+    const tag = `v${version}`
+    const changes = readChangesForVersion(version)
+
+    console.log(`Version: ${version}`)
+    console.log(`Tag: ${tag}`)
+    console.log(`Changes:\n${changes.split('\n').slice(0, 5).join('\n')}${changes.split('\n').length > 5 ? '\n...' : ''}`)
+    console.log()
+
+    if (!skipBump) {
+      console.log('=== Committing version bump ===')
+      run(`git add -A`, dryRun)
+      if (hasStagedChanges()) {
+        run(`git commit -m "chore: release v${version}"`, dryRun)
+      } else {
+        console.log('No changes to commit (version already up to date)')
+      }
+      console.log()
+    }
 
   if (all || pushMain) {
     run('git push origin main', dryRun)
