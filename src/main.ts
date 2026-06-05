@@ -6,10 +6,11 @@ import router from './router'
 
 // Iconify web component — enables <iconify-icon icon="mdi:xxx">
 // rendering. Must be imported before app mounts.
-// Preload all Material Design Icons (mdi) so the app works fully offline.
+// P0: Use build-time extracted minimal icon set instead of full @iconify-json/mdi
+// (29KB vs 3MB, only includes icons actually referenced in source code).
 import 'iconify-icon'
 import { addCollection } from 'iconify-icon'
-import mdiIcons from '@iconify-json/mdi/icons.json'
+import mdiIcons from './assets/used-icons.json'
 
 addCollection(mdiIcons)
 

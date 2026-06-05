@@ -1,7 +1,9 @@
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { useRustup, type HistRelease } from './useRustup'
 
 const PAGE_SIZE = 50
+/// P1: Cap the list to prevent unbounded memory growth
+const MAX_ITEMS = 500
 
 /**
  * Extract a human-readable error message from a Tauri command error.
@@ -21,7 +23,7 @@ function extractErrorMessage(e: unknown): string {
   return String(e)
 }
 
-const releases = ref<HistRelease[]>([])
+const releases = shallowRef<HistRelease[]>([])  // P1: shallowRef 避免深度响应式代理开销
 const loading = ref(false)
 const loadingMore = ref(false)
 const hasMore = ref(false)
@@ -73,8 +75,10 @@ export function useHistoryVersions() {
     try {
       const offset = releases.value.length
       const page = await listHistReleases(channel, offset, PAGE_SIZE)
-      releases.value = [...releases.value, ...page.items]
-      hasMore.value = page.has_more
+      const merged = [...releases.value, ...page.items]
+      // P1: Cap list to MAX_ITEMS to prevent unbounded memory growth
+      releases.value = merged.length > MAX_ITEMS ? merged.slice(-MAX_ITEMS) : merged
+      hasMore.value = page.has_more && releases.value.length < MAX_ITEMS
       totalCount.value = page.total
     } catch {
       // ignore
@@ -103,8 +107,10 @@ export function useHistoryVersions() {
     try {
       const offset = releases.value.length
       const page = await searchHistReleases(keyword, channel, offset, PAGE_SIZE)
-      releases.value = [...releases.value, ...page.items]
-      hasMore.value = page.has_more
+      const merged = [...releases.value, ...page.items]
+      // P1: Cap list to MAX_ITEMS to prevent unbounded memory growth
+      releases.value = merged.length > MAX_ITEMS ? merged.slice(-MAX_ITEMS) : merged
+      hasMore.value = page.has_more && releases.value.length < MAX_ITEMS
       totalCount.value = page.total
     } catch {
       // ignore

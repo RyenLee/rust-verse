@@ -1002,7 +1002,8 @@ pub fn insert_notification(
         - 1)
 }
 
-/// List all notifications.
+/// List all notifications (kept for backward compatibility).
+#[allow(dead_code)]
 pub fn list_notifications(db: &Database) -> Result<Vec<Notification>, String> {
     let read_tx = db.begin_read().map_err(|e| e.to_string())?;
     let Ok(table) = read_tx.open_table(NOTIFICATIONS) else {
@@ -1016,6 +1017,58 @@ pub fn list_notifications(db: &Database) -> Result<Vec<Notification>, String> {
         result.push(notif);
     }
     Ok(result)
+}
+
+/// List notifications with pagination, newest first (by ID descending).
+/// Uses the NOTIF_COUNTER to determine the ID range, then scans backwards
+/// to avoid loading all notifications into memory.
+pub fn list_notifications_paginated(
+    db: &Database,
+    limit: usize,
+    offset: usize,
+) -> Result<Vec<Notification>, String> {
+    let read_tx = db.begin_read().map_err(|e| e.to_string())?;
+    let Ok(table) = read_tx.open_table(NOTIFICATIONS) else {
+        return Ok(vec![]);
+    };
+    let Ok(counter_table) = read_tx.open_table(NOTIF_COUNTER) else {
+        return Ok(vec![]);
+    };
+    let max_id = counter_table
+        .get("next_id")
+        .map_err(|e| e.to_string())?
+        .map(|g| g.value())
+        .unwrap_or(1);
+    // IDs are 1-based; skip the oldest `offset` and take `limit`
+    let start_id = max_id.saturating_sub(offset as u64);
+    let end_id = start_id.saturating_sub(limit as u64);
+    let mut result = Vec::with_capacity(limit);
+    for id in (end_id + 1..=start_id).rev() {
+        if id == 0 {
+            continue;
+        }
+        if let Ok(Some(guard)) = table.get(id) {
+            let notif: Notification =
+                serde_json::from_slice(guard.value()).map_err(|e| e.to_string())?;
+            result.push(notif);
+        }
+    }
+    Ok(result)
+}
+
+/// Get total notification count from the counter (O(1) read).
+pub fn notification_count(db: &Database) -> Result<u64, String> {
+    let read_tx = db.begin_read().map_err(|e| e.to_string())?;
+    let Ok(counter_table) = read_tx.open_table(NOTIF_COUNTER) else {
+        return Ok(0);
+    };
+    let count = counter_table
+        .get("next_id")
+        .map_err(|e| e.to_string())?
+        .map(|g| g.value())
+        .unwrap_or(1)
+        .saturating_sub(1);
+    Ok(count)
 }
 
 /// Mark a notification as read.
@@ -1064,8 +1117,20 @@ pub fn delete_all_notifications(db: &Database) -> Result<(), String> {
 
 /// Get unread notification count.
 pub fn unread_count(db: &Database) -> Result<u64, String> {
-    let notifications = list_notifications(db)?;
-    Ok(notifications.iter().filter(|n| !n.is_read).count() as u64)
+    let read_tx = db.begin_read().map_err(|e| e.to_string())?;
+    let Ok(table) = read_tx.open_table(NOTIFICATIONS) else {
+        return Ok(0);
+    };
+    let mut count = 0u64;
+    for res in table.iter().map_err(|e| e.to_string())? {
+        let (_id, guard) = res.map_err(|e| e.to_string())?;
+        if let Ok(notif) = serde_json::from_slice::<Notification>(guard.value()) {
+            if !notif.is_read {
+                count += 1;
+            }
+        }
+    }
+    Ok(count)
 }
 
 /// Delete all read notifications created before `cutoff_ms`.
@@ -1188,6 +1253,27 @@ impl NotificationRepository for RedbDataStore {
                     .collect()
             })
             .map_err(|e| RepositoryError::Database(e))
+    }
+
+    fn notification_list_paginated(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<(u64, String)>, RepositoryError> {
+        list_notifications_paginated(&*self.db, limit, offset)
+            .map(|list| {
+                list.into_iter()
+                    .map(|n| {
+                        let json = serde_json::to_string(&n).unwrap_or_default();
+                        (n.id, json)
+                    })
+                    .collect()
+            })
+            .map_err(|e| RepositoryError::Database(e))
+    }
+
+    fn notification_count(&self) -> Result<u64, RepositoryError> {
+        notification_count(&*self.db).map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_mark_read(&self, id: u64) -> Result<(), RepositoryError> {

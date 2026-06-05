@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, shallowRef, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
@@ -35,7 +35,7 @@ interface Notification {
 const PAGE_SIZE = 10
 const loading = ref(true)
 const loadingMore = ref(false)
-const notifications = ref<Notification[]>([])
+const notifications = shallowRef<Notification[]>([])  // P1: shallowRef 避免深度响应式代理开销
 const totalCount = ref(0)
 const searchQuery = ref('')
 const filterCategory = ref('all')
@@ -150,7 +150,8 @@ async function loadMore() {
       limit: PAGE_SIZE,
       offset: notifications.value.length,
     })
-    notifications.value.push(...more)
+    // P1: Replace entire array to trigger shallowRef reactivity
+    notifications.value = [...notifications.value, ...more]
     // Refresh total count in case new notifications arrived
     totalCount.value = await invoke<number>('notify_count')
   } catch (e) {
@@ -163,8 +164,10 @@ async function loadMore() {
 async function markRead(id: number) {
   try {
     await invoke('notify_mark_read', { id })
-    const n = notifications.value.find(x => x.id === id)
-    if (n) n.is_read = true
+    // P1: Replace entire array to trigger shallowRef reactivity
+    notifications.value = notifications.value.map(n =>
+      n.id === id ? { ...n, is_read: true } : n
+    )
     notifyNotificationChange()
   } catch (e) {
     console.error('[NotificationCenter] markRead failed:', e)
@@ -174,8 +177,10 @@ async function markRead(id: number) {
 async function markUnread(id: number) {
   try {
     await invoke('notify_mark_unread', { id })
-    const n = notifications.value.find(x => x.id === id)
-    if (n) n.is_read = false
+    // P1: Replace entire array to trigger shallowRef reactivity
+    notifications.value = notifications.value.map(n =>
+      n.id === id ? { ...n, is_read: false } : n
+    )
     notifyNotificationChange()
   } catch (e) {
     console.error('[NotificationCenter] markUnread failed:', e)
@@ -319,6 +324,11 @@ onBeforeUnmount(() => {
     notifSettingsWatchStop()
     notifSettingsWatchStop = null
   }
+  // P3: Close AudioContext to release audio resources
+  if (audioCtx) {
+    audioCtx.close()
+    audioCtx = null
+  }
 })
 
 // ── Notification sound (Web Audio API) ──
@@ -353,8 +363,8 @@ let unlistenCleanup: UnlistenFn | null = null
 async function startRealtimeListener() {
   try {
     unlistenNotif = await listen<Notification>('notification:new', event => {
-      // Prepend new notification to the list (newest first)
-      notifications.value.unshift(event.payload)
+      // P1: Replace entire array to trigger shallowRef reactivity
+      notifications.value = [event.payload, ...notifications.value]
       totalCount.value++
       // Play notification sound if enabled by user
       if (event.payload.sound_enabled) {

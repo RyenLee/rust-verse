@@ -52,7 +52,7 @@ impl AppState {
             config_cache: AppConfigCache::new(),
             locale: Mutex::new(locale::LC_C.to_string()),
             task_state: TaskState::new(),
-            query_cache: Arc::new(QueryCache::new(60)),
+            query_cache: Arc::new(QueryCache::new(120)),
         }
     }
 }

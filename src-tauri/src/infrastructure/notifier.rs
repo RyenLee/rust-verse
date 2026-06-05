@@ -20,7 +20,6 @@ use crate::domain::base::time::chrono_now_ms;
 use crate::domain::notification::{
     Category, NewNotification, Notification, NotificationKey, NotifParam, Priority,
 };
-use crate::domain::settings::UserSettings;
 use crate::state::AppState;
 use tauri::Emitter;
 use tauri::Manager;
@@ -49,30 +48,8 @@ pub fn notify(
 ) -> Option<u64> {
     let state = app.state::<AppState>();
 
-    // ── Read settings (use defaults if none persisted yet) ──
-    let settings = match (&*state.store).get_settings() {
-        Some(json) => match serde_json::from_str::<UserSettings>(&json) {
-            Ok(s) => {
-                if let Err(e) = s.validate() {
-                    crate::infrastructure::logger::logger().error(
-                        "notifier",
-                        &format!("settings validation failed, falling back to defaults: {e}"),
-                    );
-                    UserSettings::default()
-                } else {
-                    s
-                }
-            }
-            Err(e) => {
-                crate::infrastructure::logger::logger().error(
-                    "notifier",
-                    &format!("failed to parse settings, falling back to defaults: {e}"),
-                );
-                UserSettings::default()
-            }
-        },
-        None => UserSettings::default(),
-    };
+    // P3: Use cached settings to avoid repeated JSON parsing on every notify() call
+    let settings = state.config_cache.get_settings(&*state.store);
 
     // ── Determine whether to push a real-time event ──
     let should_push = settings.notifications.enabled

@@ -42,6 +42,8 @@ pub fn save_settings(
     // Invalidate the proxy cache so next subprocess execution picks up
     // the updated proxy settings.
     proxy::invalidate_cache();
+    // Invalidate the config cache so notifier picks up updated settings.
+    state.config_cache.invalidate();
     // Also apply them to the current process immediately, so that any
     // process spawned from this one inherits the correct proxy env vars.
     let config = proxy::get_proxy_config();

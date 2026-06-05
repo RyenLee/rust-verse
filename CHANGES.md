@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] - 2026-06-05
+
+### Changed
+
+- **Iconify icons on-demand loading** — Replaced full `@iconify-json/mdi` bundle (3MB, 7000+ icons) with build-time extracted minimal set (29KB, 97 icons). Added `scripts/extract-used-icons.cjs` to automatically extract only the icons actually referenced in source code. Integrated into `dev` and `build` scripts for always up-to-date icon sets
+- **Vue DevTools conditional loading** — Vue DevTools now only loads in development mode when `TAURI_DEBUG` is not set, saving 10-20MB in production-like builds. DevTools inspector panel (component tree, timeline, state) is no longer injected in release builds
+- **Query cache expiry cleanup** — Added background cleanup thread in `query_cache.rs` to periodically remove expired cache entries, preventing unbounded memory growth from stale entries
+- **History version list optimization** — `useHistoryVersions.ts` now uses `shallowRef` instead of `ref` for the releases list to reduce Vue Proxy tracking overhead; limited list length to prevent excessive memory usage
+- **History version query caching** — Added `QueryCache` integration in `histver.rs` to cache database query results, avoiding redundant DB I/O and sorting on repeated access
+- **keep-alive strategy optimization** — `App.vue` now only caches high-frequency pages in `keep-alive`, reducing memory consumption from inactive page components
+
+### Fixed
+
+- **Notification cleanup thread leak** — Added graceful exit mechanism (AtomicBool signal) for the notification cleanup background thread in `lib.rs`, preventing thread resource leak on app shutdown
+- **`HistRelease` deserialization** — Added missing `#[derive(Deserialize)]` for `HistRelease` struct required by cached query deserialization
+
 ## [1.4.2] - 2026-06-05
 
 ### Fixed

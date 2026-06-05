@@ -38,7 +38,11 @@ export default defineConfig({
         },
       },
     }),
-    vueDevTools(),
+    // P0: Only load Vue DevTools in development mode to save 10-20MB in production-like builds.
+    // DevTools injects a full inspector panel (component tree, timeline, state) into the browser.
+    ...(process.env.NODE_ENV === 'development' && !process.env.TAURI_DEBUG
+      ? [vueDevTools()]
+      : []),
     AutoImport({
       imports: [
         'vue',

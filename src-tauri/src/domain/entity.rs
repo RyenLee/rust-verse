@@ -116,7 +116,7 @@ pub struct SearchResult {
 
 // ── Historical Release ──
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HistRelease {
     pub version: String,
     pub date: String,

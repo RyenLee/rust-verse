@@ -1,4 +1,6 @@
 import { ref } from 'vue'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { PhysicalPosition, PhysicalSize } from '@tauri-apps/api/dpi'
 
 let storeInstance: any = null
 
@@ -98,10 +100,9 @@ async function restoreWindowBounds() {
     const store = await getStore()
     const bounds = await store.get<WindowBounds>('windowBounds')
     if (!bounds) return
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
     const win = getCurrentWindow()
-    await win.setPosition(new (await import('@tauri-apps/api/dpi')).PhysicalPosition(bounds.x, bounds.y))
-    await win.setSize(new (await import('@tauri-apps/api/dpi')).PhysicalSize(bounds.width, bounds.height))
+    await win.setPosition(new PhysicalPosition(bounds.x, bounds.y))
+    await win.setSize(new PhysicalSize(bounds.width, bounds.height))
   } catch {
     // Non-critical, skip
   }
@@ -109,7 +110,6 @@ async function restoreWindowBounds() {
 
 async function saveWindowBounds() {
   try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
     const win = getCurrentWindow()
     const position = await win.outerPosition()
     const size = await win.outerSize()
@@ -127,20 +127,23 @@ async function saveWindowBounds() {
 
 function setupWindowBoundsListener() {
   try {
-    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-      const win = getCurrentWindow()
-      win.onResized(() => {
-        if (saveTimeout) clearTimeout(saveTimeout)
-        saveTimeout = setTimeout(saveWindowBounds, 500)
-      })
-      win.onMoved(() => {
-        if (saveTimeout) clearTimeout(saveTimeout)
-        saveTimeout = setTimeout(saveWindowBounds, 500)
-      })
+    const win = getCurrentWindow()
+    win.onResized(() => {
+      if (saveTimeout) clearTimeout(saveTimeout)
+      saveTimeout = setTimeout(saveWindowBounds, 500)
+    })
+    win.onMoved(() => {
+      if (saveTimeout) clearTimeout(saveTimeout)
+      saveTimeout = setTimeout(saveWindowBounds, 500)
     })
   } catch {
     // Non-critical, skip
   }
+}
+
+// P2: Clean up matchMedia listener
+function cleanupThemeListener() {
+  window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', applySystemTheme)
 }
 
 export function useAppStore() {
@@ -152,5 +155,6 @@ export function useAppStore() {
     toggleTheme,
     restoreWindowBounds,
     setupWindowBoundsListener,
+    cleanupThemeListener,
   }
 }

@@ -98,8 +98,19 @@ pub trait NotificationRepository: Send + Sync {
         default_priority: &str,
     ) -> Result<u64, RepositoryError>;
 
-    /// 列出所有通知。
+    /// 列出所有通知（保留用于向后兼容，新代码请使用 notification_list_paginated）。
+    #[allow(dead_code)]
     fn notification_list(&self) -> Result<Vec<(u64, String)>, RepositoryError>;
+
+    /// 分页列出通知，按 ID 降序（最新在前）。
+    fn notification_list_paginated(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<(u64, String)>, RepositoryError>;
+
+    /// 获取通知总数（O(1) 计数器查询，不遍历全表）。
+    fn notification_count(&self) -> Result<u64, RepositoryError>;
 
     /// 标记为已读。
     fn notification_mark_read(&self, id: u64) -> Result<(), RepositoryError>;

@@ -1002,14 +1002,14 @@
         <div class="hero-version">
           <span class="ver-label" data-lang="zh-CN">最新版本</span>
           <span class="ver-label" data-lang="en">Latest</span>
-          <span class="ver-num">v1.4.2</span>
+          <span class="ver-num">v1.4.3</span>
           <span class="ver-sep"></span>
           <span class="ver-date">2026-06-05</span>
         </div>
         <div class="cta-row">
           <a
             class="btn btn-primary"
-            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.4.2"
+            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.4.3"
             target="_blank"
             rel="noopener"
           >
@@ -1325,14 +1325,74 @@
           <h2 class="section-title" data-lang="en">Release History</h2>
         </div>
         <div class="changelog-timeline">
+          <!-- v1.4.3 -->
+          <div class="release-entry">
+            <div class="release-dot"></div>
+            <div class="release-head">
+              <span class="release-ver">v1.4.3</span>
+              <span class="release-date">2026-06-05</span>
+              <span class="release-latest" data-lang="zh-CN">最新</span>
+              <span class="release-latest" data-lang="en">Latest</span>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-improved" data-lang="zh-CN">改进</span>
+              <span class="change-group-label label-improved" data-lang="en">Improved</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">
+                  Iconify 图标按需加载 — 将全量 @iconify-json/mdi 包（3MB，7000+
+                  图标）替换为构建时提取的最小集（29KB，97 个图标），新增 extract-used-icons.cjs
+                  脚本自动提取源码中实际使用的图标
+                </li>
+                <li data-lang="en">
+                  Iconify icons on-demand loading — Replaced full @iconify-json/mdi bundle (3MB, 7000+ icons) with
+                  build-time extracted minimal set (29KB, 97 icons)
+                </li>
+                <li data-lang="zh-CN">
+                  Vue DevTools 条件加载 — DevTools 仅在开发模式且非 Tauri Debug 模式下加载，生产构建节省 10-20MB 内存
+                </li>
+                <li data-lang="en">
+                  Vue DevTools conditional loading — DevTools only loads in development mode, saving 10-20MB in
+                  production builds
+                </li>
+                <li data-lang="zh-CN">查询缓存过期清理 — 添加后台清理线程定期移除过期缓存条目，防止内存无限增长</li>
+                <li data-lang="en">
+                  Query cache expiry cleanup — Added background cleanup thread to periodically remove expired cache
+                  entries
+                </li>
+                <li data-lang="zh-CN">
+                  历史版本列表优化 — 使用 shallowRef 替代 ref 减少响应式开销，限制列表长度防止内存过度占用
+                </li>
+                <li data-lang="en">
+                  History version list optimization — Uses shallowRef to reduce Proxy tracking overhead, limits list
+                  length
+                </li>
+                <li data-lang="zh-CN">keep-alive 策略优化 — 仅缓存高频页面，减少非活跃页面组件的内存占用</li>
+                <li data-lang="en">
+                  keep-alive strategy optimization — Only caches high-frequency pages to reduce memory from inactive
+                  components
+                </li>
+              </ul>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-fixed" data-lang="zh-CN">修复</span>
+              <span class="change-group-label label-fixed" data-lang="en">Fixed</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">
+                  通知清理线程泄漏 — 为通知清理后台线程添加优雅退出机制，防止应用关闭时线程资源泄漏
+                </li>
+                <li data-lang="en">
+                  Notification cleanup thread leak — Added graceful exit mechanism for the notification cleanup
+                  background thread
+                </li>
+              </ul>
+            </div>
+          </div>
           <!-- v1.4.2 -->
           <div class="release-entry">
             <div class="release-dot"></div>
             <div class="release-head">
               <span class="release-ver">v1.4.2</span>
               <span class="release-date">2026-06-05</span>
-              <span class="release-latest" data-lang="zh-CN">最新</span>
-              <span class="release-latest" data-lang="en">Latest</span>
             </div>
             <div class="change-group">
               <span class="change-group-label label-fixed" data-lang="zh-CN">修复</span>
@@ -1342,7 +1402,8 @@
                   通知设置不生效 — 修复设置页面配置的通知选项未应用到新创建通知的问题，数据库层现正确接收用户设置参数
                 </li>
                 <li data-lang="en">
-                  Notification settings not taking effect — Fixed the issue where notification settings configured in the Settings page were not applied to newly created notifications
+                  Notification settings not taking effect — Fixed the issue where notification settings configured in
+                  the Settings page were not applied to newly created notifications
                 </li>
               </ul>
             </div>
@@ -1351,17 +1412,15 @@
               <span class="change-group-label label-improved" data-lang="en">Improved</span>
               <ul class="change-list">
                 <li data-lang="zh-CN">
-                  版本搜索性能优化 — 搜索历史版本时不再加载全量数据到内存，改为迭代阶段过滤；版本计数使用 table.len() 替代全量加载，大幅降低内存占用
+                  版本搜索性能优化 — 搜索历史版本时不再加载全量数据到内存，改为迭代阶段过滤；版本计数使用 table.len()
+                  替代全量加载，大幅降低内存占用
                 </li>
                 <li data-lang="en">
-                  Search performance optimized — Release search now filters during iteration instead of loading all data into memory; counting uses table.len() for significantly reduced memory usage
+                  Search performance optimized — Release search now filters during iteration instead of loading all data
+                  into memory; counting uses table.len() for significantly reduced memory usage
                 </li>
-                <li data-lang="zh-CN">
-                  文档同步更新 — README.md、首页及相关文档已同步升级到 v1.4.2
-                </li>
-                <li data-lang="en">
-                  Documentation sync — README.md, homepage and related docs updated to v1.4.2
-                </li>
+                <li data-lang="zh-CN">文档同步更新 — README.md、首页及相关文档已同步升级到 v1.4.2</li>
+                <li data-lang="en">Documentation sync — README.md, homepage and related docs updated to v1.4.2</li>
               </ul>
             </div>
           </div>
@@ -1380,14 +1439,11 @@
                   镜像加速列表文本缩略展示 — 表格数据支持自动缩略，文本不换行，可根据窗口宽度自适应调整
                 </li>
                 <li data-lang="en">
-                  Mirror list text truncation — Table data now supports automatic text truncation with no wrapping, adapting to window width
+                  Mirror list text truncation — Table data now supports automatic text truncation with no wrapping,
+                  adapting to window width
                 </li>
-                <li data-lang="zh-CN">
-                  文档同步更新 — README.md、首页及相关文档已同步升级到 v1.4.1
-                </li>
-                <li data-lang="en">
-                  Documentation sync — README.md, homepage and related docs updated to v1.4.1
-                </li>
+                <li data-lang="zh-CN">文档同步更新 — README.md、首页及相关文档已同步升级到 v1.4.1</li>
+                <li data-lang="en">Documentation sync — README.md, homepage and related docs updated to v1.4.1</li>
               </ul>
             </div>
           </div>
@@ -1397,8 +1453,6 @@
             <div class="release-head">
               <span class="release-ver">v1.4.0</span>
               <span class="release-date">2026-05-31</span>
-              <span class="release-latest" data-lang="zh-CN">最新</span>
-              <span class="release-latest" data-lang="en">Latest</span>
             </div>
             <div class="change-group">
               <span class="change-group-label label-improved" data-lang="zh-CN">改进</span>

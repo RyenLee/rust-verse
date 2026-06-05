@@ -30,6 +30,9 @@ const { update, checkForUpdate } = useAppUpdater()
 const updateAvailableInfo = computed(() => update.value)
 provide('updateAvailableInfo', updateAvailableInfo)
 
+// P0: keep-alive 策略优化 — 仅对高频切换页面启用缓存，避免所有页面常驻内存
+const keepAliveNames = ['ToolchainListView', 'DashboardView']
+
 function dismissUpdateNotification() {
   // Keep update data for page, just don't show badge (can be extended if needed)
 }
@@ -575,10 +578,10 @@ onBeforeUnmount(() => {
 
         <!-- Page content -->
         <main class="flex-1 overflow-hidden">
-          <router-view v-slot="{ Component }">
+          <router-view v-slot="{ Component, route: r }">
             <Transition name="route" mode="out-in">
-              <keep-alive>
-                <component :is="Component" />
+              <keep-alive :include="keepAliveNames">
+                <component :is="Component" :key="r.fullPath" />
               </keep-alive>
             </Transition>
           </router-view>

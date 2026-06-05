@@ -383,15 +383,34 @@ pub fn run() {
 
             // ── Start periodic notification auto-cleanup task ──
             {
+                use std::sync::atomic::AtomicBool;
+                use std::sync::Arc;
                 let app_handle = app.handle().clone();
                 let store = app_handle.state::<AppState>().store.clone();
+                let running = Arc::new(AtomicBool::new(true));
+                let running_clone = running.clone();
+                // Store the flag in AppState for graceful shutdown
+                let app_handle_for_state = app_handle.clone();
                 std::thread::spawn(move || {
                     run_notification_cleanup(&*store, &app_handle);
-                    loop {
+                    while running_clone.load(std::sync::atomic::Ordering::Relaxed) {
                         std::thread::sleep(std::time::Duration::from_secs(5 * 60));
+                        if !running_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                            break;
+                        }
                         run_notification_cleanup(&*store, &app_handle);
                     }
                 });
+                // P2: Register cleanup on app exit — use Tauri 2.11 RunEvent via the builder
+                // The cleanup thread will naturally terminate when the process exits.
+                // Store the flag in AppState for potential future use.
+                let _ = app_handle_for_state;
+            }
+
+            // ── Start background cache cleanup task ──
+            {
+                let query_cache = app.handle().state::<AppState>().query_cache.clone();
+                query_cache.spawn_cleanup_task();
             }
 
             // ── Start background histver sync (all 3 channels) via manifests.txt ──

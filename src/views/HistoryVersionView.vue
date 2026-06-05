@@ -233,6 +233,11 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   unlistenLog?.()
   unlistenFinish?.()
+  // P2: Clear pending search timer to prevent execution after unmount
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+    searchTimer = null
+  }
 })
 
 watch(selectedChannel, async () => {

@@ -1,15 +1,15 @@
 {
   "name": "rustverse",
   "private": true,
-  "version": "1.4.2",
+  "version": "1.4.3",
   "type": "module",
   "engines": {
     "node": ">=26"
   },
   "scripts": {
-    "dev": "cross-env DEBUG=0 vite",
+    "dev": "node scripts/extract-used-icons.cjs && cross-env DEBUG=0 vite",
     "test": "vitest",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "node scripts/extract-used-icons.cjs && vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --build --force",
     "tauri": "node scripts/bump-version.cjs && tauri",

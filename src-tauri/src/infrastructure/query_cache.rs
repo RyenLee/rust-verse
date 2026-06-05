@@ -29,11 +29,13 @@ impl QueryCache {
 
     pub fn get(&self, key: &str) -> Option<String> {
         let idx = Self::shard_index(key);
-        let guard = self.shards[idx].lock().ok()?;
+        let mut guard = self.shards[idx].lock().ok()?;
         let (ts, val) = guard.get(key)?;
         if ts.elapsed().as_secs() < self.default_ttl_secs {
             Some(val.clone())
         } else {
+            // P0: 删除过期条目，避免 HashMap 无限增长
+            guard.remove(key);
             None
         }
     }
@@ -51,5 +53,19 @@ impl QueryCache {
                 guard.clear();
             }
         }
+    }
+
+    // P0: 后台定期清理过期条目（每 5 分钟一次）
+    pub fn spawn_cleanup_task(self: &std::sync::Arc<Self>) {
+        let cache = std::sync::Arc::clone(self);
+        let ttl = self.default_ttl_secs;
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(300));
+            for shard in &cache.shards {
+                if let Ok(mut guard) = shard.lock() {
+                    guard.retain(|_, (ts, _)| ts.elapsed().as_secs() < ttl);
+                }
+            }
+        });
     }
 }
