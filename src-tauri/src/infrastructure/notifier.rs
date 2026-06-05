@@ -116,7 +116,11 @@ pub fn notify(
         }
     };
 
-    let id = match (&*state.store).notification_insert(&json) {
+    let id = match (&*state.store).notification_insert_with_settings(
+        &json,
+        settings.notifications.sound_enabled,
+        &settings.notifications.default_priority,
+    ) {
         Ok(id) => id,
         Err(e) => {
             crate::infrastructure::logger::logger()
@@ -135,6 +139,8 @@ pub fn notify(
         params_json,
         action_route,
         is_read: false,
+        sound_enabled: settings.notifications.sound_enabled,
+        default_priority: settings.notifications.default_priority.clone(),
         created_at: chrono_now_ms(),
     };
 

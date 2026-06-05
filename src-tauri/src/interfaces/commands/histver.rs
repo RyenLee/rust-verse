@@ -6,12 +6,21 @@ use crate::domain::error::AppResult;
 use crate::state::AppState;
 
 pub use crate::domain::entity::HistRelease;
+use crate::domain::entity::HistReleasePage;
 
+const PAGE_SIZE: u64 = 50;
 const TABLE_STABLE: TableDefinition<&str, &str> = TableDefinition::new(table_name::HISTVER_STABLE);
 const TABLE_BETA: TableDefinition<&str, &str> = TableDefinition::new(table_name::HISTVER_BETA);
 const TABLE_NIGHTLY: TableDefinition<&str, &str> = TableDefinition::new(table_name::HISTVER_NIGHTLY);
 
-fn read_releases_from_db(db: &Database, channel_filter: Option<&str>) -> AppResult<Vec<HistRelease>> {
+/// Read all releases from db for the given channel filter, sorted by date desc.
+/// Returns (total_count, releases_slice) where releases_slice is [offset..offset+limit].
+fn read_releases_slice(
+    db: &Database,
+    channel_filter: Option<&str>,
+    offset: u64,
+    limit: u64,
+) -> AppResult<HistReleasePage> {
     let channels: Vec<&str> = if let Some(ch) = channel_filter {
         vec![ch]
     } else {
@@ -57,15 +66,33 @@ fn read_releases_from_db(db: &Database, channel_filter: Option<&str>) -> AppResu
         }
     }
     releases.sort_by(|a, b| b.date.cmp(&a.date));
-    Ok(releases)
+    let total = releases.len() as u64;
+    let items = releases
+        .into_iter()
+        .skip(offset as usize)
+        .take(limit as usize)
+        .collect::<Vec<_>>();
+    let has_more = offset + limit < total;
+    Ok(HistReleasePage {
+        items,
+        total,
+        has_more,
+    })
 }
 
 #[tauri::command]
 pub fn list_hist_releases(
     state: State<'_, AppState>,
     channel: Option<String>,
-) -> AppResult<Vec<HistRelease>> {
-    read_releases_from_db(&state.db, channel.as_deref())
+    offset: Option<u64>,
+    limit: Option<u64>,
+) -> AppResult<HistReleasePage> {
+    read_releases_slice(
+        &state.db,
+        channel.as_deref(),
+        offset.unwrap_or(0),
+        limit.unwrap_or(PAGE_SIZE),
+    )
 }
 
 #[tauri::command]
@@ -73,17 +100,35 @@ pub fn search_hist_releases(
     state: State<'_, AppState>,
     keyword: String,
     channel: Option<String>,
-) -> AppResult<Vec<HistRelease>> {
-    let releases = read_releases_from_db(&state.db, channel.as_deref())?;
+    offset: Option<u64>,
+    limit: Option<u64>,
+) -> AppResult<HistReleasePage> {
+    let page = read_releases_slice(
+        &state.db,
+        channel.as_deref(),
+        0,
+        u64::MAX,
+    )?;
     let lower = keyword.to_lowercase();
-    Ok(releases
+    let filtered: Vec<HistRelease> = page
+        .items
         .into_iter()
         .filter(|r| r.version.to_lowercase().contains(&lower))
-        .collect())
+        .collect();
+    let total = filtered.len() as u64;
+    let off = offset.unwrap_or(0) as usize;
+    let lim = limit.unwrap_or(PAGE_SIZE) as usize;
+    let items: Vec<HistRelease> = filtered.into_iter().skip(off).take(lim).collect();
+    let has_more = (off + lim) < total as usize;
+    Ok(HistReleasePage {
+        items,
+        total,
+        has_more,
+    })
 }
 
 #[tauri::command]
 pub fn count_hist_releases(state: State<'_, AppState>, channel: Option<String>) -> AppResult<u64> {
-    let releases = read_releases_from_db(&state.db, channel.as_deref())?;
-    Ok(releases.len() as u64)
+    let page = read_releases_slice(&state.db, channel.as_deref(), 0, u64::MAX)?;
+    Ok(page.total)
 }

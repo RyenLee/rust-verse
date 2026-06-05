@@ -25,7 +25,7 @@ const router = useRouter()
 const { installToolchain } = useRustup()
 const { notifyToolchainChange } = useDataRefresh()
 const { toolchains } = useToolchainOptions()
-const { releases, loading, syncing, syncError, syncFromManifests, refresh, search } = useHistoryVersions()
+const { releases, loading, loadingMore, hasMore, totalCount, syncing, syncError, syncFromManifests, refresh, loadMore, search, searchLoadMore } = useHistoryVersions()
 const bgTask = useBackgroundTask()
 
 const selectedChannel = ref('stable')
@@ -177,6 +177,15 @@ function selectAndGoBack(release: { version: string; date: string; channel: stri
   })
 }
 
+async function handleLoadMore() {
+  const query = searchQuery.value.trim()
+  if (query) {
+    await searchLoadMore(query, selectedChannel.value)
+  } else {
+    await loadMore(selectedChannel.value)
+  }
+}
+
 function goBackToToolchains() {
   router.push('/toolchains')
 }
@@ -317,7 +326,7 @@ watch(searchQuery, () => {
               ? t('histver.channel.beta')
               : t('histver.channel.nightly')
           "
-          :count="groupReleases.length"
+          :count="totalCount"
         />
         <div class="space-y-2">
           <ListItem
@@ -359,6 +368,25 @@ watch(searchQuery, () => {
 
       <EmptyState v-if="filteredReleases.length === 0 && releases.length > 0" :message="t('common.status.noMatch')" />
       <EmptyState v-if="releases.length === 0" :message="t('histver.status.noData')" />
+
+      <!-- Load more -->
+      <div v-if="hasMore && releases.length > 0" class="flex justify-center pb-4">
+        <BaseButton
+          variant="ghost"
+          :loading="loadingMore"
+          :disabled="loadingMore"
+          @click="handleLoadMore"
+        >
+          <iconify-icon icon="mdi:chevron-down" width="16" class="mr-1"></iconify-icon>
+          <span v-if="loadingMore">{{ t('histver.action.loadingMore') }}</span>
+          <span v-else>{{ t('histver.action.loadMore') }} ({{ releases.length }} / {{ totalCount }})</span>
+        </BaseButton>
+      </div>
+      <div v-if="!hasMore && releases.length > 0" class="flex justify-center pb-4">
+        <span class="text-xs text-gray-400 dark:text-gray-500">
+          {{ t('histver.status.allLoaded', { count: totalCount }) }}
+        </span>
+      </div>
     </div>
 
     <!-- Install progress dialog -->

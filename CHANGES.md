@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-06-05
+
+### Fixed
+
+- **Notification settings not taking effect** — Fixed the issue where notification settings configured in the Settings page were not being applied to newly created notifications. The root cause was that `insert_notification` function in `db.rs` was hardcoding `sound_enabled: false` and `default_priority: ""` instead of using user-configured settings. Modified the database layer to accept these parameters from the notification trigger module.
+
+### Changed
+
+- **NotificationRepository trait extended** — Added new `notification_insert_with_settings` method to support passing user settings when creating notifications
+- **Notifier module updated** — Modified `notify` function to read current user settings and pass them to the storage layer
+- **Documentation sync** — Updated README.md, docs/README.en.md and docs/index.html to v1.4.2
+
 ## [1.4.1] - 2026-06-01
 
 ### Changed
@@ -360,6 +372,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo plugins management
 - Dashboard with system status
 
+[1.4.2]: https://github.com/RyenLee/rust-verse/compare/v1.4.1...v1.4.2
+[1.4.1]: https://github.com/RyenLee/rust-verse/compare/v1.3.18...v1.4.1
 [1.3.18]: https://github.com/RyenLee/rust-verse/compare/v1.3.17...v1.3.18
 [1.3.17]: https://github.com/RyenLee/rust-verse/compare/v1.3.16...v1.3.17
 [1.3.16]: https://github.com/RyenLee/rust-verse/compare/v1.3.15...v1.3.16
@@ -390,7 +404,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 本文件记录了 RustVerse 项目的所有重要变更。
 
-- [最新版本 1.3.18](#1318---2026-05-31) — 工具链选择器自动刷新、跨页面工具链同步、组件/目标管理页面自动重载修复
+- [最新版本 1.4.2](#142---2026-06-05) — 修复通知设置不生效问题、扩展 NotificationRepository trait、文档同步更新至 v1.4.2
 - [版本 1.3.8](#138---2026-05-27) — DDD架构重构、通知中心、设置页面、历史版本浏览、DateRangePicker组件
 - [版本 1.3.7](#137---2026-05-25) — 日期范围选择组件、useCalendar 组合式函数、跨组件工具链刷新、安装面板简化
 - [版本 1.3.6](#136---2026-05-25) — 历史版本页面、自定义日期选择组件、安装面板简化、项目主页上线

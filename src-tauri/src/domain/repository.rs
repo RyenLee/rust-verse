@@ -85,8 +85,18 @@ pub trait NotificationRepository: Send + Sync {
     #[allow(dead_code)]
     fn notification_ensure_table(&self) -> Result<(), RepositoryError>;
 
-    /// 插入通知，返回生成的 ID。
+    /// 插入通知（兼容旧接口，sound_enabled 和 default_priority 使用默认值）。
     fn notification_insert(&self, json: &str) -> Result<u64, RepositoryError>;
+
+    /// 插入通知并同时设置 sound_enabled 和 default_priority 字段。
+    ///
+    /// 新代码应优先使用此方法，确保存储的通知与事件通知数据一致。
+    fn notification_insert_with_settings(
+        &self,
+        json: &str,
+        sound_enabled: bool,
+        default_priority: &str,
+    ) -> Result<u64, RepositoryError>;
 
     /// 列出所有通知。
     fn notification_list(&self) -> Result<Vec<(u64, String)>, RepositoryError>;

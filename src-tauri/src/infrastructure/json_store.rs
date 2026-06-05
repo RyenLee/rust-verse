@@ -210,6 +210,17 @@ impl NotificationRepository for JsonDataStore {
         Ok(id)
     }
 
+    fn notification_insert_with_settings(
+        &self,
+        json: &str,
+        _sound_enabled: bool,
+        _default_priority: &str,
+    ) -> Result<u64, RepositoryError> {
+        // JSON store stores the raw JSON as-is; settings fields are
+        // embedded in the JSON payload by the caller.
+        self.notification_insert(json)
+    }
+
     fn notification_list(&self) -> Result<Vec<(u64, String)>, RepositoryError> {
         let inner = self.inner.lock().unwrap();
         Ok(inner

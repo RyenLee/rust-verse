@@ -123,6 +123,14 @@ pub struct HistRelease {
     pub channel: String,
 }
 
+/// Paginated result for historical releases.
+#[derive(Debug, Clone, Serialize)]
+pub struct HistReleasePage {
+    pub items: Vec<HistRelease>,
+    pub total: u64,
+    pub has_more: bool,
+}
+
 // ── Update ──
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

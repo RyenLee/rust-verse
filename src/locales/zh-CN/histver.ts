@@ -8,6 +8,8 @@ export default {
     searchPlaceholder: '搜索版本号或日期...',
     backToToolchains: '返回工具链',
     select: '选择',
+    loadMore: '加载更多',
+    loadingMore: '加载中...',
   },
   filter: {
     dateFrom: '起始日期',
@@ -23,6 +25,7 @@ export default {
   status: {
     installed: '已安装',
     noData: '暂无版本数据，请先点击"同步版本数据"获取。',
+    allLoaded: '已加载全部数据（共 {count} 条）',
   },
   error: {
     syncHint: '请检查网络连接后重试，或切换到其他频道。',

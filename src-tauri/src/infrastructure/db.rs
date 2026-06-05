@@ -938,7 +938,17 @@ pub fn notification_ensure_table(_db: &Database) -> Result<(), String> {
 }
 
 /// Insert a new notification, assigning an auto-increment ID.
-pub fn insert_notification(db: &Database, new: &NewNotification) -> Result<u64, String> {
+///
+/// `sound_enabled` and `default_priority` are snapshots of the current user
+/// settings at notification creation time.  Callers that have access to the
+/// `UserSettings` should pass real values; legacy callers (e.g. the
+/// `notify_create` Tauri command) may pass `false` / `""`.
+pub fn insert_notification(
+    db: &Database,
+    new: &NewNotification,
+    sound_enabled: bool,
+    default_priority: &str,
+) -> Result<u64, String> {
     let write_tx = db.begin_write().map_err(|e| e.to_string())?;
     {
         let mut counter_table = write_tx
@@ -960,6 +970,8 @@ pub fn insert_notification(db: &Database, new: &NewNotification) -> Result<u64, 
             params_json: new.params_json.clone(),
             action_route: new.action_route.clone(),
             is_read: false,
+            sound_enabled,
+            default_priority: default_priority.to_string(),
             created_at: chrono_now_ms(),
         };
 
@@ -1149,7 +1161,20 @@ impl NotificationRepository for RedbDataStore {
     fn notification_insert(&self, json: &str) -> Result<u64, RepositoryError> {
         let new: crate::domain::notification::NewNotification = serde_json::from_str(json)
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
-        insert_notification(&*self.db, &new).map_err(|e| RepositoryError::Database(e))
+        insert_notification(&*self.db, &new, false, "")
+            .map_err(|e| RepositoryError::Database(e))
+    }
+
+    fn notification_insert_with_settings(
+        &self,
+        json: &str,
+        sound_enabled: bool,
+        default_priority: &str,
+    ) -> Result<u64, RepositoryError> {
+        let new: crate::domain::notification::NewNotification = serde_json::from_str(json)
+            .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
+        insert_notification(&*self.db, &new, sound_enabled, default_priority)
+            .map_err(|e| RepositoryError::Database(e))
     }
 
     fn notification_list(&self) -> Result<Vec<(u64, String)>, RepositoryError> {

@@ -149,8 +149,8 @@ function validate(): string | null {
 
 // ── Core: persist settings with error recovery (revert on failure) ──
 async function commitSetting(key: SettingKey) {
-  // Snapshot current state for potential rollback
-  const snapshot: UserSettings = { ...settings.value }
+  // Snapshot current state for potential rollback (deep clone)
+  const snapshot: UserSettings = JSON.parse(JSON.stringify(settings.value))
 
   // Client-side validation
   const validationError = validate()

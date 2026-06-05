@@ -25,6 +25,8 @@ interface Notification {
   params_json: string | null
   action_route: string | null
   is_read: boolean
+  sound_enabled: boolean
+  default_priority: string
   created_at: number
 }
 
@@ -319,6 +321,31 @@ onBeforeUnmount(() => {
   }
 })
 
+// ── Notification sound (Web Audio API) ──
+let audioCtx: AudioContext | null = null
+
+function playNotificationSound(): void {
+  try {
+    if (!audioCtx) {
+      audioCtx = new AudioContext()
+    }
+    const osc = audioCtx.createOscillator()
+    const gain = audioCtx.createGain()
+    osc.connect(gain)
+    gain.connect(audioCtx.destination)
+    osc.type = 'sine'
+    // Two-tone chime: 880 Hz → 1047 Hz
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime)
+    osc.frequency.setValueAtTime(1047, audioCtx.currentTime + 0.1)
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3)
+    osc.start(audioCtx.currentTime)
+    osc.stop(audioCtx.currentTime + 0.3)
+  } catch {
+    // Sound playback is best-effort; silently ignore failures
+  }
+}
+
 // ── Real-time listener ──
 let unlistenNotif: UnlistenFn | null = null
 let unlistenCleanup: UnlistenFn | null = null
@@ -329,6 +356,10 @@ async function startRealtimeListener() {
       // Prepend new notification to the list (newest first)
       notifications.value.unshift(event.payload)
       totalCount.value++
+      // Play notification sound if enabled by user
+      if (event.payload.sound_enabled) {
+        playNotificationSound()
+      }
     })
     // Listen for auto-cleanup events from the backend
     unlistenCleanup = await listen<number>('notification:cleanup', () => {

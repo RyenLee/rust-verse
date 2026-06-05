@@ -8,6 +8,8 @@ export default {
     searchPlaceholder: 'Search version or date...',
     backToToolchains: 'Back to Toolchains',
     select: 'Select',
+    loadMore: 'Load More',
+    loadingMore: 'Loading...',
   },
   filter: {
     dateFrom: 'Start date',
@@ -23,6 +25,7 @@ export default {
   status: {
     installed: 'Installed',
     noData: 'No release data yet. Click "Sync Releases" to fetch.',
+    allLoaded: 'All data loaded ({count} total)',
   },
   error: {
     syncHint: 'Check your internet connection and try again, or switch to another channel.',

@@ -1,6 +1,6 @@
 # RustVerse
 
-> **v1.4.1** — Rust 工具链可视化管理器　|　[English Documentation](docs/README.en.md)
+> **v1.4.2** — Rust 工具链可视化管理器　|　[English Documentation](docs/README.en.md)
 
 RustVerse 是一个跨平台桌面应用，提供对 Rust 工具链、组件、编译目标和 Cargo 插件的可视化一站式管理。基于 **Tauri 2** + **Vue 3** + **TypeScript** + **Tailwind CSS 4** 构建，融合 Rust 系统级性能与现代 Web 前端体验。
 

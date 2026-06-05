@@ -62,6 +62,12 @@ pub struct Notification {
     /// Whether the user has dismissed / read this notification.
     #[serde(default)]
     pub is_read: bool,
+    /// Whether the user has enabled notification sounds in settings.
+    #[serde(default)]
+    pub sound_enabled: bool,
+    /// User's default priority preference from settings ("high" / "medium" / "low").
+    #[serde(default)]
+    pub default_priority: String,
     /// Unix timestamp in milliseconds.
     pub created_at: i64,
 }

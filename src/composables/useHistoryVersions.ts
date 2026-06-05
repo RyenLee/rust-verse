@@ -1,6 +1,8 @@
 import { ref } from 'vue'
 import { useRustup, type HistRelease } from './useRustup'
 
+const PAGE_SIZE = 50
+
 /**
  * Extract a human-readable error message from a Tauri command error.
  * Tauri serializes AppError as { kind: string, message: string }.
@@ -21,6 +23,9 @@ function extractErrorMessage(e: unknown): string {
 
 const releases = ref<HistRelease[]>([])
 const loading = ref(false)
+const loadingMore = ref(false)
+const hasMore = ref(false)
+const totalCount = ref(0)
 const syncing = ref(false)
 const syncError = ref<string | null>(null)
 
@@ -51,7 +56,10 @@ export function useHistoryVersions() {
   async function refresh(channel?: string) {
     loading.value = true
     try {
-      releases.value = await listHistReleases(channel)
+      const page = await listHistReleases(channel, 0, PAGE_SIZE)
+      releases.value = page.items
+      hasMore.value = page.has_more
+      totalCount.value = page.total
     } catch {
       // ignore
     } finally {
@@ -59,14 +67,49 @@ export function useHistoryVersions() {
     }
   }
 
+  async function loadMore(channel?: string) {
+    if (loadingMore.value || !hasMore.value) return
+    loadingMore.value = true
+    try {
+      const offset = releases.value.length
+      const page = await listHistReleases(channel, offset, PAGE_SIZE)
+      releases.value = [...releases.value, ...page.items]
+      hasMore.value = page.has_more
+      totalCount.value = page.total
+    } catch {
+      // ignore
+    } finally {
+      loadingMore.value = false
+    }
+  }
+
   async function search(keyword: string, channel?: string) {
     loading.value = true
     try {
-      releases.value = await searchHistReleases(keyword, channel)
+      const page = await searchHistReleases(keyword, channel, 0, PAGE_SIZE)
+      releases.value = page.items
+      hasMore.value = page.has_more
+      totalCount.value = page.total
     } catch {
       // ignore
     } finally {
       loading.value = false
+    }
+  }
+
+  async function searchLoadMore(keyword: string, channel?: string) {
+    if (loadingMore.value || !hasMore.value) return
+    loadingMore.value = true
+    try {
+      const offset = releases.value.length
+      const page = await searchHistReleases(keyword, channel, offset, PAGE_SIZE)
+      releases.value = [...releases.value, ...page.items]
+      hasMore.value = page.has_more
+      totalCount.value = page.total
+    } catch {
+      // ignore
+    } finally {
+      loadingMore.value = false
     }
   }
 
@@ -81,11 +124,16 @@ export function useHistoryVersions() {
   return {
     releases,
     loading,
+    loadingMore,
+    hasMore,
+    totalCount,
     syncing,
     syncError,
     syncFromManifests,
     refresh,
+    loadMore,
     search,
+    searchLoadMore,
     count,
     installFromHistory,
   }

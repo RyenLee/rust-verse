@@ -67,6 +67,12 @@ export interface HistRelease {
   channel: string
 }
 
+export interface HistReleasePage {
+  items: HistRelease[]
+  total: number
+  has_more: boolean
+}
+
 // --- Rustup commands ---
 
 const RUSTUP = 'rustup'
@@ -190,12 +196,21 @@ export function useRustup() {
   }
 
   // Historical versions
-  async function listHistReleases(channel?: string) {
-    return invoke<HistRelease[]>('list_hist_releases', { channel: channel || null })
+  async function listHistReleases(channel?: string, offset?: number, limit?: number) {
+    return invoke<HistReleasePage>('list_hist_releases', {
+      channel: channel || null,
+      offset: offset ?? null,
+      limit: limit ?? null,
+    })
   }
 
-  async function searchHistReleases(keyword: string, channel?: string) {
-    return invoke<HistRelease[]>('search_hist_releases', { keyword, channel: channel || null })
+  async function searchHistReleases(keyword: string, channel?: string, offset?: number, limit?: number) {
+    return invoke<HistReleasePage>('search_hist_releases', {
+      keyword,
+      channel: channel || null,
+      offset: offset ?? null,
+      limit: limit ?? null,
+    })
   }
 
   async function countHistReleases(channel?: string) {
