@@ -1,7 +1,7 @@
 {
   "name": "rustverse",
   "private": true,
-  "version": "1.4.2",
+  "version": "1.4.1",
   "type": "module",
   "engines": {
     "node": ">=26"

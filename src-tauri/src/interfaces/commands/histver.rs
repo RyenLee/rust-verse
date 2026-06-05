@@ -1,4 +1,4 @@
-use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
+use redb::{Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition};
 use tauri::State;
 
 use crate::domain::constants::{channel, table_name};
@@ -11,13 +11,16 @@ use crate::domain::entity::HistReleasePage;
 const PAGE_SIZE: u64 = 50;
 const TABLE_STABLE: TableDefinition<&str, &str> = TableDefinition::new(table_name::HISTVER_STABLE);
 const TABLE_BETA: TableDefinition<&str, &str> = TableDefinition::new(table_name::HISTVER_BETA);
-const TABLE_NIGHTLY: TableDefinition<&str, &str> = TableDefinition::new(table_name::HISTVER_NIGHTLY);
+const TABLE_NIGHTLY: TableDefinition<&str, &str> =
+    TableDefinition::new(table_name::HISTVER_NIGHTLY);
 
-/// Read all releases from db for the given channel filter, sorted by date desc.
+/// Read releases from db for the given channel filter, sorted by date desc.
+/// If `keyword` is provided, only releases whose version contains the keyword are collected.
 /// Returns (total_count, releases_slice) where releases_slice is [offset..offset+limit].
 fn read_releases_slice(
     db: &Database,
     channel_filter: Option<&str>,
+    keyword: Option<&str>,
     offset: u64,
     limit: u64,
 ) -> AppResult<HistReleasePage> {
@@ -26,6 +29,7 @@ fn read_releases_slice(
     } else {
         channel::ALL.to_vec()
     };
+    let lower = keyword.map(|k| k.to_lowercase());
     let read_tx = db.begin_read().map_err(|e| {
         crate::domain::error::AppError::Command(format!("Failed to begin read transaction: {}", e))
     })?;
@@ -58,8 +62,14 @@ fn read_releases_slice(
                     e
                 ))
             })?;
+            let version = value.value().to_string();
+            if let Some(ref kw) = lower {
+                if !version.to_lowercase().contains(kw) {
+                    continue;
+                }
+            }
             releases.push(HistRelease {
-                version: value.value().to_string(),
+                version,
                 date: key.value().to_string(),
                 channel: ch.to_string(),
             })
@@ -90,6 +100,7 @@ pub fn list_hist_releases(
     read_releases_slice(
         &state.db,
         channel.as_deref(),
+        None,
         offset.unwrap_or(0),
         limit.unwrap_or(PAGE_SIZE),
     )
@@ -103,32 +114,52 @@ pub fn search_hist_releases(
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> AppResult<HistReleasePage> {
-    let page = read_releases_slice(
+    read_releases_slice(
         &state.db,
         channel.as_deref(),
-        0,
-        u64::MAX,
-    )?;
-    let lower = keyword.to_lowercase();
-    let filtered: Vec<HistRelease> = page
-        .items
-        .into_iter()
-        .filter(|r| r.version.to_lowercase().contains(&lower))
-        .collect();
-    let total = filtered.len() as u64;
-    let off = offset.unwrap_or(0) as usize;
-    let lim = limit.unwrap_or(PAGE_SIZE) as usize;
-    let items: Vec<HistRelease> = filtered.into_iter().skip(off).take(lim).collect();
-    let has_more = (off + lim) < total as usize;
-    Ok(HistReleasePage {
-        items,
-        total,
-        has_more,
-    })
+        Some(&keyword),
+        offset.unwrap_or(0),
+        limit.unwrap_or(PAGE_SIZE),
+    )
 }
 
 #[tauri::command]
 pub fn count_hist_releases(state: State<'_, AppState>, channel: Option<String>) -> AppResult<u64> {
-    let page = read_releases_slice(&state.db, channel.as_deref(), 0, u64::MAX)?;
-    Ok(page.total)
+    let channels: Vec<&str> = if let Some(ch) = channel.as_deref() {
+        vec![ch]
+    } else {
+        channel::ALL.to_vec()
+    };
+    let read_tx = db_begin_read(&state.db)?;
+    let mut count = 0u64;
+    for ch in channels {
+        let table_def = match ch {
+            channel::STABLE => TABLE_STABLE,
+            channel::BETA => TABLE_BETA,
+            channel::NIGHTLY => TABLE_NIGHTLY,
+            _ => continue,
+        };
+        let table = match read_tx.open_table(table_def) {
+            Ok(t) => t,
+            Err(e) => {
+                if e.to_string().contains("does not exist") {
+                    continue;
+                }
+                return Err(crate::domain::error::AppError::Command(format!(
+                    "Failed to open histver table for {}: {}",
+                    ch, e
+                )));
+            }
+        };
+        count += table.len().map_err(|e| {
+            crate::domain::error::AppError::Command(format!("Failed to count releases: {}", e))
+        })?;
+    }
+    Ok(count)
+}
+
+fn db_begin_read(db: &Database) -> AppResult<redb::ReadTransaction> {
+    db.begin_read().map_err(|e| {
+        crate::domain::error::AppError::Command(format!("Failed to begin read transaction: {}", e))
+    })
 }
