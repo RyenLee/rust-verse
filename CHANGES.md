@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **NotificationRepository trait extended** — Added new `notification_insert_with_settings` method to support passing user settings when creating notifications
 - **Notifier module updated** — Modified `notify` function to read current user settings and pass them to the storage layer
-- **Documentation sync** — Updated README.md, docs/README.en.md and docs/index.html to v1.4.2
+- **Search performance optimized** — `search_hist_releases` now filters by keyword during database iteration instead of loading all releases into memory first. `count_hist_releases` now uses `table.len()` instead of loading all data. This significantly reduces memory usage and improves response time when the release history is large
 
 ## [1.4.1] - 2026-06-01
 
