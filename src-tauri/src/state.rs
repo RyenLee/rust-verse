@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
 use redb::Database;
@@ -38,6 +39,16 @@ pub struct AppState {
     pub locale: Mutex<String>,
     pub task_state: TaskState,
     pub query_cache: Arc<QueryCache>,
+    /// Stop flag for the notification cleanup background thread.
+    /// Set to `false` on app shutdown to signal the thread to exit.
+    pub notif_cleanup_running: Arc<AtomicBool>,
+}
+
+impl Drop for AppState {
+    fn drop(&mut self) {
+        self.notif_cleanup_running
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 impl AppState {
@@ -53,6 +64,7 @@ impl AppState {
             locale: Mutex::new(locale::LC_C.to_string()),
             task_state: TaskState::new(),
             query_cache: Arc::new(QueryCache::new(120)),
+            notif_cleanup_running: Arc::new(AtomicBool::new(true)),
         }
     }
 }
