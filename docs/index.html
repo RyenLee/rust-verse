@@ -1002,14 +1002,14 @@
         <div class="hero-version">
           <span class="ver-label" data-lang="zh-CN">最新版本</span>
           <span class="ver-label" data-lang="en">Latest</span>
-          <span class="ver-num">v1.4.3</span>
+          <span class="ver-num">v1.4.4</span>
           <span class="ver-sep"></span>
-          <span class="ver-date">2026-06-05</span>
+          <span class="ver-date">2026-06-06</span>
         </div>
         <div class="cta-row">
           <a
             class="btn btn-primary"
-            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.4.3"
+            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.4.4"
             target="_blank"
             rel="noopener"
           >
@@ -1325,14 +1325,55 @@
           <h2 class="section-title" data-lang="en">Release History</h2>
         </div>
         <div class="changelog-timeline">
+          <!-- v1.4.4 -->
+          <div class="release-entry">
+            <div class="release-dot"></div>
+            <div class="release-head">
+              <span class="release-ver">v1.4.4</span>
+              <span class="release-date">2026-06-06</span>
+              <span class="release-latest" data-lang="zh-CN">最新</span>
+              <span class="release-latest" data-lang="en">Latest</span>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-improved" data-lang="zh-CN">改进</span>
+              <span class="change-group-label label-improved" data-lang="en">Improved</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">
+                  缓存清理线程优雅退出 — 为 QueryCache 添加 AtomicBool 停止标志和 Drop 实现，后台清理线程在应用退出时及时终止
+                </li>
+                <li data-lang="en">
+                  QueryCache cleanup thread graceful shutdown — Added AtomicBool shutdown flag and Drop impl; the
+                  background cleanup thread now exits promptly when the app shuts down
+                </li>
+                <li data-lang="zh-CN">
+                  通知清理线程停止标志存入 AppState — 将 AtomicBool 停止标志从临时变量移入 AppState，AppState Drop 时自动设为 false，确保线程优雅终止
+                </li>
+                <li data-lang="en">
+                  Notification cleanup thread stop flag stored in AppState — Moved the AtomicBool stop flag into
+                  AppState.notif_cleanup_running; AppState::Drop sets it to false on exit
+                </li>
+              </ul>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-fixed" data-lang="zh-CN">修复</span>
+              <span class="change-group-label label-fixed" data-lang="en">Fixed</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">
+                  版本号 semver 合规 — 修复 config.toml 版本号被解析为 1.4.3.1（4 段，非法 semver）导致 tauri build 失败的问题
+                </li>
+                <li data-lang="en">
+                  Version string semver compliance — Fixed config.toml version being parsed as 1.4.3.1 (4-segment,
+                  invalid semver) which caused tauri build to fail
+                </li>
+              </ul>
+            </div>
+          </div>
           <!-- v1.4.3 -->
           <div class="release-entry">
             <div class="release-dot"></div>
             <div class="release-head">
               <span class="release-ver">v1.4.3</span>
               <span class="release-date">2026-06-05</span>
-              <span class="release-latest" data-lang="zh-CN">最新</span>
-              <span class="release-latest" data-lang="en">Latest</span>
             </div>
             <div class="change-group">
               <span class="change-group-label label-improved" data-lang="zh-CN">改进</span>

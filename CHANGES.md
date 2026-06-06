@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.4] - 2026-06-06
+
+### Changed
+
+- **QueryCache cleanup thread graceful shutdown** — Added `AtomicBool` shutdown flag and `Drop` impl to `QueryCache`; the background cleanup thread now exits promptly when the app shuts down instead of running indefinitely
+- **Notification cleanup thread stop flag stored in AppState** — Moved the `AtomicBool` stop flag from a temporary local variable into `AppState.notif_cleanup_running`; `AppState::Drop` sets it to `false` on exit, ensuring the notification cleanup thread terminates gracefully
+
+### Fixed
+
+- **Version string semver compliance** — Fixed `config.toml` version being parsed as `1.4.3.1` (4-segment, invalid semver) which caused `tauri build` to fail with "version must be a semver string"
+
 ## [1.4.3] - 2026-06-05
 
 ### Changed

@@ -1,6 +1,6 @@
 # RustVerse
 
-> **v1.4.3** — Visual Rust Toolchain Manager
+> **v1.4.4** — Visual Rust Toolchain Manager
 
 RustVerse is a cross-platform desktop application for visually managing Rust toolchains, components, targets, and Cargo plugins — all in one place. Built with **Tauri 2** + **Vue 3** + **TypeScript** + **Tailwind CSS 4**, combining Rust's system-level performance with a modern web frontend experience.
 
