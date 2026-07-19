@@ -92,14 +92,6 @@ function handleClickOutside(e: MouseEvent) {
     langOpen.value = false
   }
 }
-
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside, true)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('click', handleClickOutside, true)
-})
 </script>
 
 <template>
