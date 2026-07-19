@@ -53,7 +53,6 @@ let notifRefreshTimer: ReturnType<typeof setInterval> | null = null
 let notifChangeWatchStop: (() => void) | null = null
 
 onMounted(() => {
-  document.addEventListener('click', handleClickOutside, true)
   refreshNotificationUnreadCount()
   notifRefreshTimer = setInterval(refreshNotificationUnreadCount, 30_000)
   // Refresh badge immediately when NotificationCenter emits change events
@@ -63,7 +62,6 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('click', handleClickOutside, true)
   if (notifRefreshTimer) {
     clearInterval(notifRefreshTimer)
     notifRefreshTimer = null
@@ -92,6 +90,14 @@ function handleClickOutside(e: MouseEvent) {
     langOpen.value = false
   }
 }
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside, true)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside, true)
+})
 </script>
 
 <template>
