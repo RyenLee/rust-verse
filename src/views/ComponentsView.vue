@@ -91,7 +91,7 @@ function closeProgress() {
 async function cancelComponentOp() {
   await bgTask.requestCancel()
   progressStatus.value = 'error'
-  progressLogs.value.push('操作已取消')
+  progressLogs.value.push(t('common.message.operationCancelled'))
 }
 
 function minimizeComponentOp() {
@@ -158,7 +158,7 @@ const { listHeight, listContainerRef } = useResponsiveListHeight({
 
       <div v-else class="space-y-6">
         <div v-if="installedComponents.length > 0">
-          <SectionTitle title="已安装" :count="installedComponents.length" />
+          <SectionTitle :title="t('components.section.installed')" :count="installedComponents.length" />
           <div
             ref="listContainerRef"
             class="overflow-y-auto scroll-container space-y-2 rounded-lg"
@@ -171,7 +171,7 @@ const { listHeight, listContainerRef } = useResponsiveListHeight({
               :active="true"
             >
               <template #badges>
-                <StatusBadge type="installed" label="已安装" />
+                <StatusBadge type="installed" :label="t('common.status.installed')" />
               </template>
               <template #actions>
                 <button
@@ -186,7 +186,7 @@ const { listHeight, listContainerRef } = useResponsiveListHeight({
         </div>
 
         <div v-if="availableComponents.length > 0">
-          <SectionTitle title="可安装" :count="availableComponents.length" />
+          <SectionTitle :title="t('components.section.available')" :count="availableComponents.length" />
           <div class="space-y-2">
             <ListItem
               v-for="comp in availableComponents"

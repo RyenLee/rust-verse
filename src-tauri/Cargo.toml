@@ -1,6 +1,6 @@
 [package]
 name = "rustverse"
-version = "1.4.4"
+version = "1.4.5"
 description = "Rust Toolchain Visual Version Manager"
 authors = ["ryenlii"]
 edition = "2024"
@@ -17,16 +17,16 @@ name = "rustverse_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.6.2", features = [] }
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2.11.2", features = ["tray-icon"] }
-tauri-plugin-shell = "2.3.5"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
-tauri-plugin-prevent-default = "5.0.0"
-thiserror = "2.0.18"
-tokio = { version = "1.52.3", features = [
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri-plugin-prevent-default = "5"
+thiserror = "2"
+tokio = { version = "1", features = [
     "rt-multi-thread",
     "process",
     "time",
@@ -34,24 +34,25 @@ tokio = { version = "1.52.3", features = [
     "macros",
     "net",
 ] }
-regex = "1.12.3"
-which = "8.0.2"
-dirs = "6.0.0"
-tauri-plugin-updater = "2.10.1"
-tauri-plugin-store = "2.4.3"
-tauri-plugin-dialog = "2.7.1"
-redb = "4.1.0"
-toml = "1.1.2"
-reqwest = { version = "0.13.4", features = ["stream"] }
-futures-util = "0.3.32"
-chrono = "0.4.44"
-normpath = "1.5.1"
+regex = "1"
+which = "8"
+dirs = "6"
+tauri-plugin-updater = "2"
+tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
+redb = "4"
+toml = "1"
+reqwest = { version = "0.13", features = ["stream"] }
+futures-util = "0.3"
+chrono = "0.4"
+normpath = "1"
+semver = "1"
 
 [features]
 db-json = []
 
 [target.'cfg(windows)'.dependencies]
-winreg = "0.56.0"
+winreg = "0"
 
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.

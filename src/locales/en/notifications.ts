@@ -93,6 +93,14 @@ export default {
       title: 'Plugin uninstalled',
       body: '{name} has been uninstalled.',
     },
+    plugin_updated: {
+      title: 'Plugin updated',
+      body: '{name} has been updated to the latest version.',
+    },
+    plugin_update_failed: {
+      title: 'Plugin update failed',
+      body: 'Failed to update {name}: {error}',
+    },
     toolchain_updates_available: {
       title: 'Toolchain updates available',
       body: '{count} update(s) available: {names}',

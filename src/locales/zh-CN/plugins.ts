@@ -18,6 +18,7 @@ export default {
   },
   badge: {
     official: '官方',
+    updateAvailable: '有更新',
   },
   dialog: {
     confirmUninstall: '确认卸载',

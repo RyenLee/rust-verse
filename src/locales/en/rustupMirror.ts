@@ -28,6 +28,10 @@ export default {
     builtin: 'Built-in',
     custom: 'Custom',
   },
+  placeholder: {
+    distServer: 'https://...',
+    updateRoot: 'https://...',
+  },
   message: {
     switchSuccess: 'Switched to {name} mirror',
     switchFailed: 'Switch failed: {error}',

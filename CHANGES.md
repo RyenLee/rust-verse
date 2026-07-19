@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.5] - 2026-07-20
+
+### Changed
+
+- **Dependency upgrades** — Updated 119 Rust dependencies to latest compatible versions (tauri 2.11.2→2.11.5, tokio 1.52→1.53, regex 1.12→1.13, etc.); switched `Cargo.toml` to broad SemVer ranges for better compatibility
+- **i18n internationalization overhaul** — Migrated all hardcoded UI text to locale configuration files; buttons, alerts, page titles, and error messages now use `t()` dynamic lookup, supporting seamless multi-language switching
+- **Plugin list UI improvement** — Added vertical spacing and scrollable display (5+ items) for installed plugins list
+
+### Fixed
+
+- **Plugin update detection** — Fixed `check_plugin_updates` to perform actual semver version comparison instead of only checking crate existence; plugins no longer incorrectly show "update available"
+- **Toolchain update status** — Fixed background task state management where stale "update in progress" message persisted after task completion
+
 ## [1.4.4] - 2026-06-06
 
 ### Changed

@@ -33,6 +33,7 @@ src-tauri/gen/
 .trae/
 rules/
 .ai/
+/docs/debug-sessions/*
 
 # Test & coverage
 coverage/

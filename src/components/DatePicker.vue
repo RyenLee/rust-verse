@@ -5,6 +5,9 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useCalendar, fmtDate, parseDate, WEEK_DAYS } from '../composables/useCalendar'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 // ──────────────────────── Props / Emits ──────────────────────────
 
@@ -198,7 +201,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
             class="text-xs text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
             @click="selectDay(fmtDate(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()))"
           >
-            今天
+            {{ t('components.datePicker.today') }}
           </button>
           <button
             v-if="modelValue"
@@ -206,7 +209,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
             class="text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
             @click="clear"
           >
-            清除
+            {{ t('components.datePicker.clear') }}
           </button>
         </div>
       </div>

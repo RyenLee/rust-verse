@@ -1002,14 +1002,14 @@
         <div class="hero-version">
           <span class="ver-label" data-lang="zh-CN">最新版本</span>
           <span class="ver-label" data-lang="en">Latest</span>
-          <span class="ver-num">v1.4.4</span>
+          <span class="ver-num">v1.4.5</span>
           <span class="ver-sep"></span>
-          <span class="ver-date">2026-06-06</span>
+          <span class="ver-date">2026-07-20</span>
         </div>
         <div class="cta-row">
           <a
             class="btn btn-primary"
-            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.4.4"
+            href="https://github.com/RyenLee/rust-verse/releases/tag/v1.4.5"
             target="_blank"
             rel="noopener"
           >
@@ -1325,12 +1325,12 @@
           <h2 class="section-title" data-lang="en">Release History</h2>
         </div>
         <div class="changelog-timeline">
-          <!-- v1.4.4 -->
+          <!-- v1.4.5 -->
           <div class="release-entry">
             <div class="release-dot"></div>
             <div class="release-head">
-              <span class="release-ver">v1.4.4</span>
-              <span class="release-date">2026-06-06</span>
+              <span class="release-ver">v1.4.5</span>
+              <span class="release-date">2026-07-20</span>
               <span class="release-latest" data-lang="zh-CN">最新</span>
               <span class="release-latest" data-lang="en">Latest</span>
             </div>
@@ -1339,14 +1339,66 @@
               <span class="change-group-label label-improved" data-lang="en">Improved</span>
               <ul class="change-list">
                 <li data-lang="zh-CN">
-                  缓存清理线程优雅退出 — 为 QueryCache 添加 AtomicBool 停止标志和 Drop 实现，后台清理线程在应用退出时及时终止
+                  依赖升级 — 更新 119 个 Rust 依赖到最新兼容版本，优化 Cargo.toml 使用 SemVer 范围配置
+                </li>
+                <li data-lang="en">
+                  Dependency upgrades — Updated 119 Rust dependencies to latest compatible versions; switched Cargo.toml
+                  to broad SemVer ranges
+                </li>
+                <li data-lang="zh-CN">
+                  国际化 i18n 改造 — 将所有硬编码 UI 文本迁移到 locale 配置文件，支持多语言无缝切换
+                </li>
+                <li data-lang="en">
+                  i18n internationalization overhaul — Migrated all hardcoded UI text to locale configuration files,
+                  supporting seamless multi-language switching
+                </li>
+                <li data-lang="zh-CN">插件列表 UI 优化 — 已安装插件列表添加上下间距，超过 5 项时可滚动显示</li>
+                <li data-lang="en">
+                  Plugin list UI improvement — Added vertical spacing and scrollable display for installed plugins list
+                  (5+ items)
+                </li>
+              </ul>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-fixed" data-lang="zh-CN">修复</span>
+              <span class="change-group-label label-fixed" data-lang="en">Fixed</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">
+                  插件更新检测 — 修复 check_plugin_updates 使用 semver 版本比较，不再错误显示"有更新"
+                </li>
+                <li data-lang="en">
+                  Plugin update detection — Fixed check_plugin_updates to perform actual semver version comparison,
+                  plugins no longer incorrectly show "update available"
+                </li>
+                <li data-lang="zh-CN">工具链更新状态 — 修复后台任务完成后状态残留问题，不再持续显示"更新中"</li>
+                <li data-lang="en">
+                  Toolchain update status — Fixed stale "update in progress" state after task completion
+                </li>
+              </ul>
+            </div>
+          </div>
+          <!-- v1.4.4 -->
+          <div class="release-entry">
+            <div class="release-dot"></div>
+            <div class="release-head">
+              <span class="release-ver">v1.4.4</span>
+              <span class="release-date">2026-06-06</span>
+            </div>
+            <div class="change-group">
+              <span class="change-group-label label-improved" data-lang="zh-CN">改进</span>
+              <span class="change-group-label label-improved" data-lang="en">Improved</span>
+              <ul class="change-list">
+                <li data-lang="zh-CN">
+                  缓存清理线程优雅退出 — 为 QueryCache 添加 AtomicBool 停止标志和 Drop
+                  实现，后台清理线程在应用退出时及时终止
                 </li>
                 <li data-lang="en">
                   QueryCache cleanup thread graceful shutdown — Added AtomicBool shutdown flag and Drop impl; the
                   background cleanup thread now exits promptly when the app shuts down
                 </li>
                 <li data-lang="zh-CN">
-                  通知清理线程停止标志存入 AppState — 将 AtomicBool 停止标志从临时变量移入 AppState，AppState Drop 时自动设为 false，确保线程优雅终止
+                  通知清理线程停止标志存入 AppState — 将 AtomicBool 停止标志从临时变量移入 AppState，AppState Drop
+                  时自动设为 false，确保线程优雅终止
                 </li>
                 <li data-lang="en">
                   Notification cleanup thread stop flag stored in AppState — Moved the AtomicBool stop flag into
@@ -1359,7 +1411,8 @@
               <span class="change-group-label label-fixed" data-lang="en">Fixed</span>
               <ul class="change-list">
                 <li data-lang="zh-CN">
-                  版本号 semver 合规 — 修复 config.toml 版本号被解析为 1.4.3.1（4 段，非法 semver）导致 tauri build 失败的问题
+                  版本号 semver 合规 — 修复 config.toml 版本号被解析为 1.4.3.1（4 段，非法 semver）导致 tauri build
+                  失败的问题
                 </li>
                 <li data-lang="en">
                   Version string semver compliance — Fixed config.toml version being parsed as 1.4.3.1 (4-segment,

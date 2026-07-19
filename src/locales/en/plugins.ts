@@ -18,6 +18,7 @@ export default {
   },
   badge: {
     official: 'Official',
+    updateAvailable: 'Update Available',
   },
   dialog: {
     confirmUninstall: 'Confirm Uninstall',

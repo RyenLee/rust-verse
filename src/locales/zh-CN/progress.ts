@@ -12,4 +12,9 @@ export default {
     minimize: '后台运行',
     showDetails: '查看详情',
   },
+  message: {
+    taskInProgress: '已有"{title}"任务正在进行中，请等待完成后再试。',
+    genericTaskInProgress: '已有安装或更新任务正在进行中，请等待完成后再试。',
+    taskCancelled: '任务已取消',
+  },
 }

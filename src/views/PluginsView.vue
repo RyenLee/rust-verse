@@ -21,6 +21,8 @@ const {
   searchPlugins: doSearch,
   installPlugin: doInstall,
   uninstallPlugin: doUninstall,
+  updatePlugin: doUpdate,
+  checkPluginUpdates: doCheckUpdates,
 } = useRustup()
 
 const bgTask = useBackgroundTask()
@@ -32,6 +34,7 @@ const installStatus = ref<'running' | 'success' | 'error'>('running')
 const installTarget = ref('')
 const showProgress = ref(false)
 const confirmUninstall = ref<string | null>(null)
+const checkingUpdates = ref(false)
 
 // Search state - unified search box
 const searchQuery = ref('')
@@ -64,6 +67,25 @@ async function refresh() {
   if (!searchQuery.value.trim()) {
     searchResults.value = []
     searchError.value = ''
+  }
+}
+
+async function checkUpdates() {
+  if (plugins.value.length === 0) return
+  checkingUpdates.value = true
+  try {
+    const pluginVersions: Array<[string, string]> = plugins.value.map(p => [p.crate_name, p.version])
+    const results = await doCheckUpdates(pluginVersions)
+    for (const [crateName, hasUpdate] of results) {
+      const plugin = plugins.value.find(p => p.crate_name === crateName)
+      if (plugin) {
+        plugin.update_available = hasUpdate
+      }
+    }
+  } catch {
+    // ignore
+  } finally {
+    checkingUpdates.value = false
   }
 }
 
@@ -221,6 +243,10 @@ onMounted(async () => {
             :placeholder="t('plugins.placeholder.filter')"
           />
         </div>
+        <BaseButton variant="secondary" :loading="checkingUpdates" @click="checkUpdates">
+          <iconify-icon icon="mdi:refresh" width="14"></iconify-icon>
+          {{ t('common.action.checkUpdates') }}
+        </BaseButton>
       </div>
 
       <div v-if="loading" class="flex items-center justify-center py-16">
@@ -240,7 +266,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-else :style="{ maxHeight: listHeight }" class="overflow-y-auto pr-1 scroll-container">
+      <div v-else class="space-y-3 max-h-[300px] overflow-y-auto pr-2 scroll-container">
           <ListItem
             v-for="p in filteredPlugins"
             :key="p.crate_name"
@@ -249,8 +275,16 @@ onMounted(async () => {
           >
             <template #badges>
               <StatusBadge v-if="p.is_official" type="default" :label="t('plugins.badge.official')" />
+              <StatusBadge v-if="p.update_available" type="success" :label="t('plugins.badge.updateAvailable')" />
             </template>
             <template #actions>
+              <button
+                v-if="p.update_available"
+                class="text-xs bg-amber-100 hover:bg-amber-200 text-amber-700 dark:bg-amber-900 dark:hover:bg-amber-800 dark:text-amber-300 px-3 py-1.5 rounded transition-colors mr-2"
+                @click="installCrateByName(p.crate_name)"
+              >
+                {{ t('common.action.update') }}
+              </button>
               <button
                 class="text-xs bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900 dark:hover:bg-red-800 dark:text-red-300 px-3 py-1.5 rounded transition-colors"
                 @click="confirmUninstall = p.crate_name"

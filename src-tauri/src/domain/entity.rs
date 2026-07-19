@@ -105,6 +105,7 @@ pub struct CargoPluginInfo {
     pub crate_name: String,
     pub version: String,
     pub is_official: bool,
+    pub update_available: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -21,4 +21,8 @@ export default {
   settings: 'Settings',
   notifications: 'Notifications',
   appUpdate: 'App Update',
+  tooltip: {
+    toggleSidebar: 'Toggle sidebar (Ctrl+B)',
+    newVersionAvailable: 'New version available — click to update',
+  },
 }

@@ -109,7 +109,7 @@ onBeforeUnmount(() => {
     <!-- Left: sidebar toggle -->
     <button
       class="p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-      title="Toggle sidebar (Ctrl+B)"
+      :title="t('nav.tooltip.toggleSidebar')"
       @click="$emit('toggle-sidebar')"
     >
       <iconify-icon icon="mdi:menu" width="20"></iconify-icon>
@@ -143,7 +143,7 @@ onBeforeUnmount(() => {
       <button
         v-if="hasUpdate"
         class="relative p-2 rounded-lg text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
-        title="New version available — click to update"
+        :title="t('nav.tooltip.newVersionAvailable')"
         @click="handleUpdateClick"
       >
         <iconify-icon icon="mdi:update" width="20"></iconify-icon>

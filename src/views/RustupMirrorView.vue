@@ -458,7 +458,7 @@ onMounted(async () => {
                 <input
                   v-model="formDistServer"
                   type="url"
-                  placeholder="https://..."
+                  :placeholder="t('rustupMirror.placeholder.distServer')"
                   class="w-full h-9 px-3 rounded-lg text-sm font-mono bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-colors"
                 />
               </div>
@@ -469,7 +469,7 @@ onMounted(async () => {
                 <input
                   v-model="formUpdateRoot"
                   type="url"
-                  placeholder="https://..."
+                  :placeholder="t('rustupMirror.placeholder.updateRoot')"
                   class="w-full h-9 px-3 rounded-lg text-sm font-mono bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-colors"
                 />
               </div>

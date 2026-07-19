@@ -482,8 +482,8 @@ watch(
           <template #actions>
             <div class="flex items-center gap-3">
               <div v-if="latencyMap[m.name]" class="flex items-center gap-3">
-                <LatencyBar :value="getNetworkMs(m.name)" label="Net" />
-                <LatencyBar :value="getDownloadMs(m.name)" label="DL" />
+                <LatencyBar :value="getNetworkMs(m.name)" :label="t('common.label.net')" />
+                <LatencyBar :value="getDownloadMs(m.name)" :label="t('common.label.dl')" />
               </div>
               <button
                 v-if="m.name !== currentMirror"

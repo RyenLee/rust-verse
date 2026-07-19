@@ -7,6 +7,7 @@ export default {
     edit: '编辑',
     install: '安装',
     uninstall: '卸载',
+    update: '更新',
     remove: '移除',
     search: '搜索',
     close: '关闭',
@@ -15,6 +16,9 @@ export default {
     add: '添加',
     browse: '浏览',
     refresh: '刷新',
+    checkUpdates: '检查更新',
+    retry: '重试',
+    skipToMain: '跳过到主界面',
   },
   status: {
     loading: '加载中...',
@@ -25,18 +29,29 @@ export default {
     default: '默认',
     active: '活动',
     official: '官方',
+    installed: '已安装',
+    available: '可安装',
   },
   dialog: {
     confirmUninstall: '确认卸载',
     deleteTitle: '删除环境变量',
+    welcomePageError: '欢迎页错误',
   },
   label: {
     example: '示例：',
     items: '{count} 项',
     showLess: '收起',
     showAll: '显示全部（{count}）',
+    net: '网络',
+    dl: '下载',
+    releaseNotes: '更新说明',
   },
   empty: {
     noItems: '未找到项目。',
+  },
+  message: {
+    taskCancelled: '任务已取消',
+    operationCancelled: '操作已取消',
+    rejectAccess: '拒绝访问',
   },
 }

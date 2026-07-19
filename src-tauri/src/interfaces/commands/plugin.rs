@@ -117,6 +117,149 @@ pub async fn install_plugin(
     }
 }
 
+/// Update a cargo plugin to the latest version.
+#[tauri::command]
+pub async fn update_plugin(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    cargo_path: String,
+    crate_name: String,
+) -> AppResult<()> {
+    logger::logger().log_request(
+        "update_plugin",
+        &format!("cargo_path={:?}, crate_name={:?}", cargo_path, crate_name),
+    );
+    crate::infrastructure::system::env::validate_rust_binary(&cargo_path)
+        .map_err(|e| crate::domain::error::AppError::Command(e))?;
+    let (locale_key, log_event, finished_event) = {
+        let events = state.config_cache.get_events(&*state.store);
+        let locale_key = state.config_cache.get_locale(&*state.store);
+        (
+            locale_key,
+            events.plugin_install_log,
+            events.plugin_install_finished,
+        )
+    };
+
+    {
+        let mut running = state.task_state.running.lock().unwrap();
+        if *running {
+            return Err(crate::domain::error::AppError::Command(
+                "Another installation or update task is already in progress.".to_string(),
+            ));
+        }
+        *running = true;
+    }
+    state
+        .task_state
+        .cancel_flag
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    let cancel_notify = state.task_state.cancel_notify.clone();
+
+    let result = exec::run_command_with_cancel(
+        app.clone(),
+        &cargo_path,
+        &["install", "--force", &crate_name],
+        &locale_key,
+        &log_event,
+        &finished_event,
+        600,
+        cancel_notify,
+    )
+    .await;
+
+    *state.task_state.running.lock().unwrap() = false;
+
+    match result {
+        Ok(()) => {
+            let display_name = crate_name.clone();
+            notifier::notify(
+                &app,
+                Category::Update,
+                Priority::Low,
+                NotificationKey::PluginUpdated,
+                &[("name", &display_name)],
+                Some("/plugins"),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            notifier::notify(
+                &app,
+                Category::Operation,
+                Priority::Low,
+                NotificationKey::PluginUpdateFailed,
+                &[("name", &crate_name), ("error", &format!("{e}"))],
+                Some("/plugins"),
+            );
+            Err(e)
+        }
+    }
+}
+
+/// Check for updates for installed plugins.
+#[tauri::command]
+pub async fn check_plugin_updates(
+    cargo_path: String,
+    plugins: Vec<(String, String)>,
+    state: State<'_, AppState>,
+) -> AppResult<Vec<(String, bool)>> {
+    logger::logger().log_request(
+        "check_plugin_updates",
+        &format!("cargo_path={:?}, plugins={:?}", cargo_path, plugins),
+    );
+    crate::infrastructure::system::env::validate_rust_binary(&cargo_path)
+        .map_err(|e| crate::domain::error::AppError::Command(e))?;
+
+    let timeout = (&*state.store)
+        .get_config(keys::TIMEOUT_CARGO_SEARCH)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_else(crate::infrastructure::config::defaults::cargo_search_seconds);
+
+    let mut results = Vec::new();
+    for (crate_name, installed_version) in plugins {
+        let output = match exec::run_command_with_timeout(
+            &cargo_path,
+            &["search", "--registry", "crates-io", &crate_name],
+            timeout,
+        )
+        .await
+        {
+            Ok(o) => o,
+            Err(_) => {
+                results.push((crate_name, false));
+                continue;
+            }
+        };
+
+        let search_results = parsing::parse_search_results(&output);
+        let has_update = match search_results.into_iter().find(|r| r.name == crate_name) {
+            Some(result) => {
+                let installed = match semver::Version::parse(&installed_version) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        results.push((crate_name, false));
+                        continue;
+                    }
+                };
+                let latest = match semver::Version::parse(&result.version) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        results.push((crate_name, false));
+                        continue;
+                    }
+                };
+                latest > installed
+            }
+            None => false,
+        };
+
+        results.push((crate_name, has_update));
+    }
+
+    Ok(results)
+}
+
 /// Uninstall a cargo plugin.
 #[tauri::command]
 pub async fn uninstall_plugin(

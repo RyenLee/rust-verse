@@ -10,6 +10,9 @@
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useCalendar, fmtDate, WEEK_DAYS } from '../composables/useCalendar'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 // ──────────────────────── Props / Emits ──────────────────────────
 
@@ -252,10 +255,10 @@ defineExpose({ open, pendingStart, clear, onClickCell })
             class="text-xs text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
             @click="selectToday"
           >
-            今天
+            {{ t('components.datePicker.today') }}
           </button>
           <span class="text-[11px] text-gray-400">
-            {{ !modelValue?.start ? '选择起始日期' : !modelValue?.end ? '选择结束日期' : '' }}
+            {{ !modelValue?.start ? t('components.datePicker.selectStartDate') : !modelValue?.end ? t('components.datePicker.selectEndDate') : '' }}
           </span>
           <button
             v-if="modelValue?.start"
@@ -263,7 +266,7 @@ defineExpose({ open, pendingStart, clear, onClickCell })
             class="text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
             @click="clear"
           >
-            清除
+            {{ t('components.datePicker.clear') }}
           </button>
         </div>
       </div>

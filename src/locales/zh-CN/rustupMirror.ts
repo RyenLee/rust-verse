@@ -28,6 +28,10 @@ export default {
     builtin: '内置',
     custom: '自定义',
   },
+  placeholder: {
+    distServer: 'https://...',
+    updateRoot: 'https://...',
+  },
   message: {
     switchSuccess: '已切换到 {name} 镜像源',
     switchFailed: '切换失败：{error}',

@@ -174,6 +174,14 @@ export function useRustup() {
     return invoke('uninstall_plugin', { cargoPath: CARGO, crateName })
   }
 
+  async function updatePlugin(crateName: string) {
+    return invoke('update_plugin', { cargoPath: CARGO, crateName })
+  }
+
+  async function checkPluginUpdates(plugins: Array<[string, string]>) {
+    return invoke<Array<[string, boolean]>>('check_plugin_updates', { cargoPath: CARGO, plugins })
+  }
+
   // Environment
   async function checkEnv() {
     return invoke<EnvCheck>('check_env')
@@ -249,6 +257,8 @@ export function useRustup() {
     searchPlugins,
     installPlugin,
     uninstallPlugin,
+    updatePlugin,
+    checkPluginUpdates,
     // Environment
     checkEnv,
     refreshProcessPath,

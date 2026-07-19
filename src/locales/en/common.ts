@@ -7,6 +7,7 @@ export default {
     edit: 'Edit',
     install: 'Install',
     uninstall: 'Uninstall',
+    update: 'Update',
     remove: 'Remove',
     search: 'Search',
     close: 'Close',
@@ -15,6 +16,9 @@ export default {
     add: 'Add',
     browse: 'Browse',
     refresh: 'Refresh',
+    checkUpdates: 'Check Updates',
+    retry: 'Retry',
+    skipToMain: 'Skip to Main',
   },
   status: {
     loading: 'Loading...',
@@ -25,18 +29,29 @@ export default {
     default: 'default',
     active: 'active',
     official: 'Official',
+    installed: 'Installed',
+    available: 'Available',
   },
   dialog: {
     confirmUninstall: 'Confirm Uninstall',
     deleteTitle: 'Delete Environment Variable',
+    welcomePageError: 'Welcome Page Error',
   },
   label: {
     example: 'Example:',
     items: '{count} items',
     showLess: 'Show less',
     showAll: 'Show all ({count})',
+    net: 'Net',
+    dl: 'DL',
+    releaseNotes: 'Release Notes',
   },
   empty: {
     noItems: 'No items found.',
+  },
+  message: {
+    taskCancelled: 'Task cancelled',
+    operationCancelled: 'Operation cancelled',
+    rejectAccess: 'Access denied',
   },
 }

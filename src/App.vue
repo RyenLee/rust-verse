@@ -312,7 +312,7 @@ function closeUninstallProgress() {
 async function cancelUninstallOp() {
   await bgTask.requestCancel()
   uninstallProgressStatus.value = 'error'
-  uninstallProgressLines.value.push('操作已取消')
+  uninstallProgressLines.value.push(t('common.message.operationCancelled'))
 }
 
 function minimizeUninstallOp() {
@@ -485,7 +485,7 @@ onBeforeUnmount(() => {
   >
     <div class="flex flex-col items-center gap-4 px-6 max-w-md w-full text-center">
       <iconify-icon icon="mdi:alert-octagon" width="48" class="text-red-500"></iconify-icon>
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Welcome Page Error</h2>
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ t('common.dialog.welcomePageError') }}</h2>
       <p class="text-sm text-red-600 dark:text-red-400 break-all font-mono">{{ welcomeError }}</p>
       <pre
         v-if="welcomeErrorStack"
@@ -496,13 +496,13 @@ onBeforeUnmount(() => {
         class="px-6 py-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-medium text-sm transition-colors cursor-pointer"
         @click="clearWelcomeError"
       >
-        Retry
+        {{ t('common.action.retry') }}
       </button>
       <button
         class="px-6 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm transition-colors cursor-pointer"
         @click="skipToMain"
       >
-        Skip to Main
+        {{ t('common.action.skipToMain') }}
       </button>
     </div>
   </div>

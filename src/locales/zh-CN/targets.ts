@@ -8,6 +8,10 @@ export default {
   status: {
     selectPrompt: '选择一个工具链并点击"加载"以查看编译目标。',
   },
+  section: {
+    installed: '已安装',
+    available: '可安装',
+  },
   placeholder: {
     search: '搜索编译目标...',
     toolchainPlaceholder: '选择工具链',

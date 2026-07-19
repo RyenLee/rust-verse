@@ -21,4 +21,8 @@ export default {
   settings: '设置',
   notifications: '通知中心',
   appUpdate: '软件更新',
+  tooltip: {
+    toggleSidebar: '切换侧边栏 (Ctrl+B)',
+    newVersionAvailable: '有新版本可用 — 点击更新',
+  },
 }

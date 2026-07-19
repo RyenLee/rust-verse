@@ -8,6 +8,10 @@ export default {
   status: {
     selectPrompt: 'Select a toolchain and click "Load" to view targets.',
   },
+  section: {
+    installed: 'Installed',
+    available: 'Available',
+  },
   placeholder: {
     search: 'Search targets...',
     toolchainPlaceholder: 'Select Toolchain',

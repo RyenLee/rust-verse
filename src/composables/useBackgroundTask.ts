@@ -1,6 +1,7 @@
 import { reactive, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useToast } from './useToast'
+import i18n from '../locales'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -70,14 +71,12 @@ function clearStorage(): void {
 
 // ── Singleton state ────────────────────────────────────────────────────────
 
-/** Load persisted state on module init. Resets to idle if status was 'running'. */
-const persisted = loadFromStorage()
+/** Always reset to idle on restart since task state is volatile. */
 const initialState: BackgroundTaskState = {
   visible: false,
   minimized: false,
-  title: persisted?.title ?? '',
-  // If the app was restarted while a task was running, reset to idle
-  status: persisted?.status === 'running' ? 'idle' : (persisted?.status ?? 'idle'),
+  title: '',
+  status: 'idle',
   progress: 0,
   lines: [],
 }
@@ -211,31 +210,25 @@ export function useBackgroundTask() {
    */
   async function guardStart(showAlert?: (msg: string) => void): Promise<boolean> {
     // 1. Check frontend global state
-    if (!canStartTask()) {
-      const msg = state.title
-        ? `已有"${state.title}"任务正在进行中，请等待完成后再试。`
-        : '已有安装或更新任务正在进行中，请等待完成后再试。'
-      if (showAlert) {
-        showAlert(msg)
-      } else {
-        try {
-          useToast().info(msg)
-        } catch {
-          alert(msg)
-        }
-      }
-      return false
+    const frontendIdle = canStartTask()
+
+    // 2. Verify with backend
+    let backendRunning = false
+    try {
+      backendRunning = await invoke<boolean>('is_background_task_running')
+    } catch {
+      // Backend check failed — assume safe to proceed
     }
 
-    // 2. Double-check backend (safety net)
-    try {
-      const backendRunning = await invoke<boolean>('is_background_task_running')
-      if (backendRunning) {
-        // Backend has a running task but frontend state is idle — sync state
-        state.status = 'running'
-        saveToStorage(state)
-        notifySubscribers()
-        const msg = '已有安装或更新任务正在进行中，请等待完成后再试。'
+    if (!frontendIdle) {
+      if (!backendRunning) {
+        // Frontend state is stale — auto-reset and allow
+        reset()
+      } else {
+        // Backend confirms running — block with message
+        const msg = state.title
+          ? i18n.global.t('progress.message.taskInProgress', { title: state.title })
+          : i18n.global.t('progress.message.genericTaskInProgress')
         if (showAlert) {
           showAlert(msg)
         } else {
@@ -247,8 +240,22 @@ export function useBackgroundTask() {
         }
         return false
       }
-    } catch {
-      // If backend check fails, proceed (don't block on network error)
+    } else if (backendRunning) {
+      // Frontend is idle but backend has a running task — sync state and block
+      state.status = 'running'
+      saveToStorage(state)
+      notifySubscribers()
+      const msg = i18n.global.t('progress.message.genericTaskInProgress')
+      if (showAlert) {
+        showAlert(msg)
+      } else {
+        try {
+          useToast().info(msg)
+        } catch {
+          alert(msg)
+        }
+      }
+      return false
     }
 
     return true
@@ -285,7 +292,7 @@ export function useBackgroundTask() {
       await invoke('cancel_background_task')
       // Immediately update frontend state
       state.status = 'failed'
-      state.lines.push('任务已取消')
+      state.lines.push(i18n.global.t('progress.message.taskCancelled'))
       saveToStorage(state)
       notifySubscribers()
 

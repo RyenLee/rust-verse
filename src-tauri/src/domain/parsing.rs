@@ -81,6 +81,7 @@ pub fn parse_cargo_plugin_list(output: &str, cargo_prefix: &str, official_names:
             crate_name: crate_name.clone(),
             version,
             is_official: is_official_plugin(&crate_name, official_names),
+            update_available: false,
         });
     }
     plugins

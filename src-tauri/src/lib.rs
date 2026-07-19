@@ -40,7 +40,8 @@ use interfaces::commands::persist::{
     is_env_var_persisted, list_persisted_env_vars, persist_env_var, remove_persisted_env_var,
 };
 use interfaces::commands::plugin::{
-    install_plugin, list_cargo_plugins, search_plugins, uninstall_plugin,
+    check_plugin_updates, install_plugin, list_cargo_plugins, search_plugins, uninstall_plugin,
+    update_plugin,
 };
 use interfaces::commands::rustup_mirror::{
     add_rustup_mirror_source, delete_rustup_mirror_source, init_rustup_mirror_sources,
@@ -460,6 +461,8 @@ pub fn run() {
             search_plugins,
             install_plugin,
             uninstall_plugin,
+            update_plugin,
+            check_plugin_updates,
             list_env_vars,
             get_env_var,
             set_env_var,

@@ -217,7 +217,7 @@ watch(downloadPhase, async phase => {
 
       <!-- Release notes -->
       <div v-if="appUpdate?.body" class="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-5">
-        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Release Notes</h3>
+        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">{{ t('common.label.releaseNotes') }}</h3>
         <div
           class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed max-h-80 overflow-y-auto prose prose-sm dark:prose-invert"
         >

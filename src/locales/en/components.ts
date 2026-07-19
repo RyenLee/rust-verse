@@ -8,6 +8,10 @@ export default {
   status: {
     selectPrompt: 'Select a toolchain and click "Load" to view components.',
   },
+  section: {
+    installed: 'Installed',
+    available: 'Available',
+  },
   placeholder: {
     search: 'Search components...',
     toolchainPlaceholder: 'Select Toolchain',
@@ -19,5 +23,11 @@ export default {
     log: '{action} {name} for {toolchain}...',
     success: '{name} installed/removed successfully',
     failed: 'Failed to install/remove {name}',
+  },
+  datePicker: {
+    today: 'Today',
+    clear: 'Clear',
+    selectStartDate: 'Select start date',
+    selectEndDate: 'Select end date',
   },
 }

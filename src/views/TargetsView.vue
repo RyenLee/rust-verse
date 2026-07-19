@@ -167,7 +167,7 @@ const { listHeight, listContainerRef } = useResponsiveListHeight({
 
       <div v-else class="space-y-6">
         <div v-if="installedTargets.length > 0">
-          <SectionTitle title="已安装" :count="installedTargets.length" />
+          <SectionTitle :title="t('targets.section.installed')" :count="installedTargets.length" />
           <div
             ref="listContainerRef"
             class="overflow-y-auto scroll-container space-y-2 rounded-lg"
@@ -180,7 +180,7 @@ const { listHeight, listContainerRef } = useResponsiveListHeight({
               :active="true"
             >
               <template #badges>
-                <StatusBadge type="installed" label="已安装" />
+                <StatusBadge type="installed" :label="t('common.status.installed')" />
               </template>
               <template #actions>
                 <button
@@ -195,7 +195,7 @@ const { listHeight, listContainerRef } = useResponsiveListHeight({
         </div>
 
         <div v-if="availableTargets.length > 0">
-          <SectionTitle title="可安装" :count="availableTargets.length" />
+          <SectionTitle :title="t('targets.section.available')" :count="availableTargets.length" />
           <div class="space-y-2">
             <ListItem
               v-for="target in availableTargets"
